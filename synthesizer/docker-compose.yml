@@ -1,0 +1,27 @@
+version: '3'
+services:
+  migrate:
+    build: server/
+    container_name: migrate
+    command: >
+      /bin/sh -c "python3 manage.py makemigrations --force-color --no-input -v 3
+      && python3 makemigrations --merge --no-input -v 3
+      && python3 migrate --force-color -v 3
+      && python3 createsuperuser --no-input; exit 0"
+    environment:
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_PASSWORD=admin
+      - DJANGO_SUPERUSER_EMAIL=admin@example.com
+    volumes:
+      - ./server:/ontology
+  ontology:
+    image: synthesizer-migrate
+    container_name: ontology
+    restart: always
+    command: /bin/sh -c "python3 -m gunicorn -b 0.0.0.0:80 ontology.wsgi --reload"
+    volumes:
+      - ./server:/ontology
+    ports:
+      - 80:80
+    depends_on:
+      - migrate
