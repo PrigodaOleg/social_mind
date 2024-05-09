@@ -1,5 +1,5 @@
+import 'package:client/graph_widget/graph_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:graphview/GraphView.dart';
 
 void main() {
   runApp(const MyApp());
@@ -57,6 +57,13 @@ class GraphViewPage extends StatefulWidget {
 
 class _GraphViewPageState extends State<GraphViewPage> {
   int _counter = 0;
+  int last_id = 0;
+  List<String> names = [];
+  int selected = 0;
+  // var graphWidget = GraphWidget.gw();
+  var graphWidget = GraphWidget.gw();
+  int tapMode = 0;
+  ValueKey lastKey = ValueKey(0);
 
   void _incrementCounter() {
     setState(() {
@@ -67,6 +74,30 @@ class _GraphViewPageState extends State<GraphViewPage> {
       // called again, and so nothing would appear to happen.
       _counter++;
     });
+  }
+
+  void _add_vertex() {
+    var key = ValueKey(_counter++);
+    graphWidget.addVertex(
+      key,
+      onHintRequest: (p0) {
+        print('Hint ${p0}');
+      },
+      onSelect: (p0) {
+        if (tapMode == 0) {
+
+        }
+        else if (tapMode == 1) {
+          graphWidget.addEdge('edge', lastKey, p0);
+        }
+        else if (tapMode == 2) {
+          graphWidget.addEdge('edge', lastKey, p0);
+        }
+        lastKey = p0;
+      },
+    );
+    // ..onHintRequest=(){print('HintRequest');
+    // }
   }
 
   @override
@@ -106,91 +137,46 @@ class _GraphViewPageState extends State<GraphViewPage> {
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Expanded(
-              child: InteractiveViewer(
-                constrained: false,
-                boundaryMargin: const EdgeInsets.all(100),
-                minScale: 0.01,
-                maxScale: 5.6,
-                child: GraphView(
-                  graph: graph, 
-                  algorithm: FruchtermanReingoldAlgorithm(
-                    renderer:  ArrowEdgeRenderer()
-                  ),
-                  paint: Paint()
-                    ..color = Colors.green
-                    ..strokeWidth = 1
-                    ..style = PaintingStyle.stroke,
-                  builder: (Node node) {
-                    // I can decide what widget should be shown here based on the id
-                    var a = node.key?.value as int;
-                    return rectangleWidget(a);
-                  },
-                )
-              ),
-            )
+            // const Text(
+            //   'You have pushed the button this many times:',
+            // ),
+            // Text(
+            //   '$_counter',
+            //   style: Theme.of(context).textTheme.headlineMedium,
+            // ),
+            graphWidget
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-
-  Widget rectangleWidget(int a) {
-    return InkWell(
-      onTap: () {
-        print('clicked');
-      },
-      child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            boxShadow: const [BoxShadow(color: Color.fromARGB(0, 153, 215, 238), spreadRadius: 1),],
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () {tapMode = 2;},
+            tooltip: 'Редактировать текст',
+            mini: true,
+            child: const Icon(Icons.text_format),
           ),
-          child: Text('Node $a')),
+          const SizedBox(
+            height: 10,
+          ),
+          FloatingActionButton(
+            onPressed: () {tapMode = 1;},
+            tooltip: 'Добавить связь',
+            mini: true,
+            child: const Icon(Icons.link),
+          ),
+          const SizedBox(
+            height: 10,
+          ),
+          FloatingActionButton(
+            onPressed: _add_vertex,
+            tooltip: 'Добавить вершину',
+            child: const Icon(Icons.add),
+          ),
+        ]
+      )
+       // This trailing comma makes auto-formatting nicer for build methods.
     );
-  }
-  
-  final Graph graph = Graph()..isTree = true;
-  BuchheimWalkerConfiguration builder = BuchheimWalkerConfiguration();
-
-  @override
-  void initState() {
-    final node1 = Node.Id(1);
-    final node2 = Node.Id(2);
-    final node3 = Node.Id(3);
-    final node4 = Node.Id(4);
-    final node5 = Node.Id(5);
-    final node6 = Node.Id(6);
-    final node8 = Node.Id(7);
-    final node7 = Node.Id(8);
-    final node9 = Node.Id(9);
-    final node10 = Node.Id(10);  
-    final node11 = Node.Id(11);
-    final node12 = Node.Id(12);
-
-    graph.addEdge(node1, node2);
-    graph.addEdge(node1, node3, paint: Paint()..color = Colors.red);
-    graph.addEdge(node1, node4, paint: Paint()..color = Colors.blue);
-    graph.addEdge(node2, node5);
-    graph.addEdge(node2, node6);
-    graph.addEdge(node6, node7, paint: Paint()..color = Colors.red);
-    graph.addEdge(node6, node8, paint: Paint()..color = Colors.red);
-    graph.addEdge(node4, node9);
-    graph.addEdge(node4, node10, paint: Paint()..color = Colors.black);
-    graph.addEdge(node4, node11, paint: Paint()..color = Colors.red);
-    graph.addEdge(node11, node12);
   }
 }
-
