@@ -1,0 +1,99 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:state/state.dart';
+import 'package:state/task_list/task_list.dart';
+import 'package:ui/widgets/task_list_tile.dart';
+import 'package:ui/l10n/app_localizations.dart';
+
+
+
+class TaskListPage extends StatelessWidget {
+  const TaskListPage({super.key, required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => TaskListBloc(),
+      child: const TaskListView(),
+    );
+  }
+}
+
+class TaskListView extends StatelessWidget {
+  const TaskListView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return BlocProvider<TaskListBloc>(
+      create: (context) => TaskListBloc(),
+      child: BlocBuilder<TaskListBloc, TaskListState>(
+        builder: (context, state) {
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+              title: Text(l.taskListPageName),
+            ),
+            body: ListView(
+              children: [
+                for (final task in state.tasks)
+                  // CheckboxListTile(
+                  //   value: task.isCompleted,
+                  //   onChanged: (bool? value) {
+                  //     BlocProvider.of<TaskListBloc>(context).add(
+                  //       TaskCompletionRequested(
+                  //         task: task,
+                  //         isComplited: value ?? false
+                  //       )
+                  //     );
+                  //   },
+                  //   title: Text(task.title, style: Theme.of(context).textTheme.bodyMedium),
+                  //   // secondary: const Icon(Icons.create),
+                  //   secondary: Text(task.id),
+                  //   subtitle: Text(task.description),
+                  // ),
+                  TaskListTile(
+                    title: task.title,
+                    value: task.isCompleted,
+                    onValueChanged: (bool? isComplited) {
+                      BlocProvider.of<TaskListBloc>(context).add(
+                        TaskCompletionRequested(
+                          task: task,
+                          isComplited: isComplited ?? false
+                        )
+                      );
+                    },
+                    onTitleSubmitted: (submittedText) {
+                      BlocProvider.of<TaskListBloc>(context).add(
+                        TaskSubmitionRequested(
+                          task: task,
+                          submittedText: submittedText
+                        )
+                      );
+                    },
+                    onTitleChanged: (changedText) {
+                      context.read<TaskListBloc>().add(
+                        TaskChangingRequested(
+                          task: task,
+                          changedText: changedText
+                        )
+                      );
+                    },
+                  )
+              ]
+            ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () {
+                BlocProvider.of<TaskListBloc>(context).add(
+                  const TaskAddRequested()
+                );
+              },
+              tooltip: l.addTaskHint,
+              child: const Icon(Icons.add_task),
+            ), // This trailing comma makes auto-formatting nicer for build methods.
+          );
+      })
+    );
+  }
+}
