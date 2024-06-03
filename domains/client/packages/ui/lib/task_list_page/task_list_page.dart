@@ -4,6 +4,7 @@ import 'package:state/state.dart';
 import 'package:state/task_list/task_list.dart';
 import 'package:ui/widgets/task_list_tile.dart';
 import 'package:ui/l10n/app_localizations.dart';
+import 'package:local_storage/local_storage.dart';
 
 
 
@@ -14,7 +15,7 @@ class TaskListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => TaskListBloc(),
+      create: (context) => TaskListBloc(repository: Repository(localStorage: LocalStorage())),
       child: const TaskListView(),
     );
   }
@@ -26,8 +27,10 @@ class TaskListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // final repo = context.read(Repository);
     return BlocProvider<TaskListBloc>(
-      create: (context) => TaskListBloc(),
+      create: (context) => context.read<TaskListBloc>()
+      ..add(const StateInitRequested()),
       child: BlocBuilder<TaskListBloc, TaskListState>(
         builder: (context, state) {
           return Scaffold(
@@ -37,22 +40,7 @@ class TaskListView extends StatelessWidget {
             ),
             body: ListView(
               children: [
-                for (final task in state.tasks)
-                  // CheckboxListTile(
-                  //   value: task.isCompleted,
-                  //   onChanged: (bool? value) {
-                  //     BlocProvider.of<TaskListBloc>(context).add(
-                  //       TaskCompletionRequested(
-                  //         task: task,
-                  //         isComplited: value ?? false
-                  //       )
-                  //     );
-                  //   },
-                  //   title: Text(task.title, style: Theme.of(context).textTheme.bodyMedium),
-                  //   // secondary: const Icon(Icons.create),
-                  //   secondary: Text(task.id),
-                  //   subtitle: Text(task.description),
-                  // ),
+                for (final task in state.tasks.values)
                   TaskListTile(
                     title: task.title,
                     value: task.isCompleted,
@@ -83,15 +71,15 @@ class TaskListView extends StatelessWidget {
                   )
               ]
             ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () {
-                BlocProvider.of<TaskListBloc>(context).add(
-                  const TaskAddRequested()
-                );
-              },
-              tooltip: l.addTaskHint,
-              child: const Icon(Icons.add_task),
-            ), // This trailing comma makes auto-formatting nicer for build methods.
+            // floatingActionButton: FloatingActionButton(
+            //   onPressed: () {
+            //     BlocProvider.of<TaskListBloc>(context).add(
+            //       const TaskAddRequested()
+            //     );
+            //   },
+            //   tooltip: l.addTaskHint,
+            //   child: const Icon(Icons.add_task),
+            // ), // This trailing comma makes auto-formatting nicer for build methods.
           );
       })
     );

@@ -1,32 +1,32 @@
-name: state
+name: local_storage
 description: "A new Flutter package project."
 version: 0.0.1
 homepage:
-publish_to: none
 
 environment:
   sdk: '>=3.3.1 <4.0.0'
   flutter: ">=1.17.0"
 
 dependencies:
-  bloc: ^8.1.4
-  equatable: ^2.0.5
-  uuid: ^4.4.0
   flutter:
     sdk: flutter
-  local_storage:
-    path: ../local_storage
+  hive_flutter: ^1.1.0
+  equatable: ^2.0.5
+  uuid: ^4.4.0
+  build_runner: ^2.4.9
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  hive_generator: ^2.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # To add assets to your package, add an assets section, like this:
   # assets:

@@ -1,71 +1,85 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:state/task.dart';
+import 'package:local_storage/local_storage.dart';
 
-
-Map<String, Task> g_tasks = {};
-int id = 0;
 
 class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
-  TaskListBloc() : super(const TaskListState()) {
+  TaskListBloc({
+    required Repository repository
+    }) : _repository = repository,
+     super(const TaskListState()) {
+    on<StateInitRequested>(_onStateInit);
     on<TaskAddRequested>(_onTaskAdd);
     on<TaskCompletionRequested>(_onComplited);
     on<TaskSubmitionRequested>(_onSubmitted);
     on<TaskChangingRequested>(_onChanged);
   }
 
+  final Repository _repository;
+
+  Future<void> _onStateInit(
+    StateInitRequested event,
+    Emitter<TaskListState> emit,
+  ) async {
+    await _repository.init();
+    Map<String, Task> tasks = await _repository.getTasks();
+    final placeholderTask = Task();
+    emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
+  }
+
   Future<void> _onTaskAdd(
     TaskAddRequested event,
-    Emitter<TaskListState> emit
+    Emitter<TaskListState> emit,
   ) async {
-    var newTask = Task();
-    emit(state.copyWith(tasks: () => List<Task>.from(state.tasks)..add(newTask)));
+    final newTask = Task();
+    emit(state.copyWith(tasks: () => Map<String, Task>.from(state.tasks)..addAll({newTask.id: newTask})));
   }
   
   Future<void> _onComplited(
     TaskCompletionRequested event,
-    Emitter<TaskListState> emit
+    Emitter<TaskListState> emit,
   ) async {
+    if (event.task.title == '') {
+      return;
+    }
     final changedTask = event.task.copyWith(isCompleted: event.isComplited);
-    var index = state.tasks.indexWhere((element) => element.id == event.task.id);
-    var newlist =  List<Task>.from(state.tasks);
-    newlist[index] = changedTask;
-    emit(state.copyWith(tasks: () => newlist));
+    // await _repository.addTask(changedTask);
+    emit(state.copyWith(tasks: () => state.tasks..update(changedTask.id, (v) => changedTask)));
   }
   
   Future<void> _onSubmitted(
     TaskSubmitionRequested event,
-    Emitter<TaskListState> emit
+    Emitter<TaskListState> emit,
   ) async {
     final changedTask = event.task.copyWith(title: event.submittedText);
-    var index = state.tasks.indexWhere((element) => element.id == event.task.id);
-    var newlist =  List<Task>.from(state.tasks);
-    newlist[index] = changedTask;
-    var newTask = Task();
-    newlist.add(newTask);
-    emit(state.copyWith(tasks: () => newlist));
+    await _repository.addTask(changedTask);
+    final placeholderTask = Task();
+    emit(state.copyWith(tasks: () => state.tasks
+      ..update(changedTask.id, (task) => changedTask)
+      ..addAll({placeholderTask.id: placeholderTask})));
   }
   
   Future<void> _onChanged(
     TaskChangingRequested event,
-    Emitter<TaskListState> emit
+    Emitter<TaskListState> emit,
   ) async {
     final changedTask = event.task.copyWith(title: event.changedText);
-    var index = state.tasks.indexWhere((element) => element.id == event.task.id);
-    var newlist =  List<Task>.from(state.tasks);
-    newlist[index] = changedTask;
-    emit(state.copyWith(tasks: () => newlist));
+    var tasks = state.tasks;
+    tasks[changedTask.id] = changedTask;
+    emit(state.copyWith(tasks: () => tasks));
   }
 }
 
 class TaskListState {
   const TaskListState({
-    this.tasks = const []
+    this.tasks = const {}
   });
-  final List<Task> tasks;
+  final Map<String, Task> tasks;
+
+  // Iterable<Task> get allTasks => 
 
   TaskListState copyWith({
-    List<Task> Function()? tasks,
+    Map<String, Task> Function()? tasks,
   }) {
     return TaskListState(
       tasks: tasks != null ? tasks() : this.tasks,
@@ -78,6 +92,10 @@ sealed class TaskEvent extends Equatable{
 
   @override
   List<Object> get props => [];
+}
+
+final class StateInitRequested extends TaskEvent {
+  const StateInitRequested();
 }
 
 final class TaskCompletionRequested extends TaskEvent {

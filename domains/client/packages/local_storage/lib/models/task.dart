@@ -1,6 +1,11 @@
 import 'package:equatable/equatable.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+part 'task.g.dart';
+
+
+@HiveType(typeId: 0)
 class Task extends Equatable {
   Task({
     this.title = '',
@@ -14,21 +19,25 @@ class Task extends Equatable {
   /// The unique identifier of the `todo`.
   ///
   /// Cannot be empty.
+  @HiveField(0)
   final String id;
 
   /// The title of the `todo`.
   ///
   /// Note that the title may be empty.
+  @HiveField(1)
   final String title;
 
   /// The description of the `todo`.
   ///
   /// Defaults to an empty string.
+  @HiveField(2)
   final String description;
 
   /// Whether the `todo` is completed.
   ///
   /// Defaults to `false`.
+  @HiveField(3)
   final bool isCompleted;
   
   /// Returns a copy of this `todo` with the given values updated.

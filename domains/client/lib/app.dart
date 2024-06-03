@@ -10,18 +10,14 @@ class App extends StatelessWidget {
     return MaterialApp(
       onGenerateTitle: (context) => AppLocalizations.of(context).applicationTitle,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          // brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      // localizationsDelegates: const [
-      //   S.delegate,
-      //   GlobalMaterialLocalizations.delegate,
-      //   GlobalWidgetsLocalizations.delegate,
-      //   GlobalCupertinoLocalizations.delegate,
-      // ],
       supportedLocales: AppLocalizations.supportedLocales,
-      // supportedLocales: S.delegate.supportedLocales,
       // locale: const Locale('en'),
       home: const TaskListPage(title: 'Дела'),
     );

@@ -12,10 +12,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter 
+  intl: any
   flutter_bloc: ^8.1.5
   state:
     path: ../state
-  intl: any
+  local_storage:
+    path: ../local_storage
 
 dev_dependencies:
   flutter_test:
