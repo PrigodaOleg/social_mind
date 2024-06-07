@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: domains/client
+        working-directory: ./domains/client
 
     steps:
       - uses: actions/checkout@v4
