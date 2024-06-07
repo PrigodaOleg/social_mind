@@ -8,10 +8,10 @@ name: Closers Flutter
 on:
   push:
     branches: [ "main" ]
-    paths: [ "domains/client" ]
+    paths: [ "domains/client/**" ]
   pull_request:
     branches: [ "main" ]
-    paths: [ "domains/client" ]
+    paths: [ "domains/client/**" ]
 
 jobs:
   build:
