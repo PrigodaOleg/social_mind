@@ -13,12 +13,13 @@ on:
     branches: [ "main" ]
     paths: [ "domains/client/**" ]
 
+defaults:
+  run:
+    working-directory: ./domains/client
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./domains/client
 
     steps:
       - uses: actions/checkout@v4
