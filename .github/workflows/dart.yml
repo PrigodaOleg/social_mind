@@ -12,6 +12,7 @@ on:
   pull_request:
     branches: [ "main" ]
     paths: [ "domains/client/**" ]
+  workflow_dispatch:
 
 jobs:
   build:
