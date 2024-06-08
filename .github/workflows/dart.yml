@@ -22,9 +22,6 @@ jobs:
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version-file: ./domains/client/pubspec.yaml
 
       - name: Install dependencies
         working-directory: ./domains/client
