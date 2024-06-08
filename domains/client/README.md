@@ -1,16 +1,7 @@
-# client
+# Близкие
 
-A new Flutter project.
+Приложение для планирования и взаимодействия внутри групп близких друг другу людей, таких как семья, друзья, а также коллеги или другие социальные домены.
 
-## Getting Started
+Приложение предоставляет пользователям возможность совместной работы над проектами, списками дел, мыслями и т.д.
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Проверяем...
