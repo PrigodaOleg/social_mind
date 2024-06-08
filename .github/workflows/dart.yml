@@ -13,10 +13,6 @@ on:
     branches: [ "main" ]
     paths: [ "domains/client/**" ]
 
-defaults:
-  run:
-    working-directory: ./domains/client
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,9 +24,10 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version-file: pubspec.yaml
+          flutter-version-file: ./domains/client/pubspec.yaml
 
       - name: Install dependencies
+        working-directory: ./domains/client
         run: flutter pub get
 
       # Uncomment this step to verify the use of 'dart format' on each commit.
@@ -39,10 +36,12 @@ jobs:
 
       # Consider passing '--fatal-infos' for slightly stricter analysis.
       - name: Analyze project source
+        working-directory: ./domains/client
         run: flutter analyze
 
       # Your project will need to have tests in test/ and a dependency on
       # package:test for this step to succeed. Note that Flutter projects will
       # want to change this to 'flutter test'.
       - name: Run tests
+        working-directory: ./domains/client
         run: flutter test
