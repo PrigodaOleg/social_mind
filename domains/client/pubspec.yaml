@@ -40,6 +40,7 @@ dependencies:
     path: packages/ui
   state:
     path: packages/state
+  firebase_core: ^3.0.0
 
 dev_dependencies:
   flutter_test:
