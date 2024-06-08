@@ -158,5 +158,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 domains/client/android/app/google-services.json
-domains/client/lib/firebase_options.dart
+# domains/client/lib/firebase_options.dart
 domains/client/firebase.json
+domains/client/.vscode/launch.json
