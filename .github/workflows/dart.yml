@@ -20,6 +20,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: 'Set up JDK 12'
+        uses: 'actions/setup-java@v1'
+        with:
+          java-version: '12.x'
+        # Set up JDK 12 using the "actions/setup-java" action.
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -40,6 +46,25 @@ jobs:
       # Your project will need to have tests in test/ and a dependency on
       # package:test for this step to succeed. Note that Flutter projects will
       # want to change this to 'flutter test'.
-      - name: Run tests
+      # - name: Run tests
+      #   working-directory: ./domains/client
+      #   run: flutter test
+
+      - name: Generate google-services.json
         working-directory: ./domains/client
-        run: flutter test
+        run: echo '{"project_info":{"project_number":"${{ secrets.CLOSERS_PROJECT_NUMBER }}","project_id":"${{ secrets.CLOSERS_PROJECT_ID }}","storage_bucket":"${{ secrets.CLOSERS_PROJECT_ID }}.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"${{ secrets.CLOSERS_ANDROID_APP_ID }}","android_client_info":{"package_name":"com.example.client"}},"oauth_client":[],"api_key":[{"current_key":"${{ secrets.CLOSERS_ANDROID_API_KEY }}"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' >> android/app/google-services.json
+
+      - name: 'Build APK'
+        working-directory: ./domains/client
+        id: 'build'
+        run: 'flutter build apk --split-per-abi && echo "::set-output name=built-apk::build/app/outputs/flutter-apk/"'
+        # Build the APK using the value of the "matrix-target" input.
+        # Use the "id" property to give the step a unique identifier.
+        # Use the "::set-output" command to set the value of the "built-apk" output variable.
+
+      - name: 'Upload APK'
+        uses: 'actions/upload-artifact@v2'
+        with:
+          name: 'Closers'
+          path: '${{ steps.build.outputs.built-apk }}'
+        # Upload the built APK
