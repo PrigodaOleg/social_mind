@@ -44,18 +44,17 @@ jobs:
       #   working-directory: ./domains/client
       #   run: flutter test
 
-      # - name: Upload to dropbox
-      #   uses: aTable/deploy-to-dropbox@v1.0.7
-      #   with:
-      #     DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESSTOKEN }}
-      #     DROPBOX_DESTINATION_PATH_PREFIX: "/GithubActionsUploader/"
-      #     GLOB: "domains/client/pubspec.yaml"
+      - name: 'Build APK'
+        working-directory: ./domains/client
+        id: 'build'
+        run: 'flutter build apk --split-per-abi && echo "::set-output name=built-apk::build/app/outputs/flutter-apk/"'
+        # Build the APK using the value of the "matrix-target" input.
+        # Use the "id" property to give the step a unique identifier.
+        # Use the "::set-output" command to set the value of the "built-apk" output variable.
 
-      - name: Upload to Dropbox
-        uses: Lewuathe/dropbox-github-action@v1
+      - name: 'Upload APK'
+        uses: 'actions/upload-artifact@v2'
         with:
-          dropbox-app-key: ${{ secrets.DROPBOX_APPKEY }}
-          dropbox-app-secret: ${{ secrets.DROPBOX_APPSECRET }}
-          dropbox-refresh-token: ${{ secrets.DROPBOX_ACCESSTOKEN }}
-          source-path: "domains/client/pubspec.yaml"
-          target-path: "/GithubActionsUploader/test.yaml"
+          name: 'Closers'
+          path: '${{ steps.build.outputs.built-apk }}'
+        # Upload the built APK
