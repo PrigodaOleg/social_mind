@@ -45,7 +45,7 @@ jobs:
         run: flutter test
 
       - name: Upload to dropbox
-        uses: intersecato/dropbox-upload@v1.0.0
+        uses: intersecato/dropbox-upload@master
         with:
           DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESSTOKEN }}
           DROPBOX_DESTINATION_PATH_PREFIX: "GithubActionsUploader"
