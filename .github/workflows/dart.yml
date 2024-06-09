@@ -44,9 +44,18 @@ jobs:
       #   working-directory: ./domains/client
       #   run: flutter test
 
-      - name: Upload to dropbox
-        uses: aTable/deploy-to-dropbox@v1.0.7
+      # - name: Upload to dropbox
+      #   uses: aTable/deploy-to-dropbox@v1.0.7
+      #   with:
+      #     DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESSTOKEN }}
+      #     DROPBOX_DESTINATION_PATH_PREFIX: "/GithubActionsUploader/"
+      #     GLOB: "domains/client/pubspec.yaml"
+
+      - name: Upload to Dropbox
+        uses: Lewuathe/dropbox-github-action@v1
         with:
-          DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESSTOKEN }}
-          DROPBOX_DESTINATION_PATH_PREFIX: "/GithubActionsUploader/"
-          GLOB: "domains/client/pubspec.yaml"
+          dropbox-app-key: ${{ secrets.DROPBOX_APPKEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APPSECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_ACCESSTOKEN }}
+          source-path: "domains/client/pubspec.yaml"
+          target-path: "/GithubActionsUploader/test.yaml"
