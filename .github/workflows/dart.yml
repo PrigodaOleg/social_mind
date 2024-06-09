@@ -43,3 +43,9 @@ jobs:
       - name: Run tests
         working-directory: ./domains/client
         run: flutter test
+
+      - uses: intersecato/dropbox-upload@v1.0.0
+        with:
+          DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESSTOKEN }}
+          DROPBOX_DESTINATION_PATH_PREFIX: "GithubActionsUploader"
+          GLOB: "./domains/client/pubspec.yaml"
