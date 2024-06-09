@@ -66,5 +66,5 @@ jobs:
         uses: 'actions/upload-artifact@v2'
         with:
           name: 'Closers'
-          path: '${{ steps.build.outputs.built-apk }}'
+          path: './domains/client/${{ steps.build.outputs.built-apk }}'
         # Upload the built APK
