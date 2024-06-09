@@ -44,6 +44,10 @@ jobs:
       #   working-directory: ./domains/client
       #   run: flutter test
 
+      - name: Generate google-services.json
+        working-directory: ./domains/client
+        run: echo '{"project_info":{"project_number":"${{ secrets.CLOSERS_PROJECT_NUMBER }}","project_id":"${{ secrets.CLOSERS_PROJECT_ID }}","storage_bucket":"${{ secrets.CLOSERS_PROJECT_ID }}.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"${{ secrets.CLOSERS_ANDROID_APP_ID }}","android_client_info":{"package_name":"com.example.client"}},"oauth_client":[],"api_key":[{"current_key":"${{ secrets.CLOSERS_ANDROID_API_KEY }}"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' >> android/app/google-services.json
+
       - name: 'Build APK'
         working-directory: ./domains/client
         id: 'build'
