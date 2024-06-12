@@ -63,7 +63,7 @@ jobs:
           --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
           --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
           --dart-define CLOSERS_ANDROID_API_KEY=${{ secrets.CLOSERS_ANDROID_API_KEY }} \
-          --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }}
+          --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }}'
 
       - name: 'Upload APK'
         uses: 'actions/upload-artifact@v2'
