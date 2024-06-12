@@ -57,14 +57,17 @@ jobs:
       - name: 'Build APK'
         working-directory: ./domains/client
         id: 'build'
-        run: 'flutter build apk --split-per-abi && echo "::set-output name=built-apk::build/app/outputs/flutter-apk/"'
-        # Build the APK using the value of the "matrix-target" input.
-        # Use the "id" property to give the step a unique identifier.
-        # Use the "::set-output" command to set the value of the "built-apk" output variable.
+        run: |
+          flutter build apk \
+          --split-per-abi \
+          --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
+          --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
+          --dart-define CLOSERS_ANDROID_API_KEY=${{ secrets.CLOSERS_ANDROID_API_KEY }} \
+          --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }}
 
       - name: 'Upload APK'
         uses: 'actions/upload-artifact@v2'
         with:
           name: 'Closers'
-          path: '${{ steps.build.outputs.built-apk }}'
+          path: './domains/client/build/app/outputs/flutter-apk/'
         # Upload the built APK
