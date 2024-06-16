@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:local_storage/models/task.dart';
+// import 'package:path_provider/path_provider.dart';
 
 class LocalStorage {
   LocalStorage();
@@ -8,7 +9,8 @@ class LocalStorage {
   late Box<Task> box;
 
   Future<void> init() async {
-    Hive.init('');
+    // final directory = await getApplicationDocumentsDirectory();
+    await Hive.initFlutter();
     Hive.registerAdapter(TaskAdapter());
     box = await Hive.openBox(privateBoxName);
   }
