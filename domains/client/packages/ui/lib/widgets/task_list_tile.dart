@@ -11,6 +11,7 @@ class TaskListTile extends StatelessWidget {
     this.onTitleEditingComplete,
     this.onTitleTap,
     this.onTitleTapOutside,
+    this.backgroundColor
   });
 
   final String title;
@@ -21,18 +22,25 @@ class TaskListTile extends StatelessWidget {
   final VoidCallback? onTitleEditingComplete;
   final VoidCallback? onTitleTap;
   final VoidCallback? onTitleTapOutside;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+    // return SizedBox(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 0.0),
+      // height: 30,
+      color: backgroundColor,
       child: Row(
         children: <Widget>[
-          Checkbox(
-            value: value,
-            onChanged: (bool? newValue) {
-              onValueChanged?.call(newValue!);
-            },
+          SizedBox(
+            height: 0.0,
+            child: Checkbox(
+              value: value,
+              onChanged: (bool? newValue) {
+                onValueChanged?.call(newValue!);
+              },
+            ),
           ),
           Expanded(
             child: TextFormField(
@@ -40,10 +48,12 @@ class TaskListTile extends StatelessWidget {
               autofocus: true,
               maxLines: null,
               keyboardType: TextInputType.text,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                contentPadding: const EdgeInsets.all(0.0),
+                filled: true,
+                fillColor: backgroundColor
               ),
               onChanged: (value) => onTitleChanged?.call(value),
               onFieldSubmitted:  (value) => onTitleSubmitted?.call(value),

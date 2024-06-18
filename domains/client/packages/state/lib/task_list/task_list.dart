@@ -43,7 +43,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
       return;
     }
     final changedTask = event.task.copyWith(isCompleted: event.isComplited);
-    // await _repository.addTask(changedTask);
+    await _repository.addTask(changedTask);
     emit(state.copyWith(tasks: () => state.tasks..update(changedTask.id, (v) => changedTask)));
   }
   

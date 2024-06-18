@@ -40,10 +40,16 @@ class TaskListView extends StatelessWidget {
             ),
             body: ListView(
               children: [
-                for (final task in state.tasks.values)
+                for (final (index, task) in state.tasks.values.indexed)
                   TaskListTile(
                     title: task.title,
                     value: task.isCompleted,
+                    backgroundColor: index.isEven ? 
+                      Theme.of(context).colorScheme.background : 
+                      Color.lerp(
+                        Theme.of(context).colorScheme.background,
+                        Theme.of(context).colorScheme.primary,
+                        0.07),
                     onValueChanged: (bool? isComplited) {
                       BlocProvider.of<TaskListBloc>(context).add(
                         TaskCompletionRequested(
