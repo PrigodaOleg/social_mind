@@ -29,12 +29,11 @@ class TaskListTile extends StatelessWidget {
     // return SizedBox(
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 0.0),
-      // height: 30,
       color: backgroundColor,
       child: Row(
         children: <Widget>[
           SizedBox(
-            height: 0.0,
+            height: Theme.of(context).textTheme.bodyMedium!.height! * Theme.of(context).textTheme.bodyMedium!.fontSize!,
             child: Checkbox(
               value: value,
               onChanged: (bool? newValue) {
