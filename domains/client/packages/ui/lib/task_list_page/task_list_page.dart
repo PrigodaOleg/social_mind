@@ -45,9 +45,9 @@ class TaskListView extends StatelessWidget {
                     title: task.title,
                     value: task.isCompleted,
                     backgroundColor: index.isEven ? 
-                      Theme.of(context).colorScheme.background : 
+                      Theme.of(context).colorScheme.surface : 
                       Color.lerp(
-                        Theme.of(context).colorScheme.background,
+                        Theme.of(context).colorScheme.surface,
                         Theme.of(context).colorScheme.primary,
                         0.07),
                     onValueChanged: (bool? isComplited) {
