@@ -1,6 +1,7 @@
 name: local_storage
 description: "A new Flutter package project."
 version: 0.0.1
+publish_to: none
 homepage:
 
 environment:
@@ -11,9 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
   hive_flutter: ^1.1.0
-  equatable: ^2.0.5
-  uuid: ^4.4.0
-  build_runner: ^2.4.9
+  repository:
+    path: ../repository
 
 dev_dependencies:
   flutter_test:

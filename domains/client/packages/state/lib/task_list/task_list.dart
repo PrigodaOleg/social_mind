@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:local_storage/local_storage.dart';
+import 'package:repository/repository.dart';
 
 
 class TaskListBloc extends Bloc<TaskEvent, TaskListState> {

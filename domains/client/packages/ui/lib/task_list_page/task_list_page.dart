@@ -4,7 +4,7 @@ import 'package:state/state.dart';
 import 'package:state/task_list/task_list.dart';
 import 'package:ui/widgets/task_list_tile.dart';
 import 'package:ui/l10n/app_localizations.dart';
-import 'package:local_storage/local_storage.dart';
+import 'package:repository/repository.dart';
 
 
 
@@ -15,7 +15,7 @@ class TaskListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => TaskListBloc(repository: Repository(localStorage: LocalStorage())),
+      create: (context) => TaskListBloc(repository: Repository()),
       child: const TaskListView(),
     );
   }

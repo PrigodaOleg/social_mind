@@ -1,27 +1,40 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:local_storage/models/task.dart';
+import 'package:repository/models/task.dart';
+import 'package:repository/models/user.dart';
 // import 'package:path_provider/path_provider.dart';
 
-class LocalStorage {
-  LocalStorage();
+class HiveStorage {
+  HiveStorage();
 
-  static const privateBoxName = 'private_box';
-  late Box<Task> box;
+  static const taskBoxName = 'task_box';
+  static const operationalBoxName = 'operational_box';
+  late Box<Task> _taskBox;
+  late Box<User> _operationalBox;
 
   Future<void> init() async {
     // final directory = await getApplicationDocumentsDirectory();
     await Hive.initFlutter();
     Hive.registerAdapter(TaskAdapter());
-    box = await Hive.openBox(privateBoxName);
+    Hive.registerAdapter(UserAdapter());
+    _taskBox = await Hive.openBox(taskBoxName);
+    _operationalBox = await Hive.openBox(operationalBoxName);
+  }
+
+  Future<User?> getUser() async {
+    return _operationalBox.get('user');
+  }
+
+  Future<void> setUser(User user) async {
+    return _operationalBox.put('user', user);
   }
 
   Future<void> save({required Task item}) async {
-    box.put(item.id, item);
+    _taskBox.put(item.id, item);
   }
 
   Future<Map<String, Task>> getTasks() async {
     // Hive did not save the task order, unfortunately
-    return box.toMap().cast<String, Task>();
+    return _taskBox.toMap().cast<String, Task>();
   }
 
 }

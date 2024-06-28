@@ -1,16 +1,16 @@
-name: state
+name: remote_storage
 description: "A new Flutter package project."
 version: 0.0.1
-homepage:
 publish_to: none
+homepage:
 
 environment:
   sdk: '>=3.3.1 <4.0.0'
   flutter: ">=1.17.0"
 
 dependencies:
-  bloc: ^8.1.4
-  equatable: ^2.0.5
+  cloud_firestore: ^5.0.1
+  firebase_database: ^11.0.1
   flutter:
     sdk: flutter
   repository:

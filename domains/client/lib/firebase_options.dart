@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: const String.fromEnvironment('CLOSERS_PROJECT_NUMBER'),
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
     authDomain: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.firebaseapp.com',
+    databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
     measurementId: const String.fromEnvironment('CLOSERS_WEB_MEASUREMENT_ID'),
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: const String.fromEnvironment('CLOSERS_ANDROID_APP_ID'),
     messagingSenderId: const String.fromEnvironment('CLOSERS_PROJECT_NUMBER'),
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
+    databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
   );
 
@@ -63,6 +65,7 @@ class DefaultFirebaseOptions {
     appId: const String.fromEnvironment('CLOSERS_IOS_APP_ID'),
     messagingSenderId: const String.fromEnvironment('CLOSERS_PROJECT_NUMBER'),
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
+    databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
     iosBundleId: 'com.example.client',
   );
@@ -72,6 +75,7 @@ class DefaultFirebaseOptions {
     appId: const String.fromEnvironment('CLOSERS_MACOS_APP_ID'),
     messagingSenderId: const String.fromEnvironment('CLOSERS_PROJECT_NUMBER'),
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
+    databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
     iosBundleId: 'com.example.client',
   );
@@ -82,6 +86,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: const String.fromEnvironment('CLOSERS_PROJECT_NUMBER'),
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
     authDomain: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.firebaseapp.com',
+    databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
     measurementId: const String.fromEnvironment('CLOSERS_WINDOWS_MEASUREMENT_ID'),
   );

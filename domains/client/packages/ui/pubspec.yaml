@@ -17,6 +17,8 @@ dependencies:
   flutter_bloc: ^8.1.5
   state:
     path: ../state
+  repository:
+    path: ../repository
   local_storage:
     path: ../local_storage
 

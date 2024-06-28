@@ -16,7 +16,8 @@ class Task extends Equatable {
     id == null || id.isNotEmpty, 'id must be null or not empty'
   ),
   id = id ?? const Uuid().v4();
-  /// The unique identifier of the `todo`.
+  
+  /// The unique identifier of the `task`.
   ///
   /// Cannot be empty.
   @HiveField(0)
