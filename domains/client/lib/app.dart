@@ -19,7 +19,10 @@ class App extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       // locale: const Locale('en'),
-      home: const TaskListPage(title: 'Дела'),
+      home: const SplashScreen(
+        nextScreen: TaskListPage(title: 'Дела')
+      ),
+      // home: const TaskListPage(title: 'Дела'),
     );
   }
 }

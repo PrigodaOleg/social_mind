@@ -9,7 +9,7 @@ class HiveStorage {
   static const taskBoxName = 'task_box';
   static const operationalBoxName = 'operational_box';
   late Box<Task> _taskBox;
-  late Box<User> _operationalBox;
+  late Box _operationalBox;
 
   Future<void> init() async {
     // final directory = await getApplicationDocumentsDirectory();
