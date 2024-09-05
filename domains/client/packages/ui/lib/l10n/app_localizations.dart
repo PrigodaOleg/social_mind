@@ -110,6 +110,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Добавить задачу'**
   String get addTaskHint;
+
+  /// No description provided for @introductionHello.
+  ///
+  /// In ru, this message translates to:
+  /// **'Привет'**
+  String get introductionHello;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

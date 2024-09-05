@@ -9,13 +9,17 @@ import 'package:repository/repository.dart';
 
 
 class TaskListPage extends StatelessWidget {
-  const TaskListPage({super.key, required this.title});
+  const TaskListPage({
+    super.key,
+    required this.title,
+    required this.repository});
   final String title;
+  final Repository repository;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => TaskListBloc(repository: Repository()),
+      create: (context) => TaskListBloc(repository: repository),
       child: const TaskListView(),
     );
   }

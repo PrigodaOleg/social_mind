@@ -21,7 +21,6 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     StateInitRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    await _repository.init();
     Map<String, Task> tasks = await _repository.getTasks();
     final placeholderTask = Task();
     emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));

@@ -9,3 +9,6 @@ https://gist.github.com/Try-Parser/b7106d941cc9b1c9e7b4c7443a7c3540
 
 # Генерация оберток для Hive
 dart run build_runner build --delete-conflicting-outputs
+
+# Генерация локализации (из ui)
+flutter gen-l10n

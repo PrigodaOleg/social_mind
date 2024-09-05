@@ -21,15 +21,15 @@ class HiveStorage {
   }
 
   Future<User?> getUser() async {
-    return _operationalBox.get('user');
+    return await _operationalBox.get('user');
   }
 
   Future<void> setUser(User user) async {
-    return _operationalBox.put('user', user);
+    return await _operationalBox.put('user', user);
   }
 
   Future<void> save({required Task item}) async {
-    _taskBox.put(item.id, item);
+    await _taskBox.put(item.id, item);
   }
 
   Future<Map<String, Task>> getTasks() async {

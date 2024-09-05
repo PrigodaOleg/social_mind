@@ -16,6 +16,12 @@ class Task extends Equatable {
     id == null || id.isNotEmpty, 'id must be null or not empty'
   ),
   id = id ?? const Uuid().v4();
+
+  Task.fromJson(Map<String, dynamic> json) :
+    id = json['id'] as String,
+    title = json['title'] as String,
+    description = json['description'] as String,
+    isCompleted = json['isCompleted'] as bool;
   
   /// The unique identifier of the `task`.
   ///
@@ -57,6 +63,13 @@ class Task extends Equatable {
       isCompleted: isCompleted ?? this.isCompleted,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    "id": id,
+    "title": title, 
+    "description": description, 
+    "isCompleted": isCompleted 
+  };
 
   @override
   List<Object> get props => [id, title, description, isCompleted];

@@ -27,12 +27,6 @@ class Repository {
     _remoteStorage = FirebaseStorage();
     await _localStorage.init();
     await _remoteStorage.init();
-
-    // Temporarly do next
-    // Check local user and create it if it not exists
-    User? user = await getLocalUser() ?? await getRemoteUser() ?? User(name: 'Innokenty');
-    await setLocalUser(user);
-    await setRemoteUser(user);
   }
 
   // # Settings
@@ -66,7 +60,10 @@ class Repository {
   // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
   // переместить задачу в другое хранилище 
   Future<Map<String, Task>> getTasks() async => await _localStorage.getTasks();
-  Future<void> addTask(Task task) async => await _localStorage.save(item: task);
+  Future<void> addTask(Task task) async {
+    await _localStorage.save(item: task);
+    await _remoteStorage.save(item: task);
+  }
   Future<void> removeTask(Task task) async {throw UnimplementedError('repository removeTask');}
 
   // ### Domains

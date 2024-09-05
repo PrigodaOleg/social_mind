@@ -444,7 +444,7 @@ packages:
     source: path
     version: "0.0.1"
   repository:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "packages/repository"
       relative: true
