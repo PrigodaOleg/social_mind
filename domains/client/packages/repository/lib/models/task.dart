@@ -11,17 +11,20 @@ class Task extends Equatable {
     this.title = '',
     String? id,
     this.description = '',
-    this.isCompleted = false
-  }) : assert(
-    id == null || id.isNotEmpty, 'id must be null or not empty'
-  ),
+    this.isCompleted = false,
+    required this.originatorId,
+    this.executorId = '',
+  }) : 
+  assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
   id = id ?? const Uuid().v4();
 
   Task.fromJson(Map<String, dynamic> json) :
-    id = json['id'] as String,
-    title = json['title'] as String,
-    description = json['description'] as String,
-    isCompleted = json['isCompleted'] as bool;
+    id = (json['id'] ?? '') as String,
+    title = (json['title'] ?? '') as String,
+    description = (json['description'] ?? '') as String,
+    isCompleted = (json['isCompleted'] ?? false) as bool,
+    originatorId = (json['originatorId'] ?? '') as String,
+    executorId = (json['executorId'] ?? '') as String;
   
   /// The unique identifier of the `task`.
   ///
@@ -46,6 +49,12 @@ class Task extends Equatable {
   /// Defaults to `false`.
   @HiveField(3)
   final bool isCompleted;
+
+  @HiveField(4)
+  final String originatorId;
+
+  @HiveField(5)
+  final String executorId;
   
   /// Returns a copy of this `todo` with the given values updated.
   ///
@@ -55,12 +64,16 @@ class Task extends Equatable {
     String? title,
     String? description,
     bool? isCompleted,
+    String? originatorId,
+    String? executorId
   }) {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       isCompleted: isCompleted ?? this.isCompleted,
+      originatorId: originatorId ?? this.originatorId,
+      executorId: executorId ?? this.executorId,
     );
   }
 
@@ -68,9 +81,11 @@ class Task extends Equatable {
     "id": id,
     "title": title, 
     "description": description, 
-    "isCompleted": isCompleted 
+    "isCompleted": isCompleted,
+    "originatorId": originatorId, 
+    "executorId": executorId, 
   };
 
   @override
-  List<Object> get props => [id, title, description, isCompleted];
+  List<Object> get props => [id, title, description, isCompleted, originatorId, executorId];
 }

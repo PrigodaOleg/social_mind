@@ -9,7 +9,8 @@ part 'user.g.dart';
 class User  extends Equatable {
   User({
     String? id,
-    required this.name
+    required this.name,
+    this.domainsIds = const <String>[]
   }) : assert(
     id == null || id.isNotEmpty, 'id must be null or not empty'
   ),
@@ -17,7 +18,8 @@ class User  extends Equatable {
 
   User.fromJson(Map<String, dynamic> json) :
     id = json['id'] as String,
-    name = json['name'] as String;
+    name = json['name'] as String,
+    domainsIds = (json['domainsIds'] ?? []) as List<String>;
 
   @HiveField(0)
   final String id;
@@ -25,11 +27,15 @@ class User  extends Equatable {
   @HiveField(1)
   final String name;
 
+  @HiveField(2)
+  final List<String> domainsIds;
+
   Map<String, dynamic> toJson() => {
     "id": id,
-    "name": name 
+    "name": name,
+    "domainsIds": domainsIds
   };
 
   @override
-  List<Object> get props => [id, name];
+  List<Object> get props => [id, name, domainsIds];
 }

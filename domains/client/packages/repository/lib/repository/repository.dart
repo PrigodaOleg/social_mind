@@ -59,7 +59,10 @@ class Repository {
   // ### Tasks
   // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
   // переместить задачу в другое хранилище 
-  Future<Map<String, Task>> getTasks() async => await _localStorage.getTasks();
+  Future<Map<String, Task>> getTasks() async {
+    return await _remoteStorage.getTasks();
+    // await _localStorage.getTasks();
+  }
   Future<void> addTask(Task task) async {
     await _localStorage.save(item: task);
     await _remoteStorage.save(item: task);

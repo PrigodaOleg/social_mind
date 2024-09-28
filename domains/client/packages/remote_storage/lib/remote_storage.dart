@@ -57,21 +57,25 @@ class FirebaseStorage {
     }
   }
 
-  Future<Map<String, Task>?> getTasks() async {
+  Future<Map<String, Task>> getTasks() async {
     // Hive did not save the task order, unfortunately
     // return _taskBox.toMap().cast<String, Task>();
 
     try {
-      final snapshot = await database.child('users/$defaultId').get();
+      final snapshot = await database.child('tasks').get();
+      Map<String, Task> tasks = {};
       if (snapshot.exists) {
-        // return Task.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
-        return Map<String, dynamic>.from(snapshot.value as Map).cast<String, Task>();
-
+        Map<String?, dynamic> castedData = (snapshot.value as Map).cast<String?, dynamic>();
+        castedData.forEach((key, value) {
+          Map<String, dynamic> castedTask = (value as Map).cast<String, dynamic>();
+          tasks.addAll({key!: Task.fromJson(castedTask)});
+        });
+        return tasks;
       }
     } catch (error) {
       print(error);
     }
-    return null;
+    return <String, Task>{};
   }
 }
 

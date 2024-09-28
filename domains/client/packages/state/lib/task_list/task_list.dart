@@ -16,13 +16,15 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   }
 
   final Repository _repository;
+  late final String selfId;
 
   Future<void> _onStateInit(
     StateInitRequested event,
     Emitter<TaskListState> emit,
   ) async {
+    selfId = (await _repository.getLocalUser())?.id ?? '';
     Map<String, Task> tasks = await _repository.getTasks();
-    final placeholderTask = Task();
+    final placeholderTask = Task(originatorId: selfId);
     emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
   }
 
@@ -30,7 +32,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     TaskAddRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    final newTask = Task();
+    final newTask = Task(originatorId: selfId);
     emit(state.copyWith(tasks: () => Map<String, Task>.from(state.tasks)..addAll({newTask.id: newTask})));
   }
   
@@ -52,7 +54,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   ) async {
     final changedTask = event.task.copyWith(title: event.submittedText);
     await _repository.addTask(changedTask);
-    final placeholderTask = Task();
+    final placeholderTask = Task(originatorId: selfId);
     emit(state.copyWith(tasks: () => state.tasks
       ..update(changedTask.id, (task) => changedTask)
       ..addAll({placeholderTask.id: placeholderTask})));
