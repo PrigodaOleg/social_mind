@@ -34,7 +34,7 @@ class TaskListView extends StatelessWidget {
     // final repo = context.read(Repository);
     return BlocProvider<TaskListBloc>(
       create: (context) => context.read<TaskListBloc>()
-      ..add(const StateInitRequested()),
+      ..add(const TaskListStateInitRequested()),
       child: BlocBuilder<TaskListBloc, TaskListState>(
         builder: (context, state) {
           return Scaffold(

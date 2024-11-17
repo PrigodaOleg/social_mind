@@ -99,11 +99,23 @@ abstract class AppLocalizations {
   /// **'Близкие'**
   String get applicationTitle;
 
+  /// No description provided for @homePageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доска'**
+  String get homePageName;
+
   /// No description provided for @taskListPageName.
   ///
   /// In ru, this message translates to:
   /// **'Дела'**
   String get taskListPageName;
+
+  /// No description provided for @domainListPageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Близкие'**
+  String get domainListPageName;
 
   /// No description provided for @addTaskHint.
   ///

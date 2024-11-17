@@ -8,11 +8,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get applicationTitle => 'Closers';
 
   @override
+  String get homePageName => 'Home';
+
+  @override
   String get taskListPageName => 'Tasks';
+
+  @override
+  String get domainListPageName => 'Closee groups';
 
   @override
   String get addTaskHint => 'Add new task';
 
   @override
-  String get introductionHello => 'Привет';
+  String get introductionHello => 'Hi there';
 }

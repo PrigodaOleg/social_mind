@@ -19,7 +19,7 @@ class App extends StatelessWidget {
       await repository.setRemoteUser(user);
 
       // Show last active page to user
-      return TaskListPage(title: '123', repository: repository);
+      return HomePage(title: '123', repository: repository);
     } else {
       // Otherwise show login screen to user
       // User have a tree options:

@@ -1,48 +1,25 @@
-import 'package:equatable/equatable.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:uuid/uuid.dart';
-
-part 'task.g.dart';
+part of 'models.dart';
 
 
 @HiveType(typeId: 0)
-class Task extends Equatable {
+class Task extends Model {
   Task({
-    this.title = '',
-    String? id,
-    this.description = '',
+    super.title,
+    super.id,
+    super.description,
     this.isCompleted = false,
     required this.originatorId,
     this.executorId = '',
-  }) : 
-  assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
-  id = id ?? const Uuid().v4();
+  });
 
-  Task.fromJson(Map<String, dynamic> json) :
-    id = (json['id'] ?? '') as String,
-    title = (json['title'] ?? '') as String,
-    description = (json['description'] ?? '') as String,
+  Task.fromJson(super.json) :
     isCompleted = (json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? '') as String,
-    executorId = (json['executorId'] ?? '') as String;
-  
-  /// The unique identifier of the `task`.
-  ///
-  /// Cannot be empty.
-  @HiveField(0)
-  final String id;
-
-  /// The title of the `todo`.
-  ///
-  /// Note that the title may be empty.
-  @HiveField(1)
-  final String title;
-
-  /// The description of the `todo`.
-  ///
-  /// Defaults to an empty string.
-  @HiveField(2)
-  final String description;
+    executorId = (json['executorId'] ?? '') as String,
+    super.fromJson();
+    
+  @override
+  final String type = (Task).toString();
 
   /// Whether the `todo` is completed.
   ///
@@ -77,15 +54,12 @@ class Task extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    "id": id,
-    "title": title, 
-    "description": description, 
+  Map<String, dynamic> toJson() => super.toJson()..addAll({
     "isCompleted": isCompleted,
     "originatorId": originatorId, 
     "executorId": executorId, 
-  };
+  });
 
   @override
-  List<Object> get props => [id, title, description, isCompleted, originatorId, executorId];
+  List<Object> get props => super.props + [isCompleted, originatorId, executorId];
 }

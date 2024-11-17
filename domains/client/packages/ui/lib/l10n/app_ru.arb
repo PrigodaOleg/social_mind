@@ -1,6 +1,8 @@
 {
     "applicationTitle": "Близкие",
+    "homePageName": "Доска",
     "taskListPageName": "Дела",
+    "domainListPageName": "Близкие",
     "addTaskHint": "Добавить задачу",
     "introductionHello": "Привет"
 }

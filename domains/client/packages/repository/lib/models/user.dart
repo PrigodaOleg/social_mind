@@ -1,28 +1,21 @@
-import 'package:equatable/equatable.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:uuid/uuid.dart';
-
-part 'user.g.dart';
+part of 'models.dart';
 
 
 @HiveType(typeId: 1)
-class User  extends Equatable {
+class User extends Model {
   User({
-    String? id,
+    super.id,
     required this.name,
     this.domainsIds = const <String>[]
-  }) : assert(
-    id == null || id.isNotEmpty, 'id must be null or not empty'
-  ),
-  id = id ?? const Uuid().v4();
+  });
 
-  User.fromJson(Map<String, dynamic> json) :
-    id = json['id'] as String,
+  User.fromJson(super.json) :
     name = json['name'] as String,
-    domainsIds = (json['domainsIds'] ?? []) as List<String>;
-
-  @HiveField(0)
-  final String id;
+    domainsIds = List<String>.from(json['domainsIds'] ?? []),
+    super.fromJson();
+    
+  @override
+  final String type = (User).toString();
 
   @HiveField(1)
   final String name;
@@ -30,12 +23,12 @@ class User  extends Equatable {
   @HiveField(2)
   final List<String> domainsIds;
 
-  Map<String, dynamic> toJson() => {
-    "id": id,
+  @override
+  Map<String, dynamic> toJson() => super.toJson()..addAll({
     "name": name,
     "domainsIds": domainsIds
-  };
+  });
 
   @override
-  List<Object> get props => [id, name, domainsIds];
+  List<Object> get props => super.props + [name, domainsIds];
 }

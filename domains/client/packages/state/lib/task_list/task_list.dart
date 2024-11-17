@@ -8,7 +8,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     required Repository repository
     }) : _repository = repository,
      super(const TaskListState()) {
-    on<StateInitRequested>(_onStateInit);
+    on<TaskListStateInitRequested>(_onStateInit);
     on<TaskAddRequested>(_onTaskAdd);
     on<TaskCompletionRequested>(_onComplited);
     on<TaskSubmitionRequested>(_onSubmitted);
@@ -16,15 +16,15 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   }
 
   final Repository _repository;
-  late final String selfId;
+  late final String selfUserId;
 
   Future<void> _onStateInit(
-    StateInitRequested event,
+    TaskListStateInitRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    selfId = (await _repository.getLocalUser())?.id ?? '';
+    selfUserId = (await _repository.getLocalUser())?.id ?? '';
     Map<String, Task> tasks = await _repository.getTasks();
-    final placeholderTask = Task(originatorId: selfId);
+    final placeholderTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
   }
 
@@ -32,7 +32,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     TaskAddRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    final newTask = Task(originatorId: selfId);
+    final newTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => Map<String, Task>.from(state.tasks)..addAll({newTask.id: newTask})));
   }
   
@@ -54,7 +54,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   ) async {
     final changedTask = event.task.copyWith(title: event.submittedText);
     await _repository.addTask(changedTask);
-    final placeholderTask = Task(originatorId: selfId);
+    final placeholderTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => state.tasks
       ..update(changedTask.id, (task) => changedTask)
       ..addAll({placeholderTask.id: placeholderTask})));
@@ -95,8 +95,8 @@ sealed class TaskEvent extends Equatable{
   List<Object> get props => [];
 }
 
-final class StateInitRequested extends TaskEvent {
-  const StateInitRequested();
+final class TaskListStateInitRequested extends TaskEvent {
+  const TaskListStateInitRequested();
 }
 
 final class TaskCompletionRequested extends TaskEvent {

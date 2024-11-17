@@ -4,8 +4,7 @@ library remote_storage;
 
 import 'package:firebase_database/firebase_database.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:repository/models/task.dart';
-import 'package:repository/models/user.dart';
+import 'package:repository/models/models.dart';
 
 class FirebaseStorage {
   FirebaseStorage();
@@ -13,6 +12,10 @@ class FirebaseStorage {
   // static const String defaultId = '00000000-0000-0000-0000-000000000000';
   static const String defaultId = '575a8019-c902-4603-b4e5-cea067c31610';
   late DatabaseReference database;
+
+  final models = <String, Function(Map<String, dynamic>)>{
+    'Domain': (json) => Domain.fromJson(json),
+  };
 
   Future<void> init() async {
     // Connect and get instance
@@ -55,6 +58,39 @@ class FirebaseStorage {
     } catch (error) {
       print(error);
     }
+  }
+
+  Future<dynamic> getItem({required String id}) async {
+    // Get item by ID
+    // try {
+      final snapshot = await database.child('models/$id').get();
+      if (snapshot.exists) {
+        var json = Map<String, dynamic>.from(snapshot.value as Map);
+        if (!json.containsKey('type')) return;
+        return models[json['type']]?.call(json);
+      }
+    // } catch (error) {
+      // print(error);
+    // }
+    return;
+  }
+
+  Future<Map<String, dynamic>> getItems(List ids) async {
+    // Get item by ID
+    Map<String, dynamic> items = {};
+    return items;
+  }
+  
+  Future<int> saveItems(Map<String, dynamic> items) async {
+    // await database.child('tasks/${item.id}').update(item.toJson());
+    // try {
+      for (Domain item in items.values) {
+        await database.child('models/${item.id}').update(item.toJson());
+      }
+    // } catch (error) {
+    //   print(error);
+    // }
+    return items.length;
   }
 
   Future<Map<String, Task>> getTasks() async {

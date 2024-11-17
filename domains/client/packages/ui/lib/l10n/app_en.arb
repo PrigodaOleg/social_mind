@@ -1,6 +1,8 @@
 {
     "applicationTitle": "Closers",
+    "homePageName": "Home",
     "taskListPageName": "Tasks",
-    "addTaskHint": "Add new task"
+    "domainListPageName": "Closee groups",
+    "addTaskHint": "Add new task",
     "introductionHello": "Hi there"
 }

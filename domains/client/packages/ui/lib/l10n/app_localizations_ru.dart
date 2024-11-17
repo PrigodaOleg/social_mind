@@ -8,7 +8,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get applicationTitle => 'Близкие';
 
   @override
+  String get homePageName => 'Доска';
+
+  @override
   String get taskListPageName => 'Дела';
+
+  @override
+  String get domainListPageName => 'Близкие';
 
   @override
   String get addTaskHint => 'Добавить задачу';

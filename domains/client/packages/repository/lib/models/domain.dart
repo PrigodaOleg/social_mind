@@ -1,53 +1,30 @@
-import 'package:equatable/equatable.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:uuid/uuid.dart';
-
-part 'domain.g.dart';
+part of 'models.dart';
 
 
-@HiveType(typeId: 0)
-class Domain extends Equatable {
+@HiveType(typeId: 2)
+class Domain extends Model {
   Domain({
-    this.title = '',
-    String? id,
-    this.description = '',
+    super.title,
+    super.id,
+    super.description,
     this.isPersonal = false,
     required this.originatorId,
     this.participantsIds = const <String>[],
     this.observersIds = const <String>[],
-    this.tasksIds = const <String>[]
-  }) : 
-  assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
-  id = id ?? const Uuid().v4();
+    this.models = const <String, String>{}
+  });
   
-  Domain.fromJson(Map<String, dynamic> json) :
-    id = (json['id'] ?? '') as String,
-    title = (json['title'] ?? '') as String,
-    description = (json['description'] ?? '') as String,
+  Domain.fromJson(super.json) :
     isPersonal = (json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? []) as String,
-    participantsIds = (json['executorId'] ?? []) as List<String>,
-    observersIds = (json['executorId'] ?? []) as List<String>,
-    tasksIds = (json['tasksIds'] ?? []) as List<String>;
+    participantsIds = List<String>.from(json['executorId'] ?? []),
+    observersIds = List<String>.from(json['executorId'] ?? []),
+    models = Map<String, String>.from(json['models'] ?? {}),
+    super.fromJson();
+    
+  @override
+  final String type = (Domain).toString();
   
-  /// The unique identifier of the `task`.
-  ///
-  /// Cannot be empty.
-  @HiveField(0)
-  final String id;
-
-  /// The title of the `todo`.
-  ///
-  /// Note that the title may be empty.
-  @HiveField(1)
-  final String title;
-
-  /// Some information about domain to understand domain context.
-  ///
-  /// Defaults to an empty string.
-  @HiveField(2)
-  final String description;
-
   @HiveField(3)
   final bool isPersonal;
 
@@ -60,9 +37,41 @@ class Domain extends Equatable {
   @HiveField(6)
   final List<String> observersIds;
 
+  // Model ID: Model Type
   @HiveField(7)
-  final List<String> tasksIds;
+  final Map<String, String> models;
+
+  Domain copyWith({
+    String? id,
+    String? title,
+    String? description,
+    bool? isPersonal,
+    String? originatorId,
+    List<String>? participantsIds,
+    List<String>? observersIds,
+    Map<String, String>? models
+  }) {
+    return Domain(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      isPersonal: isPersonal ?? this.isPersonal,
+      originatorId: originatorId ?? this.originatorId,
+      participantsIds: participantsIds ?? this.participantsIds,
+      observersIds: observersIds ?? this.observersIds,
+      models: models ?? this.models,
+    );
+  }
 
   @override
-  List<Object> get props => [id, title, description, isPersonal, originatorId, participantsIds, observersIds, tasksIds];
+  Map<String, dynamic> toJson() => super.toJson()..addAll({
+    "isPersonal": isPersonal,
+    "originatorId": originatorId,
+    "participantsIds": participantsIds,
+    "observersIds": observersIds,
+    "models": models,
+  });
+
+  @override
+  List<Object> get props => super.props + [isPersonal, originatorId, participantsIds, observersIds, models];
 }
