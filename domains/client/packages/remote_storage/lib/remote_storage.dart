@@ -1,16 +1,14 @@
 library remote_storage;
 
-// export 'hive/hive_storage.dart';
-
-import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_database/firebase_database.dart'; // https://firebase.google.com/docs/database/flutter/start
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:repository/models/models.dart';
 
 class FirebaseStorage {
   FirebaseStorage();
 
-  // static const String defaultId = '00000000-0000-0000-0000-000000000000';
-  static const String defaultId = '575a8019-c902-4603-b4e5-cea067c31610';
+  static const String defaultId = '00000000-0000-0000-0000-000000000000';
+  // static const String defaultId = '575a8019-c902-4603-b4e5-cea067c31610';
   late DatabaseReference database;
 
   final models = <String, Function(Map<String, dynamic>)>{
@@ -82,11 +80,14 @@ class FirebaseStorage {
   }
   
   Future<int> saveItems(Map<String, dynamic> items) async {
-    // await database.child('tasks/${item.id}').update(item.toJson());
+    // https://firebase.google.com/docs/database/flutter/read-and-write
+
     // try {
-      for (Domain item in items.values) {
-        await database.child('models/${item.id}').update(item.toJson());
+      Map<String, Object?> updates = {};
+      for (dynamic item in items.values) {
+        updates['models/${item.id}'] = item.toJson();
       }
+      database.update(updates);
     // } catch (error) {
     //   print(error);
     // }

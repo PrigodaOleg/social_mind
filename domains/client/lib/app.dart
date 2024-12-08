@@ -17,6 +17,7 @@ class App extends StatelessWidget {
     if (user != null) {
       await repository.setLocalUser(user);
       await repository.setRemoteUser(user);
+      await repository.setMyself(user);
 
       // Show last active page to user
       return HomePage(title: '123', repository: repository);
@@ -26,6 +27,8 @@ class App extends StatelessWidget {
       //  - Login to remote storage (and try to take the actual user account from there)
       //  - Transfer actual user account from active device (QR-code and public remote storage)
       //  - Create new user account
+      await repository.setMyself(User(name: 'DebugUser'));
+      return HomePage(title: '123', repository: repository);
     }
     return null;
   }

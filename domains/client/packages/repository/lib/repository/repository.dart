@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:local_storage/hive/hive_storage.dart';
@@ -7,6 +8,57 @@ import 'package:remote_storage/remote_storage.dart';
 
 
 typedef SyncListener = void Function(String id, dynamic syncedItem);
+typedef PeriodicCallback = void Function(int left);
+typedef DoneCallback = void Function();
+
+
+class Timer {
+  Timer([this.done, this.periodic]);
+  DoneCallback? done;
+  PeriodicCallback? periodic;
+  static const int defaultTime = 5;
+  static const int defaultPeriod = 1;
+  int lastActualPeriod = defaultPeriod;
+  int lastActualtime = defaultTime;
+  Stream<int>? _timer;
+  StreamSubscription<int>? _timerSubscription;
+
+  _start(int time, int? period) {
+    _timerSubscription?.cancel();
+    _timer = Stream.periodic(
+      Duration(seconds: lastActualPeriod),
+      (x) => time! - x - 1
+    ).take(time);
+    _timerSubscription = _timer?.listen(
+      periodic,
+      onDone: done,
+      cancelOnError: true
+    );
+  }
+
+  start([int? time, int? period]) {
+    time = time ?? defaultTime;
+    period = period ?? defaultPeriod;
+    _start(time, period);
+    lastActualPeriod = period;
+    lastActualtime = time;
+  }
+
+  now() {
+    _start(0, 0);
+  }
+
+  postpone([int? time]) {
+    time = time ?? lastActualtime;
+    _start(time, lastActualPeriod);
+    lastActualtime = time;
+  }
+
+  cancel() {
+    _timerSubscription?.cancel();
+    _timer = null;
+  }
+}
 
 
 class Closee {}
@@ -22,12 +74,18 @@ class Closee {}
 class Repository {
   Repository();
 
+  late Timer _sync;
+
+  // User associated with this application instance
+  late String myId;
+  late int defaultSyncSubscriber;
+
   late final HiveStorage _localStorage;
   late final FirebaseStorage _remoteStorage;
   var outgoingChanges = Queue<dynamic>();
 
   // Listeners to incoming changes
-  var syncListeners = <int, SyncListener>{};  // by sybscribers
+  var syncListeners = <int, SyncListener>{};  // by subscribers
   var syncBackIndex = <int, Set<String>>{}; // for find all IDs by subscriber
   int subscribersCounter = 0;
   var incomingSyncIds = <String, Set<int>>{};  // with set of subscribers
@@ -39,7 +97,9 @@ class Repository {
     _remoteStorage = FirebaseStorage();
     await _localStorage.init();
     await _remoteStorage.init();
-    loop();
+    defaultSyncSubscriber = addSyncListener(_defaultSyncListener);
+    _sync = Timer(delayedSync);
+    _sync.start();
   }
 
   int addSyncListener(SyncListener syncListener) {
@@ -59,39 +119,53 @@ class Repository {
     syncBackIndex.remove(subscriberId);
   }
 
-  // todo: Change to timer timer stream
-  void loop() async {
-    // Transmit outgoing changes
-    int saved = await _remoteStorage.saveItems(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
+  void _defaultSyncListener(String id, dynamic syncedItem) {
+    _localStorage.storeItem(syncedItem);
+  }
 
-    // Make sure everything went well
-    // Тут на самом деле самого факта сохранения достаточно.
-    // Дальнейшая работа уже идет про другое. Если есть удаленные изменения
-    // в прослушиваемых моделях, то мы эти изменения отправляем слушателям
-    // Однако, о самих изменениях мы узнаем по событиям из удаленного репозитория
+  void delayedSync() async {
+    // Свежий взгляд 08.12.2024.
+    // Этот метод совершает синхронизацию локальных и удаленных объектов. Конкретно должны обрабатываться следующие сценарии:
+    // 1. Локально создан новый объект и его нужно просто загрузить в удаленное хранилище
+    // 2. Локальный объект не существует, но известен его ID, по которому нужно запросить его из удаленного хранилища
+    // 3. Локальный объект существует и изменен, и эти изменения нужно доставить в удаленное хранилище
+    // 4. Приложение только что запустилось, все объекты считаются несинхронизированными и подлежат ленивой синхронизации по запросу
+    // 5. Если объект уже был синхронизирован в этой сессии и не был изменен локально, то больше мы его синхронизировать не будем
+    // 6. Об удаленных изменениях мы узнаем через другой механизм (чат),
+    //    получаем оттуда ID объектов, которые нужно будет синхронизировать
+    // Итого, последовательность действий должна быть следующей:
+    // 1. Сперва разгребаем очередь из элементов, накопивщихся с момента последней синхронизации,
+    //    которые необходимо безусловно отправить в удаленное хранилище
+    // 2. Для каждого отправленного элемента вызываем событие для слушателя, так он понимает, что синхронизация произошла
+    // 3. После этого обрабатываем элементы, актуальность которых не известна и был запрос на синхронизацию от слушателя
+
+    // Отправляем локальные изменения в удаленное хранилище
+    int saved = await _remoteStorage.saveItems(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
+    // Вызываем для каждого синхронизированного элемента событие для слушателя
     while (saved-- > 0) {
       String id = outgoingChanges.first.id;
       _findAndCallListeners(id);
       outgoingChanges.removeFirst();
     }
 
-    // Process incoming sync first time
+    // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
     var idsToSync = incomingSyncIds.keys.toSet().difference(syncedThisTime).toList();
-    // var syncedModels = await _remoteStorage.getItems(idsToSync);
-    // Find and call listeners for group of synced models
+    var syncedModels = await _remoteStorage.getItems(idsToSync);
+    // Вызываем для каждого синхронизированного элемента событие для слушателя
     for (final id in idsToSync) {
       _findAndCallListeners(id);
     }
+    // Больше не будем синхронизировать эти объекты, если только они не будут изменены локально
+    // или не поступят события об их изменении в удаленном хранилище
     syncedThisTime.addAll(idsToSync);
-
-    Future.delayed(const Duration(seconds: 5), loop);
   }
 
   void _findAndCallListeners(String id) async {
     incomingSyncIds[id]?.forEach((subscriberId) async {
-      Model? model = await _remoteStorage.getItem(id: id);
+      Model? model = await _remoteStorage.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
       model?.sync = SyncStatus.synced;
       syncedThisTime.add(id);
+      // print(model);
       if (model != null) syncListeners[subscriberId]?.call(id, model);
     });
   }
@@ -105,7 +179,7 @@ class Repository {
     }
   }
 
-  void _subscribeToSyncs(List<String> modelIds, int? subscriberId) {
+  void _subscribeToSyncAll(List<String> modelIds, int? subscriberId) {
     modelIds.forEach((id) {
       _subscribeToSync(id, subscriberId);
     });
@@ -118,10 +192,15 @@ class Repository {
     }
   }
 
-  void _markSynceds<T>(Map<String, T> models) {
+  void _markSyncedAll<T>(Map<String, T> models) {
     models.forEach((id, model) {
       _markSynced(model);
     });
+  }
+
+  void _syncModel(Model model) {
+    _subscribeToSync(model.id, defaultSyncSubscriber);
+    _sync.postpone();
   }
 
   Future<void> saveModel(
@@ -131,6 +210,7 @@ class Repository {
     await _localStorage.storeItem(model);
     _subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
+    _sync.postpone();
   }
 
   Future<Model> getModel(
@@ -139,6 +219,7 @@ class Repository {
   ) async {
     Model model = await _localStorage.getItem(id: modelId);
     _subscribeToSync(modelId, subscriberId);
+    _sync.postpone();
     return model;
   }
 
@@ -147,12 +228,40 @@ class Repository {
     [int? subscriberId]
   ) async {
     Map<String, T> models = await _localStorage.getItems(ids);
-    _subscribeToSyncs(ids, subscriberId);
-    _markSynceds(models);
+    _subscribeToSyncAll(ids, subscriberId);
+    _markSyncedAll(models);
+    _sync.postpone();
     return models;
   }
 
+  Future<void> saveModels(
+    List<Model> models,
+    [int? subscriberId] // Item ID - sync callback pair
+  ) async {
+    var modelsMap = { for (var model in models) model.id : model };
+    await _localStorage.storeItems(modelsMap);
+    _subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
+    outgoingChanges.addAll(models);
+    _sync.postpone();
+  }
+
   // # Settings
+
+  // Get user associated with this instance of application
+  // User must be set already
+  Future<User> me() async {
+    User? me = await _localStorage.getItem(id: myId);
+    if (me == null) {
+      throw StateError('No such user in local storage $myId');
+    }
+    return me.mutable(); // ну это костыль, конечно, но что делать, если хайв возвращает строго немутабельный объект
+  }
+  // Call once at startup
+  setMyself(User me) async {
+    myId = me.id;
+    await _localStorage.storeItem(me);
+    _syncModel(me);
+  }
 
   // ## Operational settings - always local
   // Contains such data as credentials, active auth tokens...

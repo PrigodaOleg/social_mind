@@ -15,6 +15,7 @@ class HiveStorage {
   Future<void> init() async {
     // final directory = await getApplicationDocumentsDirectory();
     await Hive.initFlutter();
+    Hive.registerAdapter(LocationAdapter());
     Hive.registerAdapter(TaskAdapter());
     Hive.registerAdapter(UserAdapter());
     Hive.registerAdapter(DomainAdapter());
@@ -59,7 +60,7 @@ class HiveStorage {
     await _commonBox.put(item.id, item);
   }
 
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  Future<int> storeItems(Map<String, dynamic> items) async {
     await _commonBox.putAll(items);
     return items.length;
   }

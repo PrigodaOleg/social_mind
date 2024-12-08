@@ -7,9 +7,13 @@ part 'domain.dart';
 part 'task.dart';
 part 'models.g.dart';
 
+@HiveType(typeId: 3)
 enum Location {
+  @HiveField(0)
   local,
+  @HiveField(1)
   remote,
+  @HiveField(2)
   both
 }
 
@@ -58,7 +62,7 @@ sealed class Model extends Equatable {
 
   /// Where 
   @HiveField(3)
-  late final Location location;
+  final Location location;
 
   Map<String, dynamic> toJson() => {
     "id": id,
@@ -69,5 +73,5 @@ sealed class Model extends Equatable {
   };
 
   @override
-  List<Object> get props => [id, title, description];
+  List<Object> get props => [id, title, description, location];
 }

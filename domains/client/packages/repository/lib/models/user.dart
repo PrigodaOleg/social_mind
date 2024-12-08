@@ -17,17 +17,22 @@ class User extends Model {
   @override
   final String type = (User).toString();
 
-  @HiveField(1)
+  @HiveField(4)
   final String name;
 
-  @HiveField(2)
-  final List<String> domainsIds;
+  @HiveField(5)
+  List<String> domainsIds;
+  // final List<String> domainsIds;
 
   @override
   Map<String, dynamic> toJson() => super.toJson()..addAll({
     "name": name,
     "domainsIds": domainsIds
   });
+
+  User mutable() {
+    return User.fromJson(toJson());
+  }
 
   @override
   List<Object> get props => super.props + [name, domainsIds];

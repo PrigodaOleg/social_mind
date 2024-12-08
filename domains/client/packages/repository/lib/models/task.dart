@@ -24,13 +24,13 @@ class Task extends Model {
   /// Whether the `todo` is completed.
   ///
   /// Defaults to `false`.
-  @HiveField(3)
+  @HiveField(4)
   final bool isCompleted;
 
-  @HiveField(4)
+  @HiveField(5)
   final String originatorId;
 
-  @HiveField(5)
+  @HiveField(6)
   final String executorId;
   
   /// Returns a copy of this `todo` with the given values updated.

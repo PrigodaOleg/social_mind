@@ -25,20 +25,20 @@ class Domain extends Model {
   @override
   final String type = (Domain).toString();
   
-  @HiveField(3)
+  @HiveField(4)
   final bool isPersonal;
 
-  @HiveField(4)
+  @HiveField(5)
   final String originatorId;
 
-  @HiveField(5)
+  @HiveField(6)
   final List<String> participantsIds;
 
-  @HiveField(6)
+  @HiveField(7)
   final List<String> observersIds;
 
   // Model ID: Model Type
-  @HiveField(7)
+  @HiveField(8)
   final Map<String, String> models;
 
   Domain copyWith({

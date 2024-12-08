@@ -9,7 +9,7 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
   // deleted
   DomainListBloc({
     required Repository repository
-    }) : _repository = repository,
+    }) : _repo = repository,
      super(const DomainListState()) {
     on<DomainListStateInitRequested>(_onStateInit);
     on<DomainCreationRequested>(_onCreation);
@@ -18,13 +18,13 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     on<DomainSyncRequested>(_onSync);
   }
 
-  final Repository _repository;
+  final Repository _repo;
   late final int listenerId;
   
   @override
   Future<void> close() {
     //cancel streams
-    _repository.removeSyncListener(listenerId);
+    _repo.removeSyncListener(listenerId);
     return super.close();
   }
 
@@ -32,13 +32,14 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     DomainListStateInitRequested event,
     Emitter<DomainListState> emit,
   ) async {
-    listenerId = _repository.addSyncListener((id, item) {
+    listenerId = _repo.addSyncListener((id, item) {
       if (!isClosed) {
         add(DomainSyncRequested(domains: {id: item}));
       }
     });
-    User me = (await _repository.getLocalUser())!;
-    Map<String, Domain> domains = await _repository.getModels<Domain>(me.domainsIds, listenerId);
+    User me = await _repo.me();
+    me.domainsIds.add(Domain(originatorId: me.id).id);
+    Map<String, Domain> domains = await _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));
   }
 
@@ -46,13 +47,13 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     DomainCreationRequested event,
     Emitter<DomainListState> emit,
   ) async {
-    User me = (await _repository.getLocalUser())!;
+    User me = await _repo.me();
     final newDomain = Domain(originatorId: me.id, title: event.title);
-    await _repository.saveModel(newDomain, listenerId);
     me.domainsIds.add(newDomain.id);
-    await _repository.setLocalUser(me);
     
-    Map<String, Domain> domains = await _repository.getModels<Domain>(me.domainsIds, listenerId);
+    await _repo.saveModels([me, newDomain], listenerId);
+    
+    Map<String, Domain> domains = await _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));
   }
 
@@ -71,12 +72,12 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
       return;
     }
     final domainToDelete = event.domain;
-    await _repository.deleteDomain(domainToDelete);
-    User me = (await _repository.getLocalUser())!;
+    await _repo.deleteDomain(domainToDelete);
+    User me = await _repo.me();
     me.domainsIds.remove(domainToDelete.id);
-    await _repository.setLocalUser(me);
+    await _repo.setLocalUser(me);
 
-    Map<String, Domain> domains = await _repository.getModels<Domain>(me.domainsIds, listenerId);
+    Map<String, Domain> domains = await _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));
   }
 
