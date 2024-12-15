@@ -38,7 +38,6 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
       }
     });
     User me = await _repo.me();
-    me.domainsIds.add(Domain(originatorId: me.id).id);
     Map<String, Domain> domains = await _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));
   }
@@ -48,8 +47,8 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     Emitter<DomainListState> emit,
   ) async {
     User me = await _repo.me();
-    final newDomain = Domain(originatorId: me.id, title: event.title);
-    me.domainsIds.add(newDomain.id);
+    var newDomain = Domain(originatorId: me.id, title: event.title);
+    me.linkTo(newDomain);
     
     await _repo.saveModels([me, newDomain], listenerId);
     
@@ -72,10 +71,10 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
       return;
     }
     final domainToDelete = event.domain;
-    await _repo.deleteDomain(domainToDelete);
     User me = await _repo.me();
-    me.domainsIds.remove(domainToDelete.id);
-    await _repo.setLocalUser(me);
+    me.unlinkFrom(domainToDelete);
+    await _repo.deleteModel(domainToDelete);
+    await _repo.saveModel(me, listenerId);
 
     Map<String, Domain> domains = await _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));

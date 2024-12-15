@@ -72,6 +72,22 @@ sealed class Model extends Equatable {
     "location": location
   };
 
+  void link(Model to) {}
+
+  void unlink(Model from) {}
+
+  Model linkTo(Model to) {
+    link(to);
+    to.link(this);
+    return this;
+  }
+
+  Model unlinkFrom(Model from) {
+    unlink(from);
+    from.unlink(this);
+    return this;
+  }
+
   @override
   List<Object> get props => [id, title, description, location];
 }

@@ -9,10 +9,13 @@ class Domain extends Model {
     super.description,
     this.isPersonal = false,
     required this.originatorId,
-    this.participantsIds = const <String>[],
-    this.observersIds = const <String>[],
-    this.models = const <String, String>{}
-  });
+    List<String>? participantsIds,
+    List<String>? observersIds,
+    Map<String, String>? models
+  }) :
+    participantsIds = participantsIds ?? <String>[],
+    observersIds = observersIds ?? <String>[],
+    models = models ?? <String, String>{};
   
   Domain.fromJson(super.json) :
     isPersonal = (json['isCompleted'] ?? false) as bool,
@@ -32,14 +35,14 @@ class Domain extends Model {
   final String originatorId;
 
   @HiveField(6)
-  final List<String> participantsIds;
+  List<String> participantsIds = <String>[];
 
   @HiveField(7)
-  final List<String> observersIds;
+  List<String> observersIds;
 
   // Model ID: Model Type
   @HiveField(8)
-  final Map<String, String> models;
+  Map<String, String> models;
 
   Domain copyWith({
     String? id,
@@ -71,6 +74,20 @@ class Domain extends Model {
     "observersIds": observersIds,
     "models": models,
   });
+
+  @override
+  void link(Model to) {
+    switch (to) {
+      case User():
+        observersIds.add(to.id);
+      default:
+        models[to.id] = to.type;
+    }
+  }
+
+  @override
+  void unlink(Model from) {
+  }
 
   @override
   List<Object> get props => super.props + [isPersonal, originatorId, participantsIds, observersIds, models];

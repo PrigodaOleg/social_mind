@@ -6,8 +6,9 @@ class User extends Model {
   User({
     super.id,
     required this.name,
-    this.domainsIds = const <String>[]
-  });
+    List<String>? domainsIds
+  }) :
+    domainsIds = domainsIds ?? <String>[];
 
   User.fromJson(super.json) :
     name = json['name'] as String,
@@ -22,7 +23,6 @@ class User extends Model {
 
   @HiveField(5)
   List<String> domainsIds;
-  // final List<String> domainsIds;
 
   @override
   Map<String, dynamic> toJson() => super.toJson()..addAll({
@@ -30,8 +30,24 @@ class User extends Model {
     "domainsIds": domainsIds
   });
 
-  User mutable() {
-    return User.fromJson(toJson());
+  @override
+  void link(Model to) {
+    switch (to) {
+      case Domain():
+        domainsIds.add(to.id);
+      default:
+        break;
+    }
+  }
+
+  @override
+  void unlink(Model from) {
+    switch (from) {
+      case Domain():
+        domainsIds.remove(from.id);
+      default:
+        break;
+    }
   }
 
   @override

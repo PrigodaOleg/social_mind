@@ -81,6 +81,13 @@ class FirebaseStorage {
   
   Future<int> saveItems(Map<String, dynamic> items) async {
     // https://firebase.google.com/docs/database/flutter/read-and-write
+    // 15.12.2024
+    // Тут надо не забыть обрабатывать ошибки связи с базой, ошибки прав доступа или правил работы с объектами.
+    // Также считаем, что у нас работает контракт - если эта функция выполнилась, то все элементы сохранены.
+    // В подтверждение этого возвращаем количество элементов, которое было сохранено.
+    // Конечно, это плохой контракт. Возвращать нужно не количество, а конкретные идентификаторы.
+    // А также идентификаторы, которые сохранить не удалось.
+    // todo: переделать на возврат идентификаторов (структуру или класс с успешными, неуспешными и ошибками)
 
     // try {
       Map<String, Object?> updates = {};
@@ -91,6 +98,18 @@ class FirebaseStorage {
     // } catch (error) {
     //   print(error);
     // }
+    return items.length;
+  }
+
+  Future<int> deleteItems(Map<String, dynamic> items) async {
+    // for (dynamic item in items.values) {
+    //   database.child('models/${item.id}').remove();
+    // }
+    Map<String, Object?> updates = {};
+    for (dynamic item in items.values) {
+      updates['models/${item.id}'] = null;
+    }
+    database.update(updates);
     return items.length;
   }
 
