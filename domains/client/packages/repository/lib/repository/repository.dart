@@ -72,6 +72,7 @@ class Closee {}
 //          All data transmitted directly between user devices in encrypted form.
 //          Merge conflicts solves according user chousen merge politic.
 class Repository {
+  static late Repository instance;
   Repository();
 
   late Timer _sync;
@@ -101,6 +102,7 @@ class Repository {
     defaultSyncSubscriber = addSyncListener(_defaultSyncListener);
     _sync = Timer(delayedSync);
     _sync.start();
+    instance = this;
   }
 
   int addSyncListener(SyncListener syncListener) {
@@ -232,31 +234,31 @@ class Repository {
     _sync.postpone();
   }
 
-  Future<void> saveModel(
+  void saveModel(
     Model model,
     [int? subscriberId] // Item ID - sync callback pair
-  ) async {
-    await _localStorage.storeItem(model);
+  ) {
+    _localStorage.storeItem(model);
     _subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
     _sync.postpone();
   }
 
-  Future<Model> getModel(
+  Model getModel(
     String modelId,
     [int? subscriberId] // Item ID - sync callback pair
-  ) async {
-    Model model = await _localStorage.getItem(id: modelId);
+  ) {
+    Model model = _localStorage.getItem(id: modelId);
     _subscribeToSync(modelId, subscriberId);
     _sync.postpone();
     return model;
   }
 
-  Future<Map<String, T>> getModels<T>(
+  Map<String, T> getModels<T>(
     List<String> ids,
     [int? subscriberId]
-  ) async {
-    Map<String, T> models = await _localStorage.getItems(ids);
+  ) {
+    Map<String, T> models = _localStorage.getItems(ids);
     _subscribeToSyncAll(ids, subscriberId);
     _markSyncedAll(models);
     _sync.postpone();
@@ -274,29 +276,29 @@ class Repository {
     _sync.postpone();
   }
 
-  Future<void> deleteModel(
+  void deleteModel(
     Model model,
     [int? subscriberId] // Item ID - sync callback pair
-   ) async {
+  ) {
     outgoingDeletes.addLast(model);
     _sync.postpone();
-   }
+  }
 
   // # Settings
 
   // Get user associated with this instance of application
   // User must be set already
-  Future<User> me() async {
-    User? me = await _localStorage.getItem(id: myId);
+  User get me {
+    User? me = _localStorage.getItem(id: myId);
     if (me == null) {
       throw StateError('No such user in local storage $myId');
     }
-    return me; // ну это костыль, конечно, но что делать, если хайв возвращает строго немутабельный объект
+    return me;
   }
   // Call once at startup
-  setMyself(User me) async {
+  set me(User me) {
     myId = me.id;
-    await _localStorage.storeItem(me);
+    _localStorage.storeItem(me);
     _syncModel(me);
   }
 
@@ -349,7 +351,7 @@ class Repository {
   // войти в домен, выйти из домена, создать домен, пригласить в домен, удалить из домена, удалить домен...
   // перенести домен в другое хранилище
   Future<Map<String, Domain>> getDomains(User user) async {
-    Map<String, Domain> domains = (await _localStorage.getItems(user.domainsIds)).cast<String, Domain>();
+    Map<String, Domain> domains = (_localStorage.getItems(user.domainsIds)).cast<String, Domain>();
     // _user.domainsIds.forEach((domainId) async {
     //   domains[domainId] = await _localStorage.getItem(id: domainId);
     // });
@@ -357,7 +359,7 @@ class Repository {
   }
   Future<void> addDomain(Domain domain) async {
     // user.domainsIds.add(domain.id);
-    await _localStorage.storeItem(domain);
+    _localStorage.storeItem(domain);
   }
   Future<void> deleteDomain(Domain domain) async {
     // user.domainsIds.remove(domain.id);

@@ -41,23 +41,23 @@ class HiveStorage {
     return _taskBox.toMap().cast<String, Task>();
   }
 
-  Future<dynamic> getItem({required String id}) async {
+  dynamic getItem({required String id}) {
     // Get item by ID
-    return await _commonBox.get(id);
+    return _commonBox.get(id);
   }
 
-  Future<Map<String, T>> getItems<T>(List ids) async {
+  Map<String, T> getItems<T>(List ids) {
     // Get item by ID
     Map<String, T> items = {};
-    ids.forEach((id) async {
-      dynamic item = await _commonBox.get(id);
+    ids.forEach((id) {
+      dynamic item = _commonBox.get(id);
       if (item != null) items[id] = item;
     });
     return items;
   }
 
-  Future<void> storeItem(dynamic item) async {
-    await _commonBox.put(item.id, item);
+  void storeItem(dynamic item) {
+    _commonBox.put(item.id, item);
   }
 
   Future<int> storeItems(Map<String, dynamic> items) async {
