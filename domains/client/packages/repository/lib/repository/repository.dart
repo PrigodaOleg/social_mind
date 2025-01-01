@@ -78,7 +78,8 @@ class Repository {
   late Timer _sync;
 
   // User associated with this application instance
-  late String myId;
+  // late String myId;
+
   late int defaultSyncSubscriber;
 
   late final HiveStorage _localStorage;
@@ -122,8 +123,8 @@ class Repository {
     syncBackIndex.remove(subscriberId);
   }
 
-  void _defaultSyncListener(String id, dynamic syncedItem) {
-    _localStorage.storeItem(syncedItem);
+  void _defaultSyncListener(String id, dynamic syncedItem) async {
+    await _localStorage.storeItem(syncedItem);
   }
 
   void delayedSync() async {
@@ -160,6 +161,14 @@ class Repository {
     // todo: пересмотреть всю политику синхронизации с учетом возможных ошибок правил и доступов, а также учесть тот факт,
     //        что в самих объектах есть поле, которое указывает, где необходимо располагать данный объект.
     // Пока просто добавим удаление без учета ошибок.
+    //
+    // 10.12.2024
+    // При приеме моделей из удаленного хранилища нужно их обязательно мержить/класть в локальное хранилище,
+    // поскольку их там либо нет, либо они там старые.
+    // Как понять, что они там старые? Пока есть идея завести внутри модели счетчик, и инкрементировать его при каждом изменении модели.
+    // Однако, если на другом устройстве другой пользователь тоже будет инкрементить этот счетчик, то показания разойдутся.
+    // Может 2 счетчика? Типа каким был счетчик до того, как я начал его менять и какой счетчик сейчас.
+    // При мерже находить более раннее значение счетчика и отсчитывать мерж от него.
 
     // Отправляем локальные удаления в удаленное хранилище
     int deleted = await _remoteStorage.deleteItems(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
@@ -182,6 +191,8 @@ class Repository {
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
     var idsToSync = incomingSyncIds.keys.toSet().difference(syncedThisTime).toList();
     var syncedModels = await _remoteStorage.getItems(idsToSync);
+    // Вот тут, внимание(!), сохраняем приехвашие изменения в локальное хранилище, хотя надо делать слияние
+    await _localStorage.storeItems(syncedModels);
     // Вызываем для каждого синхронизированного элемента событие для слушателя
     for (final id in idsToSync) {
       _findAndCallListeners(id);
@@ -195,7 +206,7 @@ class Repository {
     incomingSyncIds[id]?.forEach((subscriberId) async {
       Model? model = await _remoteStorage.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
       model?.sync = SyncStatus.synced;
-      syncedThisTime.add(id);
+      syncedThisTime.add(id); // todo: тут ошибка - если в удаленном репозитории такой модели нет, то ее надо либо туда загрузить, либо удалить тут, тихо промолчать нельзя
       // print(model);
       if (model != null) syncListeners[subscriberId]?.call(id, model);
     });
@@ -234,23 +245,29 @@ class Repository {
     _sync.postpone();
   }
 
-  void saveModel(
+  Future<void> saveModel(
     Model model,
     [int? subscriberId] // Item ID - sync callback pair
-  ) {
-    _localStorage.storeItem(model);
+  ) async  {
+    await _localStorage.storeItem(model);
     _subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
     _sync.postpone();
   }
 
-  Model getModel(
+  T? getModel<T>(
     String modelId,
     [int? subscriberId] // Item ID - sync callback pair
   ) {
-    Model model = _localStorage.getItem(id: modelId);
+    T? model = _localStorage.getItem(id: modelId);
     _subscribeToSync(modelId, subscriberId);
     _sync.postpone();
+    return model;
+  }
+
+  Future<T?> getModelNow<T>(String modelId) async {
+    T? model = _localStorage.getItem(id: modelId);
+    model = model ?? await _remoteStorage.getItem(id: modelId);
     return model;
   }
 
@@ -284,43 +301,42 @@ class Repository {
     _sync.postpone();
   }
 
-  // # Settings
-
   // Get user associated with this instance of application
   // User must be set already
   User get me {
-    User? me = _localStorage.getItem(id: myId);
+    if (myId == null) {
+      throw StateError('Locak user is unknown: $myId');
+    }
+    User? me = _localStorage.getItem(id: myId!);
     if (me == null) {
-      throw StateError('No such user in local storage $myId');
+      throw StateError('No such user in local storage: $myId');
     }
     return me;
   }
   // Call once at startup
   set me(User me) {
-    myId = me.id;
-    _localStorage.storeItem(me);
-    _syncModel(me);
+    // unfortunately store item is async, so set callback to sync user with remote storage
+    _localStorage.storeItem(me).then((value) => _syncModel(me));
+    // _syncModel(me);
+    myId = me.id; // actually its async, so no call ME immediately after that? wait for second
   }
+
+  // # Settings
+  // Contains such data as credentials, active auth tokens...
 
   // ## Operational settings - always local
-  // Contains such data as credentials, active auth tokens...
   // создать нового пользователя, получить его токен или креды, сохранить токен, креды или авторизацию
-  Future<void> setLocalUser(User user) async {
-    await _localStorage.setUser(user);
+  // Gel local uder Id
+  String? get myId {
+    return _localStorage.getUserId();
   }
-  Future<User?> getLocalUser({
-    // Item ID - sync callback pair
-    Map<String, SyncListener>? syncListeners,
-  }) async {
-    return await _localStorage.getUser();
-  }
-  Future<void> removeLocalUser() async {throw UnimplementedError('repository removeLocalUser');}
-  Future<void> flushLocalStorage() async {throw UnimplementedError('repository flushLocalStorage');}
-  Future<void> setRemoteAuth(auth) async {}
-  Future<void> setRemoteUser(User user) async {_remoteStorage.setUser(user);}
-  Future<User?> getRemoteUser() async {return await _remoteStorage.getUser();}
-  Future<void> removeRemoteUser(User user) async {throw UnimplementedError('repository removeRemoteUser');}
 
+  set myId(String? id) {
+    // setUserId is async? so just start saving and leave
+    if (id != null) {
+      _localStorage.setUserId(id);
+    }
+  }
 
   // ## User settings
   // Contains such data as theme, default type of repo to store user data (local or remote).
@@ -328,11 +344,6 @@ class Repository {
   Future<void> saveUserSettings() async {}
 
   // ## User data - local/remote
-
-  // Close people (known users)
-  Future<Map<String, Closee>> getClosers() async {throw UnimplementedError('repository getClosers');}
-  Future<void> addClosee(Closee closee) async {throw UnimplementedError('repository addClosePerson');}
-  Future<void> removeClosee(Closee closee) async {throw UnimplementedError('repository removeClosePerson');}
 
   // ### Tasks
   // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
@@ -346,30 +357,4 @@ class Repository {
     await _remoteStorage.save(item: task);
   }
   Future<void> removeTask(Task task) async {throw UnimplementedError('repository removeTask');}
-
-  // ### Domains
-  // войти в домен, выйти из домена, создать домен, пригласить в домен, удалить из домена, удалить домен...
-  // перенести домен в другое хранилище
-  Future<Map<String, Domain>> getDomains(User user) async {
-    Map<String, Domain> domains = (_localStorage.getItems(user.domainsIds)).cast<String, Domain>();
-    // _user.domainsIds.forEach((domainId) async {
-    //   domains[domainId] = await _localStorage.getItem(id: domainId);
-    // });
-    return domains;
-  }
-  Future<void> addDomain(Domain domain) async {
-    // user.domainsIds.add(domain.id);
-    _localStorage.storeItem(domain);
-  }
-  Future<void> deleteDomain(Domain domain) async {
-    // user.domainsIds.remove(domain.id);
-    await _localStorage.deleteItem(domain.id);
-  }
-  Future<void> inviteToDomain(Closee closee) async {throw UnimplementedError('repository inviteToDomain');}
-  Future<void> excludeFromDomain(Closee closee) async {throw UnimplementedError('repository excludeFromDomain');}
-
-  // ### Projects
-  // ### Periods
-  // ### Events
-  // ...
 }

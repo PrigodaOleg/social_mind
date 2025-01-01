@@ -7,27 +7,27 @@ import 'package:repository/repository.dart';
 class SplashScreen extends StatelessWidget {
   const SplashScreen({
     super.key,
-    required this.nextScreen,
+    required this.nextRoute,
     required this.lottieAsset,
     required this.repository,
     this.backgroundTask
   });
 
-  final Widget nextScreen;
+  final String nextRoute;
   final String lottieAsset;
   final Repository repository;
-  final Future<Widget?> Function(Repository repository)? backgroundTask;
+  final Future<String?> Function(Repository repository)? backgroundTask;
 
   get splash => null;
 
-  Future<Widget> screenFunction() async {
-    return await backgroundTask?.call(repository) ?? nextScreen;
+  Future<String> routeFunction() async {
+    return await backgroundTask?.call(repository) ?? nextRoute;
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSplashScreen.withScreenFunction(
-      screenFunction: screenFunction,
+    return AnimatedSplashScreen.withScreenRouteFunction(
+      screenRouteFunction: routeFunction,
       animationDuration: const Duration(milliseconds: 200),
       duration: 1000,
       splash: Column(
@@ -40,7 +40,6 @@ class SplashScreen extends StatelessWidget {
           )
         ],
       ),
-      // nextScreen: nextScreen,
       splashIconSize: 400,
       pageTransitionType: PageTransitionType.fade,
     );

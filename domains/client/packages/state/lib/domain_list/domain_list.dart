@@ -34,7 +34,12 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
   ) async {
     listenerId = _repo.addSyncListener((id, item) {
       if (!isClosed) {
-        add(DomainSyncRequested(domains: {id: item}));
+        switch (item) {
+          case Domain _:
+            add(DomainSyncRequested(domains: {id: item}));
+            break;
+          default:
+        }
       }
     });
     User me = _repo.me;
@@ -47,13 +52,13 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     Emitter<DomainListState> emit,
   ) async {
     User me = _repo.me;
+
     var newDomain = Domain(originatorId: me.id, title: event.title);
-    me.linkTo(newDomain);
-    
-    await _repo.saveModels([me, newDomain], listenerId);
-    
-    Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
-    emit(state.copyWith(domains: () => domains));
+    await me.linkTo(newDomain, listenerId);
+        
+    // Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
+    // emit(state.copyWith(domains: () => domains));
+    emit(state.copyWith(domains: () => state.domains..addAll({newDomain.id: newDomain})));
   }
 
   Future<void> _onSync(
@@ -72,9 +77,8 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     }
     final domainToDelete = event.domain;
     User me = _repo.me;
-    me.unlinkFrom(domainToDelete);
-    _repo.deleteModel(domainToDelete);
-    _repo.saveModel(me, listenerId);
+    
+    await me.unlinkFrom(domainToDelete);
 
     Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));

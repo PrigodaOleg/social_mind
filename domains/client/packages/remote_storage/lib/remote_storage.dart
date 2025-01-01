@@ -13,6 +13,7 @@ class FirebaseStorage {
 
   final models = <String, Function(Map<String, dynamic>)>{
     'Domain': (json) => Domain.fromJson(json),
+    'User': (json) => User.fromJson(json),
   };
 
   Future<void> init() async {
@@ -74,8 +75,14 @@ class FirebaseStorage {
   }
 
   Future<Map<String, dynamic>> getItems(List ids) async {
-    // Get item by ID
+    // Get items by list of IDs
     Map<String, dynamic> items = {};
+    for (var id in ids) {
+      var item = await getItem(id: id);
+      if (item != null) {
+        items.addAll({id: item});
+      }
+    }
     return items;
   }
   

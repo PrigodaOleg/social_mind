@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:repository/repository/repository.dart';
 import 'package:uuid/uuid.dart';
 
 part 'user.dart';
@@ -76,15 +77,24 @@ sealed class Model extends Equatable {
 
   void unlink(Model from) {}
 
-  Model linkTo(Model to) {
+  Future<Model> linkTo(
+    Model to,
+    [int? subscriberId]
+  ) async {
     link(to);
     to.link(this);
+    await Repository.instance.saveModels([this, to], subscriberId);
     return this;
   }
 
-  Model unlinkFrom(Model from) {
+  Future<Model> unlinkFrom(
+    Model from,
+    [int? subscriberId]
+  ) async {
     unlink(from);
     from.unlink(this);
+    await Repository.instance.saveModel(this, subscriberId);
+    Repository.instance.deleteModel(from, subscriberId);
     return this;
   }
 

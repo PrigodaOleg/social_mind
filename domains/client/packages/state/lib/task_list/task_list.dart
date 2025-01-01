@@ -22,7 +22,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     TaskListStateInitRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    selfUserId = (await _repository.getLocalUser())?.id ?? '';
+    selfUserId = _repository.myId ?? '';
     Map<String, Task> tasks = await _repository.getTasks();
     final placeholderTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));

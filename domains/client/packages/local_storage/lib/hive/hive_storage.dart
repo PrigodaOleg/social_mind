@@ -24,6 +24,14 @@ class HiveStorage {
     _commonBox = await Hive.openBox(commonBoxName);
   }
 
+  String? getUserId() {
+    return _operationalBox.get('userId');
+  }
+
+  Future<void> setUserId(String userId) async {
+    return await _operationalBox.put('userId', userId);
+  }
+
   Future<User?> getUser() async {
     return await _operationalBox.get('user');
   }
@@ -56,8 +64,8 @@ class HiveStorage {
     return items;
   }
 
-  void storeItem(dynamic item) {
-    _commonBox.put(item.id, item);
+  Future<void> storeItem(dynamic item) async {
+    await _commonBox.put(item.id, item);
   }
 
   Future<int> storeItems(Map<String, dynamic> items) async {
