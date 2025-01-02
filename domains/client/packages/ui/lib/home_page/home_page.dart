@@ -41,21 +41,11 @@ class HomeView extends StatelessWidget {
       body: ListView( // todo: Change to GridView
         children: [
           IconButton(
-            onPressed: () {n.push(MaterialPageRoute(
-              builder: (context) => TaskListPage(
-                title: l.taskListPageName,
-                repository: repository
-              )
-            ));},
+            onPressed: () {n.pushNamed('/tasks');},
             icon: const Icon(Icons.task_alt)
           ),
           IconButton(
-            onPressed: () {n.push(MaterialPageRoute(
-              builder: (context) => DomainListPage(
-                title: l.domainListPageName,
-                repository: repository
-              )
-            ));},
+            onPressed: () {n.pushNamed('/domains');},
             icon: const Icon(Icons.group_work)
           ),
         ],

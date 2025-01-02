@@ -75,6 +75,8 @@ class Repository {
   static late Repository instance;
   Repository();
 
+  bool late = true;
+
   late Timer _sync;
 
   // User associated with this application instance
@@ -104,6 +106,7 @@ class Repository {
     _sync = Timer(delayedSync);
     _sync.start();
     instance = this;
+    late = false;
   }
 
   int addSyncListener(SyncListener syncListener) {
@@ -335,6 +338,17 @@ class Repository {
     // setUserId is async? so just start saving and leave
     if (id != null) {
       _localStorage.setUserId(id);
+    }
+  }
+
+  String? get lastRoute {
+    return _localStorage.getOperational('lastRoute');
+  }
+
+  set lastRoute(String? lastRoute) {
+    if (late) return;
+    if (lastRoute != null) {
+      _localStorage.setOperational('lastRoute', lastRoute);  // await
     }
   }
 

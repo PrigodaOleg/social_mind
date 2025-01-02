@@ -24,14 +24,7 @@ class IntroductionPage extends StatelessWidget {
               User? tryingUser = await repository.getModelNow<User>(userId);
               if (tryingUser != null) {
                 repository.me = tryingUser;
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => HomePage(
-                      title: "123",
-                      repository: repository
-                    )
-                  )
-                );
+                Navigator.of(context).pushNamed('/home');
               }
             },
             onChanged: (value) {
@@ -45,14 +38,7 @@ class IntroductionPage extends StatelessWidget {
                   User? tryingUser = await repository.getModelNow<User>(userId);
                   if (null != tryingUser) {
                     repository.me = tryingUser;
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => HomePage(
-                          title: "123",
-                          repository: repository
-                        )
-                      )
-                    );
+                    Navigator.of(context).pushNamed('/home');
                   }
                 },
                 child: Text('Existing user')
@@ -60,14 +46,7 @@ class IntroductionPage extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   repository.me = User(name: 'DebugUser');
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => HomePage(
-                        title: "123",
-                        repository: repository
-                      )
-                    )
-                  );
+                  Navigator.of(context).pushNamed('/home');
                 },
                 child: Text('New User')
               )

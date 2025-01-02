@@ -24,6 +24,14 @@ class HiveStorage {
     _commonBox = await Hive.openBox(commonBoxName);
   }
 
+  String? getOperational(String key) {
+    return _operationalBox.get(key);
+  }
+
+  Future<void> setOperational(String key, String value) async {
+    return await _operationalBox.put(key, value);
+  }
+
   String? getUserId() {
     return _operationalBox.get('userId');
   }
