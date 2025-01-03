@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:state/state.dart';
-import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
+import 'package:ui/ui.dart';
 
 
 
@@ -43,30 +43,34 @@ class DomainListView extends StatelessWidget {
             body: ListView(
               children: [
                 for (final (index, domain) in state.domains.values.indexed)
-                  Row(
-                    children: [
-                      Text(domain.title),
-                      IconButton(
-                        onPressed: () {
-                          BlocProvider.of<DomainListBloc>(context).add(
-                            DomainChangingRequested(domain: domain)
-                          );
-                        },
-                        icon: const Icon(Icons.create)
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          BlocProvider.of<DomainListBloc>(context).add(
-                            DomainDeletionRequested(domain: domain)
-                          );
-                        },
-                        icon: const Icon(Icons.delete)
-                      ),
-                      domain.sync == SyncStatus.no ?
-                        const Icon(Icons.sd_storage) :
-                        const Icon(Icons.cloud_done_outlined)
-                    ],
+                  ListTile(
+                    title: Text(domain.title),
+                    onTap: () => Navigator.of(context).pushNamed('${DomainContentPage.routeName}/${domain.id}', arguments: {'id': domain.id}),
                   ),
+                  // Row(
+                  //   children: [
+                  //     Text(domain.title),
+                  //     IconButton(
+                  //       onPressed: () {
+                  //         BlocProvider.of<DomainListBloc>(context).add(
+                  //           DomainChangingRequested(domain: domain)
+                  //         );
+                  //       },
+                  //       icon: const Icon(Icons.create)
+                  //     ),
+                  //     IconButton(
+                  //       onPressed: () {
+                  //         BlocProvider.of<DomainListBloc>(context).add(
+                  //           DomainDeletionRequested(domain: domain)
+                  //         );
+                  //       },
+                  //       icon: const Icon(Icons.delete)
+                  //     ),
+                  //     domain.sync == SyncStatus.no ?
+                  //       const Icon(Icons.sd_storage) :
+                  //       const Icon(Icons.cloud_done_outlined)
+                  //   ],
+                  // ),
                 IconButton(
                   onPressed: () {
                     BlocProvider.of<DomainListBloc>(context).add(

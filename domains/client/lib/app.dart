@@ -3,6 +3,7 @@ import 'package:ui/domain_list_page/domain_list_page.dart';
 import 'package:ui/ui.dart';
 import 'package:repository/repository.dart';
 
+// Reference: https://stackoverflow.com/questions/57537347/how-to-save-last-opened-screen-in-flutter-app
 class AppRouteObserver extends RouteObserver {
   AppRouteObserver(this.repository);
   Repository repository;
@@ -78,6 +79,7 @@ class App extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       navigatorObservers: <NavigatorObserver>[AppRouteObserver(repository)],
+      // Reference: https://stackoverflow.com/questions/70730934/how-do-i-detect-if-app-was-launched-with-a-route-in-flutter-web
       onGenerateInitialRoutes: (initialRoute) => [
         MaterialPageRoute(
           builder: (context) => SplashScreen(
@@ -94,6 +96,39 @@ class App extends StatelessWidget {
         '/home': (context) => HomePage(title: AppLocalizations.of(context).homePageName, repository: repository),
         '/domains': (context) => DomainListPage(title: AppLocalizations.of(context).domainListPageName, repository: repository),
         '/tasks': (context) => TaskListPage(title: AppLocalizations.of(context).taskListPageName, repository: repository),
+        // DomainContentPage.routeName: (context) => DomainContentPage(repository),
+      },
+      onGenerateRoute: (settings) {
+        // Здесь обрабатываем всякие непонятные маршруты
+        // Например, с параметрами или динамические
+        // Сперва извлекаем параметры из настроек, потом из маршрута, если они есть
+        final arguments = <String, dynamic>{};
+        final uri = Uri.parse(settings.name ?? '');
+        final id = uri.path.split('/').last;
+        if (settings.arguments != null) arguments.addAll(settings.arguments as Map<String, dynamic>);
+        if (uri.hasQuery) arguments.addAll(uri.queryParameters);
+        if (id.isNotEmpty) arguments['id'] = id;
+        final routeSettings = RouteSettings(name: settings.name, arguments: arguments);
+        // final x = uri.removeFragment().path;
+        
+        // Сохраняем последний маршрут, по которому ходил пользователь
+        // Кстати, а, может быть, нужно сохранять весь стек маршрутов, чтобы сохранялась вся история переходов? 
+        // Если он пуст, то тогда идем по маршруту поумолчанию
+        repository.lastRoute = Uri(path: uri.path, queryParameters: arguments).toString();
+
+        // Ищем маршрут без всяческих параметров
+        final rootRoute = uri.path.substring(0, uri.path.lastIndexOf('/'));
+        switch (rootRoute) {
+          case DomainContentPage.routeName:
+            // Этот маршрут не работает без аргументов
+            if (arguments.isEmpty) break;
+            return MaterialPageRoute(builder: (context) => DomainContentPage(repository),settings: routeSettings);
+          default:
+            return MaterialPageRoute(
+              builder: (context) => HomePage(title: AppLocalizations.of(context).homePageName, repository: repository),
+              settings: const RouteSettings(name: '/home', arguments: null)
+            );
+        }
       },
     );
   }
