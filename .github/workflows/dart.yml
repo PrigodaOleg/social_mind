@@ -67,7 +67,7 @@ jobs:
           --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
 
       - name: 'Upload APK'
-        uses: 'actions/upload-artifact@v2'
+        uses: 'actions/upload-artifact@v4'
         with:
           name: 'Closers'
           path: './domains/client/build/app/outputs/flutter-apk/'
