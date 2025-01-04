@@ -9,17 +9,20 @@ import 'package:repository/repository.dart';
 
 
 class TaskListPage extends StatelessWidget {
+
+  static const routeName = '/tasklist';
+
   const TaskListPage({
     super.key,
-    required this.title,
-    required this.repository});
-  final String title;
+    required this.repository
+  });
   final Repository repository;
 
   @override
   Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     return BlocProvider(
-      create: (context) => TaskListBloc(repository: repository),
+      create: (context) => TaskListBloc(repository: repository, parentId: args['id']),
       child: const TaskListView(),
     );
   }
@@ -31,6 +34,8 @@ class TaskListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final t = Theme.of(context);
+    final b = BlocProvider.of<TaskListBloc>(context);
     // final repo = context.read(Repository);
     return BlocProvider<TaskListBloc>(
       create: (context) => context.read<TaskListBloc>()
@@ -39,7 +44,7 @@ class TaskListView extends StatelessWidget {
         builder: (context, state) {
           return Scaffold(
             appBar: AppBar(
-              backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+              backgroundColor: t.colorScheme.inversePrimary,
               title: Text(l.taskListPageName),
             ),
             body: ListView(
@@ -49,13 +54,13 @@ class TaskListView extends StatelessWidget {
                     title: task.title,
                     value: task.isCompleted,
                     backgroundColor: index.isEven ? 
-                      Theme.of(context).colorScheme.surface : 
+                      t.colorScheme.surface : 
                       Color.lerp(
-                        Theme.of(context).colorScheme.surface,
-                        Theme.of(context).colorScheme.primary,
+                        t.colorScheme.surface,
+                        t.colorScheme.primary,
                         0.07),
                     onValueChanged: (bool? isComplited) {
-                      BlocProvider.of<TaskListBloc>(context).add(
+                      b.add(
                         TaskCompletionRequested(
                           task: task,
                           isComplited: isComplited ?? false
@@ -63,7 +68,7 @@ class TaskListView extends StatelessWidget {
                       );
                     },
                     onTitleSubmitted: (submittedText) {
-                      BlocProvider.of<TaskListBloc>(context).add(
+                      b.add(
                         TaskSubmitionRequested(
                           task: task,
                           submittedText: submittedText
@@ -83,7 +88,7 @@ class TaskListView extends StatelessWidget {
             ),
             // floatingActionButton: FloatingActionButton(
             //   onPressed: () {
-            //     BlocProvider.of<TaskListBloc>(context).add(
+            //     b.add(
             //       const TaskAddRequested()
             //     );
             //   },

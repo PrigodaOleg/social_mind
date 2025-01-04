@@ -95,8 +95,6 @@ class App extends StatelessWidget {
         '/': (context) => IntroductionPage(repository),
         '/home': (context) => HomePage(title: AppLocalizations.of(context).homePageName, repository: repository),
         '/domains': (context) => DomainListPage(title: AppLocalizations.of(context).domainListPageName, repository: repository),
-        '/tasks': (context) => TaskListPage(title: AppLocalizations.of(context).taskListPageName, repository: repository),
-        // DomainContentPage.routeName: (context) => DomainContentPage(repository),
       },
       onGenerateRoute: (settings) {
         // Здесь обрабатываем всякие непонятные маршруты
@@ -112,7 +110,7 @@ class App extends StatelessWidget {
         // final x = uri.removeFragment().path;
         
         // Сохраняем последний маршрут, по которому ходил пользователь
-        // Кстати, а, может быть, нужно сохранять весь стек маршрутов, чтобы сохранялась вся история переходов? 
+        // TODO: Кстати, а, может быть, нужно сохранять весь стек маршрутов, чтобы сохранялась вся история переходов? 
         // Если он пуст, то тогда идем по маршруту поумолчанию
         repository.lastRoute = Uri(path: uri.path, queryParameters: arguments).toString();
 
@@ -120,15 +118,23 @@ class App extends StatelessWidget {
         final rootRoute = uri.path.substring(0, uri.path.lastIndexOf('/'));
         switch (rootRoute) {
           case DomainContentPage.routeName:
-            // Этот маршрут не работает без аргументов
+            // Этот маршрут не работает без идентификатора домена среди аргументов
             if (arguments.isEmpty) break;
-            return MaterialPageRoute(builder: (context) => DomainContentPage(repository),settings: routeSettings);
+            return MaterialPageRoute(builder: (context) => DomainContentPage(repository), settings: routeSettings);
+          case TaskListPage.routeName:
+            // Этому маршруту нужен идентификатор родителя среди аргументов
+            if (arguments.isEmpty) break;
+            return MaterialPageRoute(builder: (context) => TaskListPage(repository: repository,), settings: routeSettings);
           default:
             return MaterialPageRoute(
               builder: (context) => HomePage(title: AppLocalizations.of(context).homePageName, repository: repository),
               settings: const RouteSettings(name: '/home', arguments: null)
             );
         }
+        return MaterialPageRoute(
+          builder: (context) => HomePage(title: AppLocalizations.of(context).homePageName, repository: repository),
+          settings: const RouteSettings(name: '/home', arguments: null)
+        );
       },
     );
   }

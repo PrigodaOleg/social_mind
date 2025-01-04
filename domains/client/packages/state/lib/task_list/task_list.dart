@@ -5,9 +5,9 @@ import 'package:repository/repository.dart';
 
 class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   TaskListBloc({
-    required Repository repository
-    }) : _repository = repository,
-     super(const TaskListState()) {
+    required this.repository,
+    required this.parentId
+    }) : super(const TaskListState()) {
     on<TaskListStateInitRequested>(_onStateInit);
     on<TaskAddRequested>(_onTaskAdd);
     on<TaskCompletionRequested>(_onComplited);
@@ -15,15 +15,18 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     on<TaskChangingRequested>(_onChanged);
   }
 
-  final Repository _repository;
+  final Repository repository;
+  final String parentId;
   late final String selfUserId;
 
   Future<void> _onStateInit(
     TaskListStateInitRequested event,
     Emitter<TaskListState> emit,
   ) async {
-    selfUserId = _repository.myId ?? '';
-    Map<String, Task> tasks = await _repository.getTasks();
+    selfUserId = repository.myId ?? '';
+    final parent = repository.getModel<Model>(parentId);
+    Map<String, Task> tasks = {};
+    if (parent != null) tasks = repository.getModels<Task>(parent.ids<Task>());
     final placeholderTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
   }
@@ -44,7 +47,7 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
       return;
     }
     final changedTask = event.task.copyWith(isCompleted: event.isComplited);
-    await _repository.addTask(changedTask);
+    await repository.saveModel(changedTask);
     emit(state.copyWith(tasks: () => state.tasks..update(changedTask.id, (v) => changedTask)));
   }
   
@@ -53,7 +56,9 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     Emitter<TaskListState> emit,
   ) async {
     final changedTask = event.task.copyWith(title: event.submittedText);
-    await _repository.addTask(changedTask);
+    final parent = repository.getModel<Model>(parentId);
+    parent!.linkTo(changedTask);
+    // await repository.saveModel(changedTask);
     final placeholderTask = Task(originatorId: selfUserId);
     emit(state.copyWith(tasks: () => state.tasks
       ..update(changedTask.id, (task) => changedTask)

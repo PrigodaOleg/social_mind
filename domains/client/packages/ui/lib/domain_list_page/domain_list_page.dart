@@ -29,6 +29,9 @@ class DomainListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final n = Navigator.of(context);
+    final t = Theme.of(context);
+    final b = BlocProvider.of<DomainListBloc>(context);
     // final repo = context.read(Repository);
     return BlocProvider<DomainListBloc>(
       create: (context) => context.read<DomainListBloc>()
@@ -37,7 +40,7 @@ class DomainListView extends StatelessWidget {
         builder: (context, state) {
           return Scaffold(
             appBar: AppBar(
-              backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+              backgroundColor: t.colorScheme.inversePrimary,
               title: Text(l.domainListPageName),
             ),
             body: ListView(
@@ -45,14 +48,14 @@ class DomainListView extends StatelessWidget {
                 for (final (index, domain) in state.domains.values.indexed)
                   ListTile(
                     title: Text(domain.title),
-                    onTap: () => Navigator.of(context).pushNamed('${DomainContentPage.routeName}/${domain.id}', arguments: {'id': domain.id}),
+                    onTap: () => n.pushNamed('${DomainContentPage.routeName}/${domain.id}', arguments: {'id': domain.id}),
                   ),
                   // Row(
                   //   children: [
                   //     Text(domain.title),
                   //     IconButton(
                   //       onPressed: () {
-                  //         BlocProvider.of<DomainListBloc>(context).add(
+                  //         b.add(
                   //           DomainChangingRequested(domain: domain)
                   //         );
                   //       },
@@ -60,7 +63,7 @@ class DomainListView extends StatelessWidget {
                   //     ),
                   //     IconButton(
                   //       onPressed: () {
-                  //         BlocProvider.of<DomainListBloc>(context).add(
+                  //         b.add(
                   //           DomainDeletionRequested(domain: domain)
                   //         );
                   //       },
@@ -73,7 +76,7 @@ class DomainListView extends StatelessWidget {
                   // ),
                 IconButton(
                   onPressed: () {
-                    BlocProvider.of<DomainListBloc>(context).add(
+                    b.add(
                       const DomainCreationRequested('New domain')
                     );
                   },

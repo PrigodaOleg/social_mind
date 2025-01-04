@@ -62,18 +62,20 @@ class UserAdapter extends TypeAdapter<User> {
     };
     return User(
       id: fields[0] as String?,
-      name: fields[4] as String,
-      domainsIds: (fields[5] as List).cast<String>(),
-    );
+      name: fields[6] as String,
+      domainsIds: (fields[7] as List?)?.cast<String>(),
+    )
+      ..children = (fields[4] as Map).cast<String, String>()
+      ..parents = (fields[5] as Map).cast<String, String>();
   }
 
   @override
   void write(BinaryWriter writer, User obj) {
     writer
+      ..writeByte(8)
       ..writeByte(6)
-      ..writeByte(4)
       ..write(obj.name)
-      ..writeByte(5)
+      ..writeByte(7)
       ..write(obj.domainsIds)
       ..writeByte(0)
       ..write(obj.id)
@@ -82,7 +84,11 @@ class UserAdapter extends TypeAdapter<User> {
       ..writeByte(2)
       ..write(obj.description)
       ..writeByte(3)
-      ..write(obj.location);
+      ..write(obj.location)
+      ..writeByte(4)
+      ..write(obj.children)
+      ..writeByte(5)
+      ..write(obj.parents);
   }
 
   @override
@@ -110,27 +116,29 @@ class DomainAdapter extends TypeAdapter<Domain> {
       title: fields[1] as String,
       id: fields[0] as String?,
       description: fields[2] as String,
-      isPersonal: fields[4] as bool,
-      originatorId: fields[5] as String,
-      participantsIds: (fields[6] as List).cast<String>(),
-      observersIds: (fields[7] as List).cast<String>(),
-      models: (fields[8] as Map).cast<String, String>(),
-    );
+      isPersonal: fields[6] as bool,
+      originatorId: fields[7] as String,
+      participantsIds: (fields[8] as List?)?.cast<String>(),
+      observersIds: (fields[9] as List?)?.cast<String>(),
+      models: (fields[10] as Map?)?.cast<String, String>(),
+    )
+      ..children = (fields[4] as Map).cast<String, String>()
+      ..parents = (fields[5] as Map).cast<String, String>();
   }
 
   @override
   void write(BinaryWriter writer, Domain obj) {
     writer
-      ..writeByte(9)
-      ..writeByte(4)
-      ..write(obj.isPersonal)
-      ..writeByte(5)
-      ..write(obj.originatorId)
+      ..writeByte(11)
       ..writeByte(6)
-      ..write(obj.participantsIds)
+      ..write(obj.isPersonal)
       ..writeByte(7)
-      ..write(obj.observersIds)
+      ..write(obj.originatorId)
       ..writeByte(8)
+      ..write(obj.participantsIds)
+      ..writeByte(9)
+      ..write(obj.observersIds)
+      ..writeByte(10)
       ..write(obj.models)
       ..writeByte(0)
       ..write(obj.id)
@@ -139,7 +147,11 @@ class DomainAdapter extends TypeAdapter<Domain> {
       ..writeByte(2)
       ..write(obj.description)
       ..writeByte(3)
-      ..write(obj.location);
+      ..write(obj.location)
+      ..writeByte(4)
+      ..write(obj.children)
+      ..writeByte(5)
+      ..write(obj.parents);
   }
 
   @override
@@ -167,21 +179,23 @@ class TaskAdapter extends TypeAdapter<Task> {
       title: fields[1] as String,
       id: fields[0] as String?,
       description: fields[2] as String,
-      isCompleted: fields[4] as bool,
-      originatorId: fields[5] as String,
-      executorId: fields[6] as String,
-    );
+      isCompleted: fields[6] as bool,
+      originatorId: fields[7] as String,
+      executorId: fields[8] as String,
+    )
+      ..children = (fields[4] as Map).cast<String, String>()
+      ..parents = (fields[5] as Map).cast<String, String>();
   }
 
   @override
   void write(BinaryWriter writer, Task obj) {
     writer
-      ..writeByte(7)
-      ..writeByte(4)
-      ..write(obj.isCompleted)
-      ..writeByte(5)
-      ..write(obj.originatorId)
+      ..writeByte(9)
       ..writeByte(6)
+      ..write(obj.isCompleted)
+      ..writeByte(7)
+      ..write(obj.originatorId)
+      ..writeByte(8)
       ..write(obj.executorId)
       ..writeByte(0)
       ..write(obj.id)
@@ -190,7 +204,11 @@ class TaskAdapter extends TypeAdapter<Task> {
       ..writeByte(2)
       ..write(obj.description)
       ..writeByte(3)
-      ..write(obj.location);
+      ..write(obj.location)
+      ..writeByte(4)
+      ..write(obj.children)
+      ..writeByte(5)
+      ..write(obj.parents);
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:state/state.dart';
 import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
+import 'package:ui/task_list_page/task_list_page.dart';
 
 
 class DomainContentPage extends StatelessWidget {
@@ -27,10 +28,13 @@ class DomainContentPage extends StatelessWidget {
       body: ListView(
         children: [
           Text(domain.id),
-          for (final id in domain.models.keys)
-            ListTile(
-              title: Text(id),
-            ),
+          ListTile(
+            title: const Text('Tasks'),
+            onTap: () {
+              Navigator.of(context).pushNamed('${TaskListPage.routeName}/${domain.id}');
+            },
+            leading: const Icon(Icons.task_alt),
+          ),
           Row(
             children: [
               IconButton(

@@ -27,7 +27,7 @@ class Timer {
     _timerSubscription?.cancel();
     _timer = Stream.periodic(
       Duration(seconds: lastActualPeriod),
-      (x) => time! - x - 1
+      (x) => time - x - 1
     ).take(time);
     _timerSubscription = _timer?.listen(
       periodic,

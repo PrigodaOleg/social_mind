@@ -2,6 +2,7 @@ part of 'models.dart';
 
 
 @HiveType(typeId: 2)
+// ignore: must_be_immutable
 class Domain extends Model {
   Domain({
     super.title,
@@ -26,22 +27,23 @@ class Domain extends Model {
     super.fromJson();
     
   @override
+  // ignore: overridden_fields
   final String type = (Domain).toString();
   
-  @HiveField(4)
+  @HiveField(6)
   final bool isPersonal;
 
-  @HiveField(5)
+  @HiveField(7)
   final String originatorId;
 
-  @HiveField(6)
+  @HiveField(8)
   List<String> participantsIds = <String>[];
 
-  @HiveField(7)
+  @HiveField(9)
   List<String> observersIds;
 
   // Model ID: Model Type
-  @HiveField(8)
+  @HiveField(10)
   Map<String, String> models;
 
   Domain copyWith({
@@ -75,19 +77,19 @@ class Domain extends Model {
     "models": models,
   });
 
-  @override
-  void link(Model to) {
-    switch (to) {
-      case User():
-        observersIds.add(to.id);
-      default:
-        models[to.id] = to.type;
-    }
-  }
+  // @override
+  // void link(Model to) {
+  //   switch (to) {
+  //     case User():
+  //       observersIds.add(to.id);
+  //     default:
+  //       models[to.id] = to.type;
+  //   }
+  // }
 
-  @override
-  void unlink(Model from) {
-  }
+  // @override
+  // void unlink(Model from) {
+  // }
 
   @override
   List<Object> get props => super.props + [isPersonal, originatorId, participantsIds, observersIds, models];

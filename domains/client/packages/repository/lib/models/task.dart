@@ -2,6 +2,7 @@ part of 'models.dart';
 
 
 @HiveType(typeId: 0)
+// ignore: must_be_immutable
 class Task extends Model {
   Task({
     super.title,
@@ -19,18 +20,19 @@ class Task extends Model {
     super.fromJson();
     
   @override
+  // ignore: overridden_fields
   final String type = (Task).toString();
 
   /// Whether the `todo` is completed.
   ///
   /// Defaults to `false`.
-  @HiveField(4)
+  @HiveField(6)
   final bool isCompleted;
 
-  @HiveField(5)
+  @HiveField(7)
   final String originatorId;
 
-  @HiveField(6)
+  @HiveField(8)
   final String executorId;
   
   /// Returns a copy of this `todo` with the given values updated.
@@ -54,6 +56,7 @@ class Task extends Model {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() => super.toJson()..addAll({
     "isCompleted": isCompleted,
     "originatorId": originatorId, 

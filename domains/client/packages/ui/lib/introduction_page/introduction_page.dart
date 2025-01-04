@@ -3,12 +3,13 @@ import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
 
 class IntroductionPage extends StatelessWidget {
-  String userId = '';
   final Repository repository;
-  IntroductionPage(this.repository, {super.key});
+  const IntroductionPage(this.repository, {super.key});
 
   @override
   Widget build(BuildContext context) {
+    String userId = '';
+    final n = Navigator.of(context);
     return Scaffold(
       body: Column(
         children: [
@@ -23,7 +24,7 @@ class IntroductionPage extends StatelessWidget {
               User? tryingUser = await repository.getModelNow<User>(userId);
               if (tryingUser != null) {
                 repository.me = tryingUser;
-                Navigator.of(context).pushNamed('/home');
+                n.pushNamed('/home');
               }
             },
             onChanged: (value) {
@@ -37,17 +38,17 @@ class IntroductionPage extends StatelessWidget {
                   User? tryingUser = await repository.getModelNow<User>(userId);
                   if (null != tryingUser) {
                     repository.me = tryingUser;
-                    Navigator.of(context).pushNamed('/home');
+                    n.pushNamed('/home');
                   }
                 },
-                child: Text('Existing user')
+                child: const Text('Existing user')
               ),
               TextButton(
                 onPressed: () {
                   repository.me = User(name: 'DebugUser');
                   Navigator.of(context).pushNamed('/home');
                 },
-                child: Text('New User')
+                child: const Text('New User')
               )
             ],
           )
