@@ -65,6 +65,7 @@ class HiveStorage {
   Map<String, T> getItems<T>(List ids) {
     // Get item by ID
     Map<String, T> items = {};
+    // ignore: avoid_function_literals_in_foreach_calls
     ids.forEach((id) {
       dynamic item = _commonBox.get(id);
       if (item != null) items[id] = item;

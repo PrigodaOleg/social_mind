@@ -225,6 +225,7 @@ class Repository {
   }
 
   void _subscribeToSyncAll(List<String> modelIds, int? subscriberId) {
+    // ignore: avoid_function_literals_in_foreach_calls
     modelIds.forEach((id) {
       _subscribeToSync(id, subscriberId);
     });

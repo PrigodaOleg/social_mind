@@ -38,6 +38,7 @@ class FirebaseStorage {
         return User.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
       }
     } catch (error) {
+      // ignore: avoid_print
       print(error);
     }
     return null;
@@ -47,6 +48,7 @@ class FirebaseStorage {
     try {
       await database.child('users/${user.id}').update(user.toJson());
     } catch (error) {
+      // ignore: avoid_print
       print(error);
     }
   }
@@ -55,6 +57,7 @@ class FirebaseStorage {
     try {
       await database.child('tasks/${item.id}').update(item.toJson());
     } catch (error) {
+      // ignore: avoid_print
       print(error);
     }
   }
@@ -136,6 +139,7 @@ class FirebaseStorage {
         return tasks;
       }
     } catch (error) {
+      // ignore: avoid_print
       print(error);
     }
     return <String, Task>{};
