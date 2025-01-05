@@ -45,6 +45,7 @@ class DomainListView extends StatelessWidget {
             ),
             body: ListView(
               children: [
+                // ignore: unused_local_variable
                 for (final (index, domain) in state.domains.values.indexed)
                   ListTile(
                     title: Text(domain.title),
