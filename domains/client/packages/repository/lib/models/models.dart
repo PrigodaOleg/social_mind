@@ -86,7 +86,7 @@ sealed class Model extends Equatable {
     "title": title, 
     "description": description,
     "type": type,
-    "location": location,
+    "location": location.toString(),
     "children": children,
     "parents": parents
   };

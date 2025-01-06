@@ -99,15 +99,15 @@ class FirebaseStorage {
     // А также идентификаторы, которые сохранить не удалось.
     // todo: переделать на возврат идентификаторов (структуру или класс с успешными, неуспешными и ошибками)
 
-    // try {
+    try {
       Map<String, Object?> updates = {};
       for (dynamic item in items.values) {
         updates['models/${item.id}'] = item.toJson();
       }
       database.update(updates);
-    // } catch (error) {
-    //   print(error);
-    // }
+    } catch (error) {
+      print(error);
+    }
     return items.length;
   }
 

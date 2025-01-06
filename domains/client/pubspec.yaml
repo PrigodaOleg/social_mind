@@ -42,7 +42,8 @@ dependencies:
     path: packages/state
   repository:
     path: packages/repository
-  firebase_core: ^3.0.0
+  firebase_core:
+  # firebase_core: ^3.9.0
 
 dev_dependencies:
   flutter_test:
