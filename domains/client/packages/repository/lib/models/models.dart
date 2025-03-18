@@ -18,6 +18,12 @@ enum Location {
   both
 }
 
+Location locationFronString(String? location) {
+  if (location == Location.remote.toString()) return Location.remote;
+  if (location == Location.both.toString()) return Location.both;
+  return Location.local;
+}
+
 enum SyncStatus {
   synced,
   syncing,
@@ -43,7 +49,7 @@ sealed class Model extends Equatable {
     id = (json['id'] ?? '') as String,
     title = (json['title'] ?? '') as String,
     description = (json['description'] ?? '') as String,
-    location = (json['location'] ?? Location.remote) as Location,
+    location = locationFronString(json['location']),
     children = Map<String, String>.from(json['children'] ?? {}),
     parents = Map<String, String>.from(json['parents'] ?? {});
 

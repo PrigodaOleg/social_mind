@@ -3,6 +3,7 @@ library remote_storage;
 import 'package:firebase_database/firebase_database.dart'; // https://firebase.google.com/docs/database/flutter/start
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:repository/models/models.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class FirebaseStorage {
   FirebaseStorage();
@@ -14,11 +15,13 @@ class FirebaseStorage {
   final models = <String, Function(Map<String, dynamic>)>{
     'Domain': (json) => Domain.fromJson(json),
     'User': (json) => User.fromJson(json),
+    'Task': (json) => Task.fromJson(json),
   };
 
   Future<void> init() async {
     // Connect and get instance
-    database = FirebaseDatabase.instance.ref();
+    database = FirebaseDatabase.instanceFor(app: Firebase.app('closers-cd24f')).ref();
+    // database = FirebaseDatabase.instance.ref();
 
     // Check last authentication is alive
 
