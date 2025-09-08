@@ -2,30 +2,36 @@ import 'package:flutter/material.dart';
 //import 'package:ui/domain_list_page/domain_list_page.dart';
 import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
+import 'package:ui/task_list_page/task_list_page.dart';
 //import 'package:ui/task_list_page/task_list_page.dart';
 
 
 
 class HomePage extends StatelessWidget {
-  const HomePage({
-    super.key,
-    required this.title,
-    required this.repository});
-  final String title;
+  const HomePage(
+    this.repository,
+    {
+      super.key,
+      this.title,
+    }
+  );
+  final String? title;
   final Repository repository;
 
   @override
   Widget build(BuildContext context) {
-    return HomeView(repository: repository);
+    return HomeView(title: title, repository: repository);
   }
 }
 
 class HomeView extends StatelessWidget {
   const HomeView({
     super.key,
+    this.title,
     required this.repository
   });
 
+  final String? title;
   final Repository repository;
 
   @override
@@ -36,16 +42,16 @@ class HomeView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: c.inversePrimary,
-        title: Text(l.homePageName),
+        title: Text(title ?? l.homePageName),
       ),
       body: ListView( // todo: Change to GridView
         children: [
           IconButton(
-            onPressed: () {n.pushNamed('/tasks');},
+            onPressed: () {n.pushNamed(TaskListPage.routeName);},
             icon: const Icon(Icons.task_alt)
           ),
           IconButton(
-            onPressed: () {n.pushNamed('/domains');},
+            onPressed: () {n.pushNamed('/domains', arguments: {#title: '123456'});},
             icon: const Icon(Icons.group_work)
           ),
         ],

@@ -12,17 +12,20 @@ class TaskListPage extends StatelessWidget {
 
   static const routeName = '/tasklist';
 
-  const TaskListPage({
-    super.key,
-    required this.repository
-  });
+  const TaskListPage(
+    this.repository,
+    {
+      super.key,
+      this.id
+    }
+  );
   final Repository repository;
+  final String? id;
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     return BlocProvider(
-      create: (context) => TaskListBloc(repository: repository, parentId: args['id']),
+      create: (context) => TaskListBloc(repository: repository, parentId: id ?? repository.myId ?? ''),
       child: const TaskListView(),
     );
   }
