@@ -38,7 +38,7 @@ class IntroductionPage extends StatelessWidget {
                   User? tryingUser = await repository.getModelNow<User>(userId);
                   if (null != tryingUser) {
                     repository.me = tryingUser;
-                    n.pushNamed('/home');
+                    n.pushReplacementNamed('/home');
                   }
                 },
                 child: const Text('Existing user')
@@ -46,7 +46,7 @@ class IntroductionPage extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   repository.me = User(name: 'DebugUser');
-                  Navigator.of(context).pushNamed('/home');
+                  Navigator.of(context).pushReplacementNamed('/home');
                 },
                 child: const Text('New User')
               )
