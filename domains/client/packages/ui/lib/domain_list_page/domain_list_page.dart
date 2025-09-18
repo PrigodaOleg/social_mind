@@ -5,7 +5,6 @@ import 'package:repository/repository.dart';
 import 'package:ui/ui.dart';
 
 
-
 class DomainListPage extends StatelessWidget {
   const DomainListPage(
     this.repository,
@@ -52,7 +51,7 @@ class DomainListView extends StatelessWidget {
                 for (final (index, domain) in state.domains.values.indexed)
                   ListTile(
                     title: Text(domain.title),
-                    onTap: () => n.pushNamed('${DomainContentPage.routeName}/${domain.id}', arguments: {#id: domain.id}),
+                    onTap: () => n.pushNamed('${DomainContentPage.routeName}/${domain.id}', arguments: {'id': domain.id}),
                   ),
                   // Row(
                   //   children: [

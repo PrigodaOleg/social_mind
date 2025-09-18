@@ -3,31 +3,40 @@ import 'package:page_transition/page_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:repository/repository.dart';
+import '../navigation.dart';
 
 class SplashScreen extends StatelessWidget {
-  const SplashScreen({
-    super.key,
-    required this.nextRoute,
-    required this.lottieAsset,
-    required this.repository,
-    this.backgroundTask
-  });
+  const SplashScreen(
+    this.repository,
+    {
+      super.key,
+      required this.nextRoute,
+      required this.lottieAsset,
+      this.backgroundTask
+    }
+  );
 
   final String nextRoute;
   final String lottieAsset;
   final Repository repository;
-  final Future<String?> Function(Repository repository)? backgroundTask;
+  final Future<List<NavStackEntry>?> Function(Repository repository)? backgroundTask;
 
   get splash => null;
 
-  Future<String> routeFunction() async {
-    return await backgroundTask?.call(repository) ?? nextRoute;
+  Future<String> routeFunction(BuildContext context) async {
+    final lastNavStack = await backgroundTask?.call(repository);
+    if (lastNavStack == null) return nextRoute;
+    if (lastNavStack.isEmpty) return nextRoute;
+    final navigator = Navigator.of(context) as AppNavigatorState;
+    navigator.replaceNavigationStack(lastNavStack);
+    return '';
+    // return await backgroundTask?.call(repository) ?? nextRoute;
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedSplashScreen.withScreenRouteFunction(
-      screenRouteFunction: routeFunction,
+      screenRouteFunction: () async {return await routeFunction(context);},
       animationDuration: const Duration(milliseconds: 200),
       duration: 1000,
       splash: Column(

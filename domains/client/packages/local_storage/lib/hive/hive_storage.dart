@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:repository/models/models.dart';
+import 'package:repository/navigation/navigation_stack.dart';
 // import 'package:path_provider/path_provider.dart';
 
 class HiveStorage {
@@ -19,6 +20,7 @@ class HiveStorage {
     Hive.registerAdapter(TaskAdapter());
     Hive.registerAdapter(UserAdapter());
     Hive.registerAdapter(DomainAdapter());
+    Hive.registerAdapter(NavStackEntryAdapter());
     _taskBox = await Hive.openBox(taskBoxName);
     _operationalBox = await Hive.openBox(operationalBoxName);
     _commonBox = await Hive.openBox(commonBoxName);
@@ -46,6 +48,14 @@ class HiveStorage {
 
   Future<void> setUser(User user) async {
     return await _operationalBox.put('user', user);
+  }
+
+  dynamic getOpItem(String id) {
+    return _operationalBox.get(id);
+  }
+
+  Future<void> storeOpItem(String id, dynamic item) async {
+    await _operationalBox.put(id, item);
   }
 
   Future<void> save({required Task item}) async {

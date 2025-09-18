@@ -3,6 +3,7 @@ import 'dart:collection';
 
 import 'package:local_storage/hive/hive_storage.dart';
 import '../models/models.dart';
+import '../navigation/navigation_stack.dart';
 
 import 'package:remote_storage/remote_storage.dart';
 
@@ -352,6 +353,19 @@ class Repository {
       _localStorage.setOperational('lastRoute', lastRoute);  // await
     }
   }
+
+  List<NavStackEntry>? get lastNavStack {
+    return _localStorage.getOpItem('lastNavStack')?.cast<NavStackEntry>();
+  }
+
+  set lastNavStack(List<NavStackEntry>? lastNavStack) {
+    if (late) return;
+    if (lastNavStack == null) return;
+    if (lastNavStack.isNotEmpty) {
+      _localStorage.storeOpItem('lastNavStack', lastNavStack);
+    }
+  }
+  
 
   // ## User settings
   // Contains such data as theme, default type of repo to store user data (local or remote).

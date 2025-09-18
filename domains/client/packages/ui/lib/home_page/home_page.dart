@@ -51,7 +51,7 @@ class HomeView extends StatelessWidget {
             icon: const Icon(Icons.task_alt)
           ),
           IconButton(
-            onPressed: () {n.pushNamed('/domains', arguments: {#title: '123456'});},
+            onPressed: () {n.pushNamed('/domains', arguments: {'title': '123456'});},
             icon: const Icon(Icons.group_work)
           ),
         ],

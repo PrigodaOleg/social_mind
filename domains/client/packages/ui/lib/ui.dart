@@ -5,4 +5,5 @@ export 'home_page/home_page.dart';
 export 'task_list_page/task_list_page.dart';
 export 'splash_screen_page/splash_screen.dart';
 export 'introduction_page/introduction_page.dart';
+export 'domain_list_page/domain_list_page.dart';
 export 'domain_content_page/domain_content_page.dart';
