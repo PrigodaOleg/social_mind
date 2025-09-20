@@ -30,9 +30,7 @@ class App extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    // Repository repository = Repository();
-    // MaterialApp x = MaterialApp(
-    MaterialApp x = MaterialApp.router(
+    return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).applicationTitle,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -53,8 +51,9 @@ class App extends StatelessWidget {
             'backgroundTask': locateUser
           }
         ),
-        unknownRoute: (args: {}, constructor: IntroductionPage.new, path: '/404'),
+        unknownRoute: (args: {}, constructor: UnknownPage.new, path: '/404'),
         routes: {
+          "/": IntroductionPage.new,
           "/home": HomePage.new,
           "/domains": DomainListPage.new,
           DomainContentPage.routeName: DomainContentPage.new,
@@ -63,6 +62,5 @@ class App extends StatelessWidget {
       ),
       routeInformationParser: AppRouteInformationParser(),
     );
-    return x;
   }
 }

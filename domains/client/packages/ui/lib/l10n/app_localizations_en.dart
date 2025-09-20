@@ -25,4 +25,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get introductionHello => 'Hi there';
+
+  @override
+  String get unknownPageText => 'The requested page does not exist';
+
+  @override
+  String get unknownPageTitle => 'Unknown page';
 }

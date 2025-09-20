@@ -54,6 +54,10 @@ class HomeView extends StatelessWidget {
             onPressed: () {n.pushNamed('/domains', arguments: {'title': '123456'});},
             icon: const Icon(Icons.group_work)
           ),
+          IconButton(
+            onPressed: () {n.pushNamed('/unknown_page', arguments: {'title': 'oops'});},
+            icon: const Icon(Icons.question_mark)
+          ),
         ],
       ),
     );

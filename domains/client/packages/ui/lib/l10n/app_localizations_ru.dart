@@ -25,4 +25,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get introductionHello => 'Привет';
+
+  @override
+  String get unknownPageText => 'Запрошенная страница не существует';
+
+  @override
+  String get unknownPageTitle => 'Неизвестная страница';
 }

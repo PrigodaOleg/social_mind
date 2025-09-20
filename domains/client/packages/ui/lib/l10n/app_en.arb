@@ -4,5 +4,7 @@
     "taskListPageName": "Tasks",
     "domainListPageName": "Closee groups",
     "addTaskHint": "Add new task",
-    "introductionHello": "Hi there"
+    "introductionHello": "Hi there",
+    "unknownPageText": "The requested page does not exist",
+    "unknownPageTitle": "Unknown page"
 }

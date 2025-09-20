@@ -7,3 +7,4 @@ export 'splash_screen_page/splash_screen.dart';
 export 'introduction_page/introduction_page.dart';
 export 'domain_list_page/domain_list_page.dart';
 export 'domain_content_page/domain_content_page.dart';
+export 'unknown_page/unknown_page.dart';

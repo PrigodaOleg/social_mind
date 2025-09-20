@@ -130,6 +130,18 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Привет'**
   String get introductionHello;
+
+  /// No description provided for @unknownPageText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Запрошенная страница не существует'**
+  String get unknownPageText;
+
+  /// No description provided for @unknownPageTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Неизвестная страница'**
+  String get unknownPageTitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
