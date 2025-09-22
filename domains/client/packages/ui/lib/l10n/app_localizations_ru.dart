@@ -24,10 +24,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addTaskHint => 'Добавить задачу';
 
   @override
-  String get introductionHello => 'Привет';
+  String get loginHello => 'Привет';
 
   @override
-  String get unknownPageText => 'Запрошенная страница не существует';
+  String get loginPutIdHintText => 'Введите ID для входа';
+
+  @override
+  String get loginExistingUserButtonText => 'Существующий пользователь';
+
+  @override
+  String get loginNewUserButtonText => 'Новый пользователь';
+
+  @override
+  String get unknownPageText => 'Запрошеная страница не существует';
 
   @override
   String get unknownPageTitle => 'Неизвестная страница';

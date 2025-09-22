@@ -125,16 +125,34 @@ abstract class AppLocalizations {
   /// **'Добавить задачу'**
   String get addTaskHint;
 
-  /// No description provided for @introductionHello.
+  /// No description provided for @loginHello.
   ///
   /// In ru, this message translates to:
   /// **'Привет'**
-  String get introductionHello;
+  String get loginHello;
+
+  /// No description provided for @loginPutIdHintText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите ID для входа'**
+  String get loginPutIdHintText;
+
+  /// No description provided for @loginExistingUserButtonText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Существующий пользователь'**
+  String get loginExistingUserButtonText;
+
+  /// No description provided for @loginNewUserButtonText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новый пользователь'**
+  String get loginNewUserButtonText;
 
   /// No description provided for @unknownPageText.
   ///
   /// In ru, this message translates to:
-  /// **'Запрошенная страница не существует'**
+  /// **'Запрошеная страница не существует'**
   String get unknownPageText;
 
   /// No description provided for @unknownPageTitle.

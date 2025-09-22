@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-//import 'package:flutter_bloc/flutter_bloc.dart';
-//import 'package:state/state.dart';
-//import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
-import 'package:ui/task_list_page/task_list_page.dart';
+import 'package:ui/ui.dart';
 
 
 class DomainContentPage extends StatelessWidget {
@@ -15,11 +12,23 @@ class DomainContentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (id == null) return TextButton(onPressed: () => Navigator.of(context).pushNamed('/domains'), child: const Text('Domains'));
+    final n = Navigator.of(context);
+    if (id == null) {
+      return TextButton(
+        onPressed: () => n.pushNamed(DomainListPage.routeName),
+        child: const Text('Domains')
+      );
+    }
 
     Domain? domain = repository.getModel<Domain>(id!);
-    // Пока я не разобрался, что делать, мы пришли в это окно по прямой ссылке из WEB на домен, а его нет в репозитории
-    if (domain == null) return TextButton(onPressed: () => Navigator.of(context).pushNamed('/home'), child: const Text('Home'));
+    // Пока я не разобрался, что делать, мы пришли в это окно по прямой ссылке из WEB на домен,
+    // а его нет в репозитории
+    if (domain == null) {
+      return TextButton(
+        onPressed: () => n.pushNamed(HomePage.routeName),
+        child: const Text('Home')
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

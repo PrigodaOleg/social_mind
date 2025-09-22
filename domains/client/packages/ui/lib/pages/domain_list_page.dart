@@ -6,6 +6,7 @@ import 'package:ui/ui.dart';
 
 
 class DomainListPage extends StatelessWidget {
+  static const routeName = '/domains';
   const DomainListPage(
     this.repository,
     {

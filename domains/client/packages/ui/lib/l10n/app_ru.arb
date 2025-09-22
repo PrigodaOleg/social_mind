@@ -4,7 +4,10 @@
     "taskListPageName": "Дела",
     "domainListPageName": "Близкие",
     "addTaskHint": "Добавить задачу",
-    "introductionHello": "Привет",
-    "unknownPageText": "Запрошенная страница не существует",
+    "loginHello": "Привет",
+    "loginPutIdHintText": "Введите ID для входа",
+    "loginExistingUserButtonText": "Существующий пользователь",
+    "loginNewUserButtonText": "Новый пользователь",
+    "unknownPageText": "Запрошеная страница не существует",
     "unknownPageTitle": "Неизвестная страница"
 }

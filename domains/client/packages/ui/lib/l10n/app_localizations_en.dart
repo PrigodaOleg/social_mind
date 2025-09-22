@@ -24,7 +24,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addTaskHint => 'Add new task';
 
   @override
-  String get introductionHello => 'Hi there';
+  String get loginHello => 'Hi there';
+
+  @override
+  String get loginPutIdHintText => 'Put user ID to authenticate';
+
+  @override
+  String get loginExistingUserButtonText => 'Existing user';
+
+  @override
+  String get loginNewUserButtonText => 'New user';
 
   @override
   String get unknownPageText => 'The requested page does not exist';

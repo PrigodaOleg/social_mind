@@ -43,21 +43,22 @@ class App extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       routerDelegate: AppRouterDelegate(
         initialRoute: (
-          path: "/splash",
+          path: SplashScreen.routeName,
           constructor: SplashScreen.new,
           args: {
-            'nextRoute': "/",
+            'nextRoute': LoginPage.routeName,
             'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
             'backgroundTask': locateUser
           }
         ),
-        unknownRoute: (args: {}, constructor: UnknownPage.new, path: '/404'),
+        unknownRoute: (args: {}, constructor: UnknownPage.new, path: UnknownPage.routeName),
         routes: {
-          "/": IntroductionPage.new,
-          "/home": HomePage.new,
-          "/domains": DomainListPage.new,
+          LoginPage.routeName: LoginPage.new,
+          HomePage.routeName: HomePage.new,
+          DomainListPage.routeName: DomainListPage.new,
           DomainContentPage.routeName: DomainContentPage.new,
-          TaskListPage.routeName: TaskListPage.new
+          TaskListPage.routeName: TaskListPage.new,
+          CreateUserPage.routeName: CreateUserPage.new
         }
       ),
       routeInformationParser: AppRouteInformationParser(),

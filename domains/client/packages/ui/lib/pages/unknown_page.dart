@@ -5,6 +5,7 @@ import 'package:repository/repository.dart';
 
 
 class UnknownPage extends StatelessWidget {
+  static const routeName = '/unknownpage';
   const UnknownPage(
     this.repository,
     {

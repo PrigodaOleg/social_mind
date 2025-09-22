@@ -1,10 +1,12 @@
 library ui;
 
 export 'l10n/app_localizations.dart';
-export 'home_page/home_page.dart';
-export 'task_list_page/task_list_page.dart';
-export 'splash_screen_page/splash_screen.dart';
-export 'introduction_page/introduction_page.dart';
-export 'domain_list_page/domain_list_page.dart';
-export 'domain_content_page/domain_content_page.dart';
-export 'unknown_page/unknown_page.dart';
+export 'pages/home_page.dart';
+export 'pages/task_list_page.dart';
+export 'pages/splash_screen.dart';
+export 'pages/login_page.dart';
+export 'pages/domain_list_page.dart';
+export 'pages/domain_content_page.dart';
+export 'pages/unknown_page.dart';
+export 'pages/user_profile_page.dart';
+export 'pages/create_user.dart';

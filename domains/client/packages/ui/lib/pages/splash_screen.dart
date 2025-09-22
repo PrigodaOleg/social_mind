@@ -6,6 +6,7 @@ import 'package:repository/repository.dart';
 import '../navigation.dart';
 
 class SplashScreen extends StatelessWidget {
+  static const routeName = '/splash';
   const SplashScreen(
     this.repository,
     {
