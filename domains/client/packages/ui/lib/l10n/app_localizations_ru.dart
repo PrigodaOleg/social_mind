@@ -24,7 +24,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addTaskHint => 'Добавить задачу';
 
   @override
-  String get loginHello => 'Привет';
+  String get loginHelloLabel => 'Привет, дорогой друг!';
+
+  @override
+  String get loginActionLabel => 'Войти как:';
 
   @override
   String get loginPutIdHintText => 'Введите ID для входа';
@@ -33,7 +36,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get loginExistingUserButtonText => 'Существующий пользователь';
 
   @override
+  String get loginExistingUserActionLabel => 'Введите ваш ID';
+
+  @override
   String get loginNewUserButtonText => 'Новый пользователь';
+
+  @override
+  String get loginBlankUserButtonText => 'Пустой пользователь';
 
   @override
   String get unknownPageText => 'Запрошеная страница не существует';

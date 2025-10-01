@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:repository/repository.dart';
 import 'package:ui/ui.dart';
+import './login_user_create.dart';
+import './login_user_existing.dart';
+import './login_user_save_credentials.dart';
 
 // Логика тут такая.
 // Если пользователь в первый раз открывае впервые установленное приложение,
@@ -17,51 +20,66 @@ import 'package:ui/ui.dart';
 class LoginPage extends StatelessWidget {
   static const routeName = '/login';
   final Repository repository;
-  final String? id;
-  const LoginPage(this.repository, {super.key, this.id});
+  const LoginPage(this.repository, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    String userId = id ?? '';
     final n = Navigator.of(context);
     final l = AppLocalizations.of(context);
     return Scaffold(
       body: Column(
         children: [
-          Text(l.loginHello),
-          TextField(
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: l.loginPutIdHintText,
-            ),
-            onSubmitted: (value) async {
-              userId = value;
-              User? tryingUser = await repository.getModelNow<User>(userId);
-              if (tryingUser != null) {
-                repository.me = tryingUser;
-                n.pushReplacementNamed(HomePage.routeName);
-              }
-            },
-            onChanged: (value) {
-              userId = value;
-            },
-          ),
+          Text(l.loginHelloLabel),
+          Text(l.loginActionLabel),
           Row(
             children: [
               TextButton(
-                onPressed: () async {
-                  User? tryingUser = await repository.getModelNow<User>(userId);
+                // Blank
+                onPressed: () async {                  
+                  User blankUser = User(name: '');
+                  bool? isPerformed = await showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return SaveUserCredentialsPage(repository, blankUser);
+                    }
+                  );
+                  if (isPerformed == true) {
+                    repository.me = blankUser;
+                    n.pushReplacementNamed(HomePage.routeName);
+                  }
+                },
+                child: Text(l.loginBlankUserButtonText)
+              ),
+              TextButton(
+                // Existing
+                onPressed: () async {                  
+                  User? tryingUser = await showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return LoginUserExistingPage(repository);
+                    }
+                  );
+                  if (null != tryingUser) {
+                    repository.me = tryingUser;
+                    // Тут наверное надо подтянуть из репозитория историю навигации
+                    n.pushReplacementNamed(HomePage.routeName);
+                  }
+                },
+                child: Text(l.loginExistingUserButtonText),
+              ),
+              TextButton(
+                // New
+                onPressed: () async {                  
+                  User? tryingUser = await showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return CreateUserPage(repository);
+                    }
+                  );
                   if (null != tryingUser) {
                     repository.me = tryingUser;
                     n.pushReplacementNamed(HomePage.routeName);
                   }
-                },
-                child: Text(l.loginExistingUserButtonText)
-              ),
-              TextButton(
-                onPressed: () {
-                  repository.me = User(name: 'DebugUser');
-                  Navigator.of(context).pushNamed(CreateUserPage.routeName);
                 },
                 child: Text(l.loginNewUserButtonText),
               )

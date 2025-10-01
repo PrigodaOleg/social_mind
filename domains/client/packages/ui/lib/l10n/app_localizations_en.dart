@@ -24,7 +24,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addTaskHint => 'Add new task';
 
   @override
-  String get loginHello => 'Hi there';
+  String get loginHelloLabel => 'Hi there';
+
+  @override
+  String get loginActionLabel => 'Login as:';
 
   @override
   String get loginPutIdHintText => 'Put user ID to authenticate';
@@ -33,7 +36,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginExistingUserButtonText => 'Existing user';
 
   @override
+  String get loginExistingUserActionLabel => 'Please input your ID';
+
+  @override
   String get loginNewUserButtonText => 'New user';
+
+  @override
+  String get loginBlankUserButtonText => 'Blank user';
 
   @override
   String get unknownPageText => 'The requested page does not exist';

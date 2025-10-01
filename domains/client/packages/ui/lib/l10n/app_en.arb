@@ -4,10 +4,13 @@
     "taskListPageName": "Tasks",
     "domainListPageName": "Closee groups",
     "addTaskHint": "Add new task",
-    "loginHello": "Hi there",
+    "loginHelloLabel": "Hi there",
+    "loginActionLabel": "Login as:",
     "loginPutIdHintText": "Put user ID to authenticate",
     "loginExistingUserButtonText": "Existing user",
+    "loginExistingUserActionLabel": "Please input your ID",    
     "loginNewUserButtonText": "New user",
+    "loginBlankUserButtonText": "Blank user",
     "unknownPageText": "The requested page does not exist",
     "unknownPageTitle": "Unknown page"
 }

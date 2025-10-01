@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 //import 'package:ui/domain_list_page/domain_list_page.dart';
 import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
-import 'package:ui/pages/task_list_page.dart';
+import 'package:ui/pages/task_list.dart';
 import 'package:ui/ui.dart';
 //import 'package:ui/task_list_page/task_list_page.dart';
 
@@ -48,6 +48,7 @@ class HomeView extends StatelessWidget {
       ),
       body: ListView( // todo: Change to GridView
         children: [
+          Text(repository.me.id),
           IconButton(
             onPressed: () {n.pushNamed(TaskListPage.routeName);},
             icon: const Icon(Icons.task_alt)
@@ -59,6 +60,12 @@ class HomeView extends StatelessWidget {
           IconButton(
             onPressed: () {n.pushNamed(UnknownPage.routeName, arguments: {'title': 'oops'});},
             icon: const Icon(Icons.question_mark)
+          ),
+          IconButton(
+            onPressed: () {
+              repository.myId = null;
+              n.pushNamed(LoginPage.routeName);},
+            icon: const Icon(Icons.exit_to_app)
           ),
         ],
       ),

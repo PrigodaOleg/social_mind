@@ -125,11 +125,17 @@ abstract class AppLocalizations {
   /// **'Добавить задачу'**
   String get addTaskHint;
 
-  /// No description provided for @loginHello.
+  /// No description provided for @loginHelloLabel.
   ///
   /// In ru, this message translates to:
-  /// **'Привет'**
-  String get loginHello;
+  /// **'Привет, дорогой друг!'**
+  String get loginHelloLabel;
+
+  /// No description provided for @loginActionLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Войти как:'**
+  String get loginActionLabel;
 
   /// No description provided for @loginPutIdHintText.
   ///
@@ -143,11 +149,23 @@ abstract class AppLocalizations {
   /// **'Существующий пользователь'**
   String get loginExistingUserButtonText;
 
+  /// No description provided for @loginExistingUserActionLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Введите ваш ID'**
+  String get loginExistingUserActionLabel;
+
   /// No description provided for @loginNewUserButtonText.
   ///
   /// In ru, this message translates to:
   /// **'Новый пользователь'**
   String get loginNewUserButtonText;
+
+  /// No description provided for @loginBlankUserButtonText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пустой пользователь'**
+  String get loginBlankUserButtonText;
 
   /// No description provided for @unknownPageText.
   ///

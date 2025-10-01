@@ -310,7 +310,7 @@ class Repository {
   // User must be set already
   User get me {
     if (myId == null) {
-      throw StateError('Locak user is unknown: $myId');
+      throw StateError('Local user is unknown: $myId');
     }
     User? me = _localStorage.getItem(id: myId!);
     if (me == null) {
