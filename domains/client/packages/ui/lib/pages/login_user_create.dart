@@ -46,9 +46,16 @@ class CreateUserPageState extends State<StatefulWidget> {
                 });
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.check),
-              onPressed: () => n.pop(user),
+            Row(
+              children: [
+                BackButton(
+                  onPressed: () => n.pop(false),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check),
+                  onPressed: () => n.pop(user),
+                ),
+              ],
             )
           ],
         ),

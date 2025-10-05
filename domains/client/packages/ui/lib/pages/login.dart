@@ -6,11 +6,11 @@ import './login_user_existing.dart';
 import './login_user_save_credentials.dart';
 
 // Логика тут такая.
-// Если пользователь в первый раз открывае впервые установленное приложение,
+// Если пользователь в первый раз открывает впервые установленное приложение,
 // его нужно отправить на приветственно-вводную страничку, где он может создать нового пользователя.
 // Когда он создал нового пользователя, он может прикопать где-то его логин (пароля пока нет)
 // путем отправки его в соседние приложения, такие как мессенджеры или менеджеры паролей.
-// После создания пользователя возвращаемся на эту страницу с уже заполненым ID.
+// После создания пользователя возвращаемся на эту страницу с уже заполненным ID.
 // Если пользователь открывает приложение повторно, то пользователь уже сохранен,
 // и эта страница вовсе скипается.
 // Если пользователь открывает вновь установленное приложение или приложение на новом устройстве или в web,
@@ -76,10 +76,16 @@ class LoginPage extends StatelessWidget {
                       return CreateUserPage(repository);
                     }
                   );
-                  if (null != tryingUser) {
-                    repository.me = tryingUser;
-                    n.pushReplacementNamed(HomePage.routeName);
-                  }
+                  if (null == tryingUser) return;
+                  bool? isPerformed = await showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return SaveUserCredentialsPage(repository, tryingUser);
+                    }
+                  );
+                  if (isPerformed == false) return;
+                  repository.me = tryingUser;
+                  n.pushReplacementNamed(HomePage.routeName);
                 },
                 child: Text(l.loginNewUserButtonText),
               )
