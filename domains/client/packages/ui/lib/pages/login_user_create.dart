@@ -28,6 +28,7 @@ class CreateUserPageState extends State<StatefulWidget> {
           children: [
             Text(user?.id ?? '-'),
             TextField(
+              autofocus: true,
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Please input your name',

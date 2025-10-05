@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-//import 'package:ui/domain_list_page/domain_list_page.dart';
 import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
 import 'package:ui/pages/task_list.dart';
 import 'package:ui/ui.dart';
-//import 'package:ui/task_list_page/task_list_page.dart';
 
 
 
 class HomePage extends StatelessWidget {
+  // Страница, на которой просто в виде списка показаны все виды доступных пользователю моделей.
+  // Знакомые, друзья, домены, списки задач, проекты, мысли, подходы, статусы, ...
   static const routeName = '/home';
   const HomePage(
     this.repository,
