@@ -216,7 +216,7 @@ class Repository {
     });
   }
 
-  void _subscribeToSync(String modelId, int? subscriberId) {
+  void subscribeToSync(String modelId, int? subscriberId) {
     if (subscriberId != null) {
       if (!incomingSyncIds.containsKey(modelId)) incomingSyncIds[modelId] = {};
       incomingSyncIds[modelId]?.add(subscriberId);
@@ -225,10 +225,10 @@ class Repository {
     }
   }
 
-  void _subscribeToSyncAll(List<String> modelIds, int? subscriberId) {
+  void subscribeToSyncAll(List<String> modelIds, int? subscriberId) {
     // ignore: avoid_function_literals_in_foreach_calls
     modelIds.forEach((id) {
-      _subscribeToSync(id, subscriberId);
+      subscribeToSync(id, subscriberId);
     });
   }
 
@@ -246,7 +246,7 @@ class Repository {
   }
 
   void _syncModel(Model model) {
-    _subscribeToSync(model.id, defaultSyncSubscriber);
+    subscribeToSync(model.id, defaultSyncSubscriber);
     _sync.postpone();
   }
 
@@ -255,7 +255,7 @@ class Repository {
     [int? subscriberId] // Item ID - sync callback pair
   ) async  {
     await _localStorage.storeItem(model);
-    _subscribeToSync(model.id, subscriberId);
+    subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
     _sync.postpone();
   }
@@ -265,7 +265,7 @@ class Repository {
     [int? subscriberId] // Item ID - sync callback pair
   ) {
     T? model = _localStorage.getItem(id: modelId);
-    _subscribeToSync(modelId, subscriberId);
+    subscribeToSync(modelId, subscriberId);
     _sync.postpone();
     return model;
   }
@@ -281,7 +281,7 @@ class Repository {
     [int? subscriberId]
   ) {
     Map<String, T> models = _localStorage.getItems(ids);
-    _subscribeToSyncAll(ids, subscriberId);
+    subscribeToSyncAll(ids, subscriberId);
     _markSyncedAll(models);
     _sync.postpone();
     return models;
@@ -293,7 +293,7 @@ class Repository {
   ) async {
     var modelsMap = { for (var model in models) model.id : model };
     await _localStorage.storeItems(modelsMap);
-    _subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
+    subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
     outgoingChanges.addAll(models);
     _sync.postpone();
   }

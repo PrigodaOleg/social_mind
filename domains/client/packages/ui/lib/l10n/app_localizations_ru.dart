@@ -49,4 +49,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get unknownPageTitle => 'Неизвестная страница';
+
+  @override
+  String get contactListPageName => 'Контакты';
 }

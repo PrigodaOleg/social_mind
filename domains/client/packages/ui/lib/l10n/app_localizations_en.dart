@@ -49,4 +49,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unknownPageTitle => 'Unknown page';
+
+  @override
+  String get contactListPageName => 'Contacts';
 }

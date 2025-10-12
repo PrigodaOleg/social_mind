@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ui/pages/contact_list.dart';
 import 'package:ui/ui.dart';
 import 'package:ui/navigation.dart';
 import 'package:repository/repository.dart';
@@ -58,6 +59,7 @@ class App extends StatelessWidget {
           DomainListPage.routeName: DomainListPage.new,
           DomainContentPage.routeName: DomainContentPage.new,
           TaskListPage.routeName: TaskListPage.new,
+          ContactListPage.routeName: ContactListPage.new
         }
       ),
       routeInformationParser: AppRouteInformationParser(),

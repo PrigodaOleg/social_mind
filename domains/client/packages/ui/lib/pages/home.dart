@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:ui/l10n/app_localizations.dart';
 import 'package:repository/repository.dart';
-import 'package:ui/pages/task_list.dart';
+import 'package:ui/pages/contact_list.dart';
 import 'package:ui/ui.dart';
 
 
@@ -54,12 +53,12 @@ class HomeView extends StatelessWidget {
             icon: const Icon(Icons.task_alt)
           ),
           IconButton(
-            onPressed: () {n.pushNamed(DomainListPage.routeName, arguments: {'title': '123456'});},
+            onPressed: () {n.pushNamed(DomainListPage.routeName);},
             icon: const Icon(Icons.group_work)
           ),
           IconButton(
-            onPressed: () {n.pushNamed(UnknownPage.routeName, arguments: {'title': 'oops'});},
-            icon: const Icon(Icons.question_mark)
+            onPressed: () {n.pushNamed(ContactListPage.routeName);},
+            icon: const Icon(Icons.contacts)
           ),
           IconButton(
             onPressed: () {

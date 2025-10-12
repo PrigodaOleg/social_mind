@@ -178,6 +178,12 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Неизвестная страница'**
   String get unknownPageTitle;
+
+  /// No description provided for @contactListPageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Контакты'**
+  String get contactListPageName;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

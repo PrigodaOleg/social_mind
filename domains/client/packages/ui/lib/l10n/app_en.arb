@@ -12,5 +12,6 @@
     "loginNewUserButtonText": "New user",
     "loginBlankUserButtonText": "Blank user",
     "unknownPageText": "The requested page does not exist",
-    "unknownPageTitle": "Unknown page"
+    "unknownPageTitle": "Unknown page",
+    "contactListPageName": "Contacts"
 }

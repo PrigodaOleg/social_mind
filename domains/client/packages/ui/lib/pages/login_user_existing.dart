@@ -18,6 +18,7 @@ class LoginUserExistingPage extends StatelessWidget {
         children: [
           Text(l.loginExistingUserActionLabel),
           TextField(
+            autofocus: true,
             decoration: InputDecoration(
               border: InputBorder.none,
               hintText: l.loginPutIdHintText,
