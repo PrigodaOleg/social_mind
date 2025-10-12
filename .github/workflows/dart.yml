@@ -13,13 +13,14 @@ on:
     branches: [ "main" ]
     paths: [ "domains/client/**" ]
   workflow_dispatch:
-  
-permissions:
-  id-token: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+        contents: write
+        pages: write
+        id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +97,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
 
 
