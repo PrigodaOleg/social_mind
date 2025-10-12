@@ -70,7 +70,7 @@ jobs:
       
       - name: 'Build web app'
         run: |
-          flutter build web --release --base-href /https://github.com/PrigodaOleg/PrigodaOleg.github.io/ \
+          flutter build web --release --base-href /https://prigodaoleg.github.io/social_mind/ \
           --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
           --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
           --dart-define CLOSERS_ANDROID_API_KEY=${{ secrets.CLOSERS_ANDROID_API_KEY }} \
@@ -93,5 +93,8 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          token: secrets.GITHUB_TOKEN
+
 
 
