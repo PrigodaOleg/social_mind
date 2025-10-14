@@ -53,7 +53,7 @@ sealed class Model extends Equatable {
     children = Map<String, String>.from(json['children'] ?? {}),
     parents = Map<String, String>.from(json['parents'] ?? {});
 
-  final String type = (Model).toString();
+  final String type = "Model";
 
   SyncStatus sync = SyncStatus.no;
     

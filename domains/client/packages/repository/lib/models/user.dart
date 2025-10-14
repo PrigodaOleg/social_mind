@@ -18,7 +18,7 @@ class User extends Model {
     
   @override
   // ignore: overridden_fields
-  final String type = (User).toString();
+  final String type = "User";
 
   @HiveField(6)
   final String name;

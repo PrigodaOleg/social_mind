@@ -22,14 +22,13 @@ class LoginUserExistingPage extends StatelessWidget {
             decoration: InputDecoration(
               border: InputBorder.none,
               hintText: l.loginPutIdHintText,
-              labelText: 'ID'
+              labelText: 'ID',
             ),
             onSubmitted: (value) async {
               userId = value;
               if (userId?.isNotEmpty ?? false) {
                 User? tryingUser = await repository.getModelNow<User>(userId!);
                 if (tryingUser != null) {
-                  repository.me = tryingUser;
                   n.pop(tryingUser);
                 }
               }
@@ -37,6 +36,7 @@ class LoginUserExistingPage extends StatelessWidget {
             onChanged: (value) {
               userId = value;
             },
+            
           ),
           Row(
             children: [
@@ -45,8 +45,8 @@ class LoginUserExistingPage extends StatelessWidget {
                 onPressed: () async {
                   if (userId?.isNotEmpty ?? false) {
                     User? tryingUser = await repository.getModelNow<User>(userId!);
+                    print(tryingUser?.name);
                     if (null != tryingUser) {
-                      repository.me = tryingUser;
                       n.pop(tryingUser);
                     }
                   }

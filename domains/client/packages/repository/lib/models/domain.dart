@@ -28,7 +28,7 @@ class Domain extends Model {
     
   @override
   // ignore: overridden_fields
-  final String type = (Domain).toString();
+  final String type = "Domain";
   
   @HiveField(6)
   final bool isPersonal;

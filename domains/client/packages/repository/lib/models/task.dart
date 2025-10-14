@@ -21,7 +21,7 @@ class Task extends Model {
     
   @override
   // ignore: overridden_fields
-  final String type = (Task).toString();
+  final String type = "Task";
 
   /// Whether the `todo` is completed.
   ///

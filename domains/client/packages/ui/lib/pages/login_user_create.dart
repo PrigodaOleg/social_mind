@@ -43,6 +43,7 @@ class CreateUserPageState extends State<StatefulWidget> {
               onChanged: (value) {
                 setState(() {
                   user = value.isEmpty ? null : User(name: value);
+                  print(user?.type);
                 });
               },
             ),
