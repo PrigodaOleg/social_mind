@@ -13,7 +13,7 @@ class User extends Model {
 
   User.fromJson(super.json) :
     name = json['name'] as String,
-    domainsIds = List<String>.from(json['domainsIds'] ?? []),
+    domainsIds = List<String>.from(json['domainsIds']?.keys.toList() ?? []),
     super.fromJson();
     
   @override

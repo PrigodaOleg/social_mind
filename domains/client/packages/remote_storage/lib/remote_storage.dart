@@ -67,16 +67,16 @@ class FirebaseStorage {
 
   Future<dynamic> getItem({required String id}) async {
     // Get item by ID
-    // try {
+    try {
       final snapshot = await database.child('models/$id').get();
       if (snapshot.exists) {
         var json = Map<String, dynamic>.from(snapshot.value as Map);
         if (!json.containsKey('type')) return;
         return models[json['type']]?.call(json);
       }
-    // } catch (error) {
-      // print(error);
-    // }
+    } catch (error) {
+      print(error);
+    }
     return;
   }
 
@@ -113,10 +113,22 @@ class FirebaseStorage {
     //    Плюс не реализован механизм уведомлений от удаленного репозитория. Для этого планируется
     //    использовать пуш-уведомления.
 
+    // 20.10.2025
+    // Попробуем писать простые поля и списки по отдельности
+
     try {
       Map<String, Object?> updates = {};
       for (dynamic item in items.values) {
-        updates['models/${item.id}'] = item.toJson();
+        for (MapEntry<String, dynamic> field in item.toJson().entries) {
+          if (field.value is List) {
+            for (String value in field.value) {
+              updates['models/${item.id}/${field.key}/$value'] = '';
+            }
+          }
+          else {
+            updates['models/${item.id}/${field.key}'] = field.value;
+          }
+        }
       }
       database.update(updates);
     } catch (error) {

@@ -21,8 +21,8 @@ class Domain extends Model {
   Domain.fromJson(super.json) :
     isPersonal = (json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? []) as String,
-    participantsIds = List<String>.from(json['executorId'] ?? []),
-    observersIds = List<String>.from(json['executorId'] ?? []),
+    participantsIds = List<String>.from(json['participantsIds']?.keys.toList() ?? []),
+    observersIds = List<String>.from(json['observersIds']?.keys.toList() ?? []),
     models = Map<String, String>.from(json['models'] ?? {}),
     super.fromJson();
     
