@@ -67,7 +67,7 @@ class DefaultFirebaseOptions {
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
     databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
-    iosBundleId: 'com.example.client',
+    iosBundleId: 'com.example.closers',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -77,7 +77,7 @@ class DefaultFirebaseOptions {
     projectId: const String.fromEnvironment('CLOSERS_PROJECT_ID'),
     databaseURL: const String.fromEnvironment('CLOSERS_DATABASE_URL'),
     storageBucket: '${const String.fromEnvironment('CLOSERS_PROJECT_ID')}.appspot.com',
-    iosBundleId: 'com.example.client',
+    iosBundleId: 'com.example.closers',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
