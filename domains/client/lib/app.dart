@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ui/pages/contact_list.dart';
-import 'package:ui/ui.dart';
-import 'package:ui/navigation.dart';
-import 'package:repository/repository.dart';
+import 'ui/pages/contact_list.dart';
+import 'ui/ui.dart';
+import 'ui/navigation.dart';
+import 'repository/repository.dart';
 
 
 class App extends StatelessWidget {

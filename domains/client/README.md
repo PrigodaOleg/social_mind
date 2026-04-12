@@ -87,7 +87,7 @@
 Состояние можно транслировать в домен.
 
 # Настройка окружения для разработки на Windows
-https://gist.github.com/Try-Parser/b7106d941cc9b1c9e7b4c7443a7c3540
+эмулятор - https://gist.github.com/Try-Parser/b7106d941cc9b1c9e7b4c7443a7c3540
 
 # Генерация оберток для Hive
 cd .\packages\repository\
