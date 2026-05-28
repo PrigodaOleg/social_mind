@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+
+import 'package:hashlib/hashlib.dart';
 
 import 'package:closers/local_storage/hive/hive_storage.dart';
 import '../models/models.dart';
@@ -62,16 +65,13 @@ class Timer {
 }
 
 
-class Closee {}
-
-
 // Operates (soon) with 3 types of storages (databases):
-//    - Local storage - stores data on this device (exlude web).
+//    - Local storage - stores data on this device (exclude web).
 //    - Remote storage - stores data remotely in back-end database (now it is 3d party).
 //    - Peer to peer storage - stores data locally on this device, but periodically updates it from closers devices.
 //          Uses remote beacons to get link to closers devices.
 //          All data transmitted directly between user devices in encrypted form.
-//          Merge conflicts solves according user chousen merge politic.
+//          Merge conflicts solves according user chosen merge politic.
 class Repository {
   static late Repository instance;
   Repository();
@@ -85,8 +85,24 @@ class Repository {
 
   late int defaultSyncSubscriber;
 
+  // Локальное хранилище есть всегда, это основное хранилище
   late final HiveStorage _localStorage;
-  late final FirebaseStorage _remoteStorage;
+
+  // Удаленное хранилище позволяет хранить состояние 
+  // Их может быть много
+  // Какие именно доступны - нужно узнать из пользовательских настроек
+  final Map<String, RemoteStorage> _remoteStorages = {};
+
+  // Холодное хранилище предназначено для бесконечно долгого хранения данных
+  // Их может быть много
+  //Map<String, RemoteStorage> _coldStorages = {}
+
+  // Распределенное хранилище предназначено для хранения данных на устройствах других пользователей,
+  // хранения данных других пользователей на этом устройстве,
+  // а также прямого обмеда данными между устройствами пользователей.
+  // По сути, представляет собой вычислительную сеть.
+  //late final MeshStorage _mashStorage;
+
   var outgoingChanges = Queue<dynamic>();
   var outgoingDeletes = Queue<dynamic>();
 
@@ -98,18 +114,76 @@ class Repository {
 
   var syncedThisTime = <String>{};
 
+  final knownRemoteStorages = <String, Function()>{
+    'FirebaseRealtimeDatabase': () => FirebaseStorage(),
+  };
+
   Future<void> init() async {
     _localStorage = HiveStorage();
-    _remoteStorage = FirebaseStorage();
-    if (late) {
-      await _localStorage.init();
-      await _remoteStorage.init();
-    }
+    await _localStorage.init();
+    await initRemoteStorages();
+    await authRemoteStorages();
     defaultSyncSubscriber = addSyncListener(_defaultSyncListener);
-    _sync = Timer(delayedSync);
+    _sync = Timer(_delayedSync);
     _sync.start();
     instance = this;
     late = false;
+  }
+
+  Future<void> initRemoteStorages() async {
+    if (myId == null) return;
+    for (var storage in me.settings.getDeep('remote_storages', defaultValue: {}).entries) {
+      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+    }
+    for (var storage in _remoteStorages.entries) {
+      var instanceFieldName = 'remote_storages.${storage.key}.instance';
+      String? instance = me.settings.getDeep(instanceFieldName);
+      if (instance != null) {
+        await storage.value.init(instance);  // todo: wrap in try-catch and show error message to user
+      } else {
+        print('No parameter $instanceFieldName is specified for ${storage.key}');
+      }
+    }
+  }
+
+  Future<void> authRemoteStorages() async {
+    if (myId == null) return;
+    for (var storage in _remoteStorages.entries) {
+      var passwordFieldName = 'remote_storages.${storage.key}.hashed_password';
+      String? password = me.secrets.getDeep(passwordFieldName);
+      if (password != null) {
+        await storage.value.auth(me.id, password);  // todo: wrap in try-catch and show error message to user
+      } else {
+        print('No parameter $passwordFieldName is specified for ${storage.key}');
+      }
+    }
+  }
+
+  Future<bool> createUserRemoteStorages(String? secret) async {
+    if (myId == null) {
+      throw Exception('Cant create user for remote storages while local user not initialized');
+    }
+    bool success = true;
+    for (var storage in _remoteStorages.entries) {
+      var passwordFieldName = 'remote_storages.${storage.key}.hashed_password';
+      var instanceFieldName = 'remote_storages.${storage.key}.instance';
+      String? password = me.secrets.getDeep(passwordFieldName);
+      String? instance = me.settings.getDeep(instanceFieldName);
+      if (password == null) {
+        if (secret == null) throw Exception('User secret for remote storage ${storage.key} is not specified');
+        String password = scrypt(utf8.encode(secret), utf8.encode('${storage.key}$instance')).toString();
+        await storage.value.createUserAndAuth(me.id, password);
+        me.secrets.setDeep(passwordFieldName, password);
+      } else {
+        try {
+          await storage.value.createUserAndAuth(me.id, password);
+        } on Exception catch (e) {
+          print('User creation for storage ${storage.key} error: $e');
+          success = false;
+        }
+      }
+    }
+    return success;
   }
 
   int addSyncListener(SyncListener syncListener) {
@@ -133,7 +207,7 @@ class Repository {
     await _localStorage.storeItem(syncedItem);
   }
 
-  void delayedSync() async {
+  void _delayedSync() async {
     // Свежий взгляд 08.12.2024.
     // Этот метод совершает синхронизацию локальных и удаленных объектов. Конкретно должны обрабатываться следующие сценарии:
     // 1. Локально создан новый объект и его нужно просто загрузить в удаленное хранилище.
@@ -176,8 +250,16 @@ class Repository {
     // Может 2 счетчика? Типа каким был счетчик до того, как я начал его менять и какой счетчик сейчас.
     // При мерже находить более раннее значение счетчика и отсчитывать мерж от него.
 
+    // Если нет ни одного удаленного хранилища, то ничего не делаем.
+    if (_remoteStorages.isEmpty) {
+      return;
+    }
+
+    // Следим за каждый удаленным хранилищем, все они должны быть проинициализированы, во всех должны быть аутентифицированы пользователи.
+    // todo: сделать проверку на инициализацию и аутентификацию.
+
     // Отправляем локальные удаления в удаленное хранилище
-    int deleted = await _remoteStorage.deleteItems(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
+    int deleted = await _remoteStorages['FirebaseRealtimeDatabase']!.deleteItems(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
     // Если все прошло успешно, то вызываем событие, по которому произойдет удаление такого объекта.
     while (deleted--> 0) {
       String id = outgoingDeletes.first.id;
@@ -186,7 +268,7 @@ class Repository {
     }
 
     // Отправляем локальные изменения в удаленное хранилище
-    int saved = await _remoteStorage.saveItems(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
+    int saved = await _remoteStorages['FirebaseRealtimeDatabase']!.saveItems(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
     // Вызываем для каждого синхронизированного элемента событие для слушателя
     while (saved-- > 0) {
       String id = outgoingChanges.first.id;
@@ -196,7 +278,7 @@ class Repository {
 
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
     var idsToSync = incomingSyncIds.keys.toSet().difference(syncedThisTime).toList();
-    var syncedModels = await _remoteStorage.getItems(idsToSync);
+    var syncedModels = await _remoteStorages['FirebaseRealtimeDatabase']!.getItems(idsToSync);
     // Вот тут, внимание(!), сохраняем приехвашие изменения в локальное хранилище, хотя надо делать слияние
     await _localStorage.storeItems(syncedModels);
     // Вызываем для каждого синхронизированного элемента событие для слушателя
@@ -210,7 +292,7 @@ class Repository {
 
   void _findAndCallListeners(String id) async {
     incomingSyncIds[id]?.forEach((subscriberId) async {
-      Model? model = await _remoteStorage.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
+      Model? model = await _remoteStorages['FirebaseRealtimeDatabase']!.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
       model?.sync = SyncStatus.synced;
       syncedThisTime.add(id); // todo: тут ошибка - если в удаленном репозитории такой модели нет, то ее надо либо туда загрузить, либо удалить тут, тихо промолчать нельзя
       // print(model);
@@ -274,7 +356,7 @@ class Repository {
 
   Future<T?> getModelNow<T>(String modelId) async {
     T? model = _localStorage.getItem(id: modelId);
-    model = model ?? await _remoteStorage.getItem(id: modelId);
+    model = model ?? await _remoteStorages['FirebaseRealtimeDatabase']!.getItem(id: modelId);
     return model;
   }
 
@@ -376,16 +458,16 @@ class Repository {
 
   // ## User data - local/remote
 
-  // ### Tasks
-  // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
-  // переместить задачу в другое хранилище 
-  Future<Map<String, Task>> getTasks() async {
-    return await _remoteStorage.getTasks();
-    // await _localStorage.getTasks();
-  }
-  Future<void> addTask(Task task) async {
-    await _localStorage.save(item: task);
-    await _remoteStorage.save(item: task);
-  }
-  Future<void> removeTask(Task task) async {throw UnimplementedError('repository removeTask');}
+  // // ### Tasks
+  // // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
+  // // переместить задачу в другое хранилище 
+  // Future<Map<String, Task>> getTasks() async {
+  //   return await _remoteStorages['FirebaseRealtimeDatabase']!.getTasks();
+  //   // await _localStorage.getTasks();
+  // }
+  // Future<void> addTask(Task task) async {
+  //   await _localStorage.save(item: task);
+  //   await _remoteStorages['FirebaseRealtimeDatabase']!.save(item: task);
+  // }
+  // Future<void> removeTask(Task task) async {throw UnimplementedError('repository removeTask');}
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:uuid/uuid.dart';
 import '../ui.dart';
 import 'login_user_create.dart';
 import 'login_user_existing.dart';
@@ -45,6 +46,10 @@ class LoginPage extends StatelessWidget {
                   );
                   if (isPerformed == true) {
                     repository.me = blankUser;
+                    repository.initRemoteStorages();
+                    String secret = const Uuid().v4();
+                    repository.createUserRemoteStorages(secret);
+                    repository.me.secret = secret;
                     n.pushReplacementNamed(HomePage.routeName);
                   }
                 },

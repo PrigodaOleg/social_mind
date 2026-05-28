@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 part 'user.dart';
 part 'domain.dart';
 part 'task.dart';
+part 'registry.dart';
 part 'models.g.dart';
 
 @HiveType(typeId: 3)
@@ -154,4 +155,55 @@ sealed class Model extends Equatable {
 
   @override
   List<Object> get props => [id, title, description, location, children, parents];
+}
+
+extension JsonHelper on Map<String, dynamic> {
+  // Безопасное получение значения с приведением типов и дефолтным значением
+  T getOrDefault<T>(String key, T defaultValue) {
+    final value = this[key];
+    if (value is T) {
+      return value;
+    }
+    return defaultValue;
+  }
+
+  // Безопасное чтение вложенного поля (например, 'user.address.city')
+  dynamic getDeep(String path, {dynamic defaultValue}) {
+    final keys = path.split('.');
+    dynamic current = this;
+
+    for (final key in keys) {
+      if (current is Map<String, dynamic>) {
+        if (current.containsKey(key)) {
+          current = current[key];
+        } else {
+          return defaultValue;
+        }
+      } else {
+        return defaultValue;
+      }
+    }
+
+    return current ?? defaultValue;
+  }
+
+  // Безопасная запись вложенного поля (с перезаписью при коллизиях)
+  void setDeep(String path, dynamic value) {
+    final keys = path.split('.');
+    int lastIndex = keys.length - 1;
+    dynamic current = this;
+
+    keys.asMap().forEach((index, key) {
+      if (!current.containsKey(key)) {
+        current[key] = <String, dynamic>{};
+      } else if (current[key] is! Map<String, dynamic>) {
+        current[key] = <String, dynamic>{};
+      }
+      if (index == lastIndex) {
+        current[key] = value;
+      } else {
+        current = current[key];
+      }
+    });
+  }
 }

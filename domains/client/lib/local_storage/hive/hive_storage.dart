@@ -15,12 +15,14 @@ class HiveStorage {
 
   Future<void> init() async {
     // final directory = await getApplicationDocumentsDirectory();
-    await Hive.initFlutter();
-    Hive.registerAdapter(LocationAdapter());
-    Hive.registerAdapter(TaskAdapter());
-    Hive.registerAdapter(UserAdapter());
-    Hive.registerAdapter(DomainAdapter());
-    Hive.registerAdapter(NavStackEntryAdapter());
+    if (!Hive.isAdapterRegistered(0)) {
+      await Hive.initFlutter();
+      Hive.registerAdapter(LocationAdapter());
+      Hive.registerAdapter(TaskAdapter());
+      Hive.registerAdapter(UserAdapter());
+      Hive.registerAdapter(DomainAdapter());
+      Hive.registerAdapter(NavStackEntryAdapter());
+    }
     _taskBox = await Hive.openBox(taskBoxName);
     _operationalBox = await Hive.openBox(operationalBoxName);
     _commonBox = await Hive.openBox(commonBoxName);

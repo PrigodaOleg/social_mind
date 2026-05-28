@@ -26,6 +26,26 @@ class User extends Model {
   @HiveField(7)
   List<String> domainsIds;
 
+  Map<String, dynamic> settings = {
+    'remote_storages': <String, dynamic>{
+      'FirebaseRealtimeDatabase': <String, dynamic>{
+        'instance': 'closers-cd24f'
+      }}
+  };
+
+  Map<String, dynamic> secrets = {
+    'remote_storages': <String, dynamic>{
+      'FirebaseRealtimeDatabase': <String, dynamic>{
+        'hashed_password': null
+      }
+    }
+  };
+
+  // Введенный человеком секрет храним в оперативной памяти до завершения сессии или до экспорта учетных данных во вне.
+  // Да, пока выглядит ужасно, нужно полностью отказаться от хранения секрета.
+  // Можно писать его в файл или отправлять в мессенджер.
+  String? secret;
+
   @override
   Map<String, dynamic> toJson() => super.toJson()..addAll({
     "name": name,

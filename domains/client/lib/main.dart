@@ -15,6 +15,8 @@ Future<void> main() async {
       name: options.projectId,
       options: options,
     );
+    // FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+    // FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
     runApp(const App());
   } catch (error) {
     print(error);
