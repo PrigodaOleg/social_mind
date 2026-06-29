@@ -1,5 +1,3 @@
-// import 'dart:io';
-
 import 'dart:io';
 
 import 'package:closers/repository/navigation/navigation_stack.dart';
@@ -31,7 +29,8 @@ void main() async {
     );
     
     // https://github.com/ahmtydn/isar_plus/releases?q=1.2.6&expanded=true
-    await Isar.initialize('test/isar_windows_x64.dll');
+    if (Platform.isWindows) await Isar.initialize('test/isar_windows_x64.dll');
+    if (Platform.isLinux) await Isar.initialize('test/libisar_linux_x64.so');
     storage = IsarStorage();
     await storage.init();
   });
