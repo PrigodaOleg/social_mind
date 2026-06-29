@@ -1,11 +1,11 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import "dart:convert";
+import 'package:equatable/equatable.dart';
 
-part 'navigation_stack.g.dart';
+// part 'navigation_stack.g.dart';
 
 
 @HiveType(typeId: 4)
-class NavStackEntry {
+class NavStackEntry extends Equatable {
   NavStackEntry(
     this.path,
     this.args
@@ -19,10 +19,13 @@ class NavStackEntry {
 
   Map<String, dynamic> toJson() => {
     "path": path,
-    "args": json.encode(args)
+    "args": args
   };
 
   NavStackEntry.fromJson(Map<String, dynamic> json) :
     path = json['path'] as String,
     args = json['args'] as Map<String, dynamic>;
+    
+  @override
+  List<Object?> get props => [path, args];
 }

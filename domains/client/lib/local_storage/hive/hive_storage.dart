@@ -1,9 +1,10 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:closers/repository/models/models.dart';
 import 'package:closers/repository/navigation/navigation_stack.dart';
+import '../local_storage.dart';
 // import 'package:path_provider/path_provider.dart';
 
-class HiveStorage {
+class HiveStorage extends LocalStorage {
   HiveStorage();
 
   static const taskBoxName = 'task_box';
@@ -13,15 +14,19 @@ class HiveStorage {
   late Box _operationalBox;
   late Box _commonBox;
 
+  @override
   Future<void> init() async {
     // final directory = await getApplicationDocumentsDirectory();
     if (!Hive.isAdapterRegistered(0)) {
       await Hive.initFlutter();
-      Hive.registerAdapter(LocationAdapter());
-      Hive.registerAdapter(TaskAdapter());
-      Hive.registerAdapter(UserAdapter());
-      Hive.registerAdapter(DomainAdapter());
-      Hive.registerAdapter(NavStackEntryAdapter());
+      // Hive.registerAdapter(LocationAdapter());
+      // Hive.registerAdapter(TaskAdapter());
+      // Hive.registerAdapter(UserAdapter());
+      // Hive.registerAdapter(DomainAdapter());
+      // Hive.registerAdapter(NavStackEntryAdapter());
+      // Hive.registerAdapter(RegistryAdapter());
+      // Hive.registerAdapter(RegistryMetadataAdapter());
+      // Hive.registerAdapter(TransactionAdapter());
     }
     _taskBox = await Hive.openBox(taskBoxName);
     _operationalBox = await Hive.openBox(operationalBoxName);
@@ -69,11 +74,13 @@ class HiveStorage {
     return _taskBox.toMap().cast<String, Task>();
   }
 
+  @override
   dynamic getItem({required String id}) {
     // Get item by ID
     return _commonBox.get(id);
   }
 
+  @override
   Map<String, T> getItems<T>(List ids) {
     // Get item by ID
     Map<String, T> items = {};
@@ -97,5 +104,8 @@ class HiveStorage {
   Future<void> deleteItem(String id) async {
     await _commonBox.delete(id);
   }
-
+  
+  // Future<Map<String, dynamic>> readRegistry(String id, {int take = 5}) async {
+    
+  // }
 }

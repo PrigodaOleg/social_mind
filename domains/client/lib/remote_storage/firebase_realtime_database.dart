@@ -3,6 +3,8 @@ import 'package:firebase_database/firebase_database.dart'; // https://firebase.g
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:closers/repository/models/models.dart';
+
 
 class FirebaseStorage extends RemoteStorage {
   FirebaseStorage();
@@ -103,15 +105,22 @@ class FirebaseStorage extends RemoteStorage {
       Map<String, Object?> updates = {};
       
       for (dynamic item in items.values) {
-        for (MapEntry<String, dynamic> field in item.toJson().entries) {
-          if (field.value is List) {
-            for (String value in field.value) {
-              updates['models/${item.id}/${field.key}/$value'] = '';
+        if (item is Model) {
+          for (MapEntry<String, dynamic> field in item.toJson().entries) {
+            if (field.value is List) {
+              for (String value in field.value) {
+                updates['models/${item.id}/${field.key}/$value'] = '';
+              }
+            }
+            else {
+              updates['models/${item.id}/${field.key}'] = field.value;
             }
           }
-          else {
-            updates['models/${item.id}/${field.key}'] = field.value;
-          }
+        }
+        if (item is Registry) {
+          updates['registries/${item.metadata.id}/metadata'] = item.metadata.toJson();
+          int lastTransactionIndex = item.transactions.keys.last;
+          updates['registries/${item.metadata.id}/transactions/$lastTransactionIndex'] = item.transactions[lastTransactionIndex]!.toJson();
         }
       }
       database.update(updates);
@@ -132,5 +141,22 @@ class FirebaseStorage extends RemoteStorage {
     }
     database.update(updates);
     return items.length;
+  }
+
+  Future<Map<String, dynamic>> readRegistry(String id, {int take = 1}) async {
+    final ref = database.child('registries/$id/transactions');
+    final takeQuery = ref.limitToLast(take);
+    final metaRef = database.child('registries/$id/metadata');
+    final List<DataSnapshot> snapshots = await Future.wait([takeQuery.get(), metaRef.get()]);
+    for (DataSnapshot snapshot in snapshots) {
+      print(snapshot.value);
+    }
+    Map<String, dynamic> registry = {};
+    registry['metadata'] = Map<String, dynamic>.from(snapshots[1].value as Map);
+    for (DataSnapshot child in snapshots[0].children) {
+      registry['transactions'][child.key] = child.value;
+    }
+    // registry['transactions'] = snapshots[0].children.map((e) => e.value).toList();
+    return registry;
   }
 }

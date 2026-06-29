@@ -52,6 +52,7 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     Emitter<DomainListState> emit,
   ) async {
     User me = _repo.me;
+    print(me);
 
     var newDomain = Domain(originatorId: me.id, title: event.title);
     await me.linkTo(newDomain, listenerId);

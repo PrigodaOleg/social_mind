@@ -4,11 +4,11 @@ import 'dart:convert';
 
 import 'package:hashlib/hashlib.dart';
 
-import 'package:closers/local_storage/hive/hive_storage.dart';
+import 'package:closers/local_storage/local_storage.dart';
+import 'package:closers/remote_storage/remote_storage.dart';
+
 import '../models/models.dart';
 import '../navigation/navigation_stack.dart';
-
-import 'package:closers/remote_storage/remote_storage.dart';
 
 
 typedef SyncListener = void Function(String id, dynamic syncedItem);
@@ -86,7 +86,7 @@ class Repository {
   late int defaultSyncSubscriber;
 
   // Локальное хранилище есть всегда, это основное хранилище
-  late final HiveStorage _localStorage;
+  late final LocalStorage _localStorage;
 
   // Удаленное хранилище позволяет хранить состояние 
   // Их может быть много
@@ -119,7 +119,8 @@ class Repository {
   };
 
   Future<void> init() async {
-    _localStorage = HiveStorage();
+    // _localStorage = HiveStorage();
+    _localStorage = IsarStorage();
     await _localStorage.init();
     await initRemoteStorages();
     await authRemoteStorages();
@@ -259,7 +260,7 @@ class Repository {
     // todo: сделать проверку на инициализацию и аутентификацию.
 
     // Отправляем локальные удаления в удаленное хранилище
-    int deleted = await _remoteStorages['FirebaseRealtimeDatabase']!.deleteItems(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
+    int deleted = await _deleteFromAllRemoteStorages(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
     // Если все прошло успешно, то вызываем событие, по которому произойдет удаление такого объекта.
     while (deleted--> 0) {
       String id = outgoingDeletes.first.id;
@@ -268,7 +269,7 @@ class Repository {
     }
 
     // Отправляем локальные изменения в удаленное хранилище
-    int saved = await _remoteStorages['FirebaseRealtimeDatabase']!.saveItems(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
+    int saved = await _saveItemsConsistently(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
     // Вызываем для каждого синхронизированного элемента событие для слушателя
     while (saved-- > 0) {
       String id = outgoingChanges.first.id;
@@ -449,25 +450,85 @@ class Repository {
       _localStorage.storeOpItem('lastNavStack', lastNavStack);
     }
   }
-  
 
-  // ## User settings
-  // Contains such data as theme, default type of repo to store user data (local or remote).
-  // Can be stored as locally as remotely
-  Future<void> saveUserSettings() async {}
+  // todo: Тут, конечно, получается полный сюрреализм, поскольку мы читаем одни и те же модели из разных источников, получаются дубли.
+  // Нужно читать либо откуда-то из одного места, либо при чтении из разных как-то сравнивать получающиеся данные и при их расхождении
+  // производить анализ на предмет того, чьи данные актуальнее, и распространять свежую версию во все хранилища.
+  // Тут по хорошему нужно нарисовать схему взаимодействия между всеми хранилищами и сделать правильную логику синхронизации.
+  Future<Map<String, dynamic>> _getFromAllRemoteStorages(List ids) async {
+    Map<String, dynamic> items = {};
+    for (var rStorage in _remoteStorages.entries) {
+      items.addAll(await rStorage.value.getItems(ids));
+    }
+    return items;
+  }
 
-  // ## User data - local/remote
+  Future<int> _saveToAllRemoteStorages(Map<String, dynamic> items) async {
+    int count = 0;
+    // todo: Сейчас сохраняет тупым перебором все remote storage'ы. Нужно сделать более умный способ
+    for (var rStorage in _remoteStorages.entries) {
+      count += await rStorage.value.saveItems(items);
+    }
+    return count; // todo: Тут вообще возвращается не пойми что
+  }
 
-  // // ### Tasks
-  // // добавить новую задачу, обновить имеющуюся задачу, удалить задачу
-  // // переместить задачу в другое хранилище 
-  // Future<Map<String, Task>> getTasks() async {
-  //   return await _remoteStorages['FirebaseRealtimeDatabase']!.getTasks();
-  //   // await _localStorage.getTasks();
-  // }
-  // Future<void> addTask(Task task) async {
-  //   await _localStorage.save(item: task);
-  //   await _remoteStorages['FirebaseRealtimeDatabase']!.save(item: task);
-  // }
-  // Future<void> removeTask(Task task) async {throw UnimplementedError('repository removeTask');}
+  Future<int> _deleteFromAllRemoteStorages(Map<String, dynamic> items) async {
+    int count = 0;
+    for (var rStorage in _remoteStorages.entries) {
+      count += await rStorage.value.deleteItems(items);
+    }
+    return count;
+  }
+
+  // Извлекаем домен для модели.
+  // todo: обработать внедоменные модели, такие как пользователя, сессии, устройства...
+  Domain? _getDomain(Model model) {
+    if (model is Domain) return model;
+    Map<String, Model> parents = _localStorage.getItems(model.parents.keys.toList());
+    while (parents.isNotEmpty) {
+      Model? parent = parents.remove(parents.keys.first);
+      if (parent is Domain) {
+        return parent;
+      } else if (parent != null) {
+        parents.addAll(_localStorage.getItems(parent.parents.keys.toList()));
+      }
+    }
+    return null;
+  }
+
+  // Реализация консистентной записи с использованием реестра изменений
+  Future<int> _saveItemsConsistently(Map<String, dynamic> items) async {
+    // Проходим по моделям и определяем, к каким доменам они относятся.
+    Map<String, Map<String, dynamic>> domainItems = {};
+    for (var entry in items.entries) {
+      final domain = _getDomain(entry.value);
+      if (domain != null) {
+        domainItems.putIfAbsent(domain.id, () => <String, dynamic>{})[entry.key] = entry.value;
+      } else {
+        print('No domain found for ${entry.value.runtimeType} ${entry.key}'); // todo: handle users
+      }
+    }
+    // Для каждого домена создаем запись в реестре событий.
+    // Реестр, скорее всего, итак уже есть, кроме случаев, когда мы создали нового пользователя, или залогинились в первый раз
+    // на новом устройстрве.
+    // В таком случае, создаем новую транзакцию поверх последней валидной.
+    // Если же реестр не существует, то создаем его, и создаем первую транзакцию.
+    // Либо пытаемся получить существующий реестр и последнюю транзакцию из удаленного или распределенного репозитория,
+    // и поверх неё создать новую транзакцию.
+    for (var entry in domainItems.entries) {
+      // извлекаем домен из локального репозитория, если он там есть
+      final domain = _localStorage.getItem(id: entry.key);
+      final transactions = <int, Transaction>{};
+      int newKey = transactions.keys.lastOrNull ?? -1 + 1;
+      transactions[newKey] = (Transaction('$newKey', 0, '0', DateTime.now(), me.id, 'changeDetails', 'changeType', ['changes'], 'path'));
+      final registry = Registry(parentId: entry.key, transactions: transactions);
+      entry.value[registry.metadata.id] = registry;
+    }
+    // Для типов моделей, относящихся в пользователям создаем запись в реестр пользователя.
+
+    // Записываем по транзакции на каждый реестр. Можно пачкой за один раз.
+    // todo: сделать асинхронную запись
+    var allItems = Map.fromEntries(domainItems.values.expand((map) => map.entries));
+    return _saveToAllRemoteStorages(allItems);
+  }
 }
