@@ -25,7 +25,7 @@ part of 'models.dart';
 
 
 @HiveType(typeId: 7)
-class Transaction {
+class Transaction extends Equatable {
   Transaction(
     String? id,
     this.prevHash,
@@ -36,15 +36,40 @@ class Transaction {
     this.changeType,
     this.changes,
     this.path
-  ) :
+  ):
   id = id ?? const Uuid().v4();
+
+  Transaction.zero(
+    this.originatorId,
+    this.changeDetails,
+    this.changeType,
+    this.changes,
+    this.path
+  ):
+  id = const Uuid().v4(),
+  prevHash = '',
+  prevId = '',
+  timeStamp = DateTime.now();
+
+  Transaction.fromPrev(
+    Transaction prev,
+    this.originatorId,
+    this.changeDetails,
+    this.changeType,
+    this.changes,
+    this.path
+  ):
+  id = const Uuid().v4(),
+  prevHash = prev.tHash(),
+  prevId = prev.id,
+  timeStamp = DateTime.now();
 
   @HiveField(0)
   String id; // Идентификатор этого изменения
   @HiveField(1)
   String prevId; // Идентификатор предыдущего изменения
   @HiveField(2)
-  int prevHash; // Хэш предыдущего изменения, возможно будем использовать его в арбитраже транзакций в распределенном хранилище
+  String prevHash; // Хэш предыдущего изменения, возможно будем использовать его в арбитраже транзакций в распределенном хранилище
   @HiveField(3)
   DateTime timeStamp;
   @HiveField(4)
@@ -72,18 +97,46 @@ class Transaction {
 
   Transaction.fromJson(Map<String, dynamic> json):
     id = json['id'] as String,
-    prevHash = json['prevHash'] as int,
+    prevHash = json['prevHash'] as String,
     prevId = json['prevId'] as String,
     timeStamp = DateTime.parse(json['timeStamp'] as String),
     originatorId = json['originatorId'] as String,
     changeDetails = json['changeDetails'] as String,
     changeType = json['changeType'] as String,
-    changes = json['changes'] as List<String>,
+    changes = List<String>.from(json['changes']),
     path = json['path'] as String;
+    
+  @override
+  List<Object?> get props => [prevHash, prevId, timeStamp, originatorId, changeDetails, changeType, changes, path];
+
+  String tHash() {
+    return sha256.string(jsonEncode(toJson())).hex();
+  }
+
+  Transaction next(
+    String originatorId,
+    String changeDetails,
+    String changeType,
+    List<String> changes,
+    String path
+  ) => Transaction.next(this, originatorId, changeDetails, changeType, changes, path);
+
+  Transaction.next(
+    Transaction? prev,
+    this.originatorId,
+    this.changeDetails,
+    this.changeType,
+    this.changes,
+    this.path
+  ):
+  id = const Uuid().v4(),
+  prevHash = prev?.tHash() ?? '',
+  prevId = prev?.id ?? '',
+  timeStamp = DateTime.now();
 }
 
 @HiveType(typeId: 8)
-class RegistryMetadata {
+class RegistryMetadata extends Equatable {
   RegistryMetadata({
     required this.id,
     required this.parentId
@@ -109,6 +162,10 @@ class RegistryMetadata {
   RegistryMetadata.fromJson(Map<String, dynamic> json):
     id = json['id'] as String,
     parentId = json['parentId'] as String;
+    
+    @override
+    List<Object?> get props => [id, parentId];
+
 }
 
 @HiveType(typeId: 6)
@@ -118,7 +175,7 @@ class Registry extends Equatable {
     String? id,
     String? parentId,
     Map<int, Transaction>? transactions
-  }) : 
+  }) :
   assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
   metadata = RegistryMetadata(
     id: id ?? const Uuid().v4(),
@@ -165,4 +222,16 @@ class Registry extends Equatable {
 
   @override
   List<Object> get props => [metadata, transactions];
+
+  String? get id => metadata.id;
+
+  String? get parentId => metadata.parentId;
+
+  Transaction? get lastTransaction => transactions.values.lastOrNull;
+
+  Transaction addNewTransaction(Transaction transaction) {
+    final newIndex = (transactions.keys.lastOrNull ?? -1) + 1;
+    transactions[newIndex] = (transaction);
+    return transaction;
+  }
 }

@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": "now < 1798744695000",  // 2026-12-31
+    ".write": "now < 1798744695000",  // 2026-12-31
+    ".validate": "auth.uid !== null
+                  && auth.token.email.endsWith('@a.aa')",
+    "registries": {
+      "$rid": {
+        ".validate": "$rid != null",
+        "transactions": {
+          "$tidx": {
+            ".validate": "
+            	newData.hasChildren(['changes', 'id', 'prevId', 'originatorId'])
+              && ((data.parent().parent().child('lastIdx').exists() && $tidx == data.parent().parent().child('lastIdx').val() + 1 + '')
+                  || (!data.parent().parent().child('lastIdx').exists() && $tidx == '0'))
+            ",
+            "changes": {
+              "$chidx": {
+                ".validate": "newData.parent().parent().parent().parent().parent().parent().child('models').child(newData.val()).val() != null"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

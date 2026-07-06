@@ -118,9 +118,10 @@ class FirebaseStorage extends RemoteStorage {
           }
         }
         if (item is Registry) {
-          updates['registries/${item.metadata.id}/metadata'] = item.metadata.toJson();
+          updates['registries/${item.id}/metadata'] = item.metadata.toJson();
           int lastTransactionIndex = item.transactions.keys.last;
-          updates['registries/${item.metadata.id}/transactions/$lastTransactionIndex'] = item.transactions[lastTransactionIndex]!.toJson();
+          updates['registries/${item.id}/lastIdx'] = lastTransactionIndex;
+          updates['registries/${item.id}/transactions/$lastTransactionIndex'] = item.transactions[lastTransactionIndex]!.toJson();
         }
       }
       database.update(updates);

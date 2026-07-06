@@ -262,7 +262,7 @@ class Repository {
     // Отправляем локальные удаления в удаленное хранилище
     int deleted = await _deleteFromAllRemoteStorages(Map.fromEntries(outgoingDeletes.map((item) => MapEntry(item.id, item))));
     // Если все прошло успешно, то вызываем событие, по которому произойдет удаление такого объекта.
-    while (deleted--> 0) {
+    while (outgoingDeletes.isNotEmpty) {
       String id = outgoingDeletes.first.id;
       _localStorage.deleteItem(id);
       outgoingDeletes.removeFirst();
@@ -271,7 +271,7 @@ class Repository {
     // Отправляем локальные изменения в удаленное хранилище
     int saved = await _saveItemsConsistently(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
     // Вызываем для каждого синхронизированного элемента событие для слушателя
-    while (saved-- > 0) {
+    while (outgoingChanges.isNotEmpty) {
       String id = outgoingChanges.first.id;
       _findAndCallListeners(id);
       outgoingChanges.removeFirst();
@@ -481,13 +481,12 @@ class Repository {
   }
 
   // Извлекаем домен для модели.
-  // todo: обработать внедоменные модели, такие как пользователя, сессии, устройства...
-  Domain? _getDomain(Model model) {
-    if (model is Domain) return model;
+  Model? _getParent(Model model) {
+    if (model is Domain || model is User) return model;
     Map<String, Model> parents = _localStorage.getItems(model.parents.keys.toList());
     while (parents.isNotEmpty) {
       Model? parent = parents.remove(parents.keys.first);
-      if (parent is Domain) {
+      if (parent is Domain || parent is User) {
         return parent;
       } else if (parent != null) {
         parents.addAll(_localStorage.getItems(parent.parents.keys.toList()));
@@ -499,11 +498,11 @@ class Repository {
   // Реализация консистентной записи с использованием реестра изменений
   Future<int> _saveItemsConsistently(Map<String, dynamic> items) async {
     // Проходим по моделям и определяем, к каким доменам они относятся.
-    Map<String, Map<String, dynamic>> domainItems = {};
+    Map<Model, Map<String, dynamic>> paretnItems = {};
     for (var entry in items.entries) {
-      final domain = _getDomain(entry.value);
-      if (domain != null) {
-        domainItems.putIfAbsent(domain.id, () => <String, dynamic>{})[entry.key] = entry.value;
+      final parent = _getParent(entry.value);
+      if (parent != null) {
+        paretnItems.putIfAbsent(parent, () => <String, dynamic>{})[entry.key] = entry.value;
       } else {
         print('No domain found for ${entry.value.runtimeType} ${entry.key}'); // todo: handle users
       }
@@ -515,20 +514,49 @@ class Repository {
     // Если же реестр не существует, то создаем его, и создаем первую транзакцию.
     // Либо пытаемся получить существующий реестр и последнюю транзакцию из удаленного или распределенного репозитория,
     // и поверх неё создать новую транзакцию.
-    for (var entry in domainItems.entries) {
-      // извлекаем домен из локального репозитория, если он там есть
-      final domain = _localStorage.getItem(id: entry.key);
-      final transactions = <int, Transaction>{};
-      int newKey = transactions.keys.lastOrNull ?? -1 + 1;
-      transactions[newKey] = (Transaction('$newKey', 0, '0', DateTime.now(), me.id, 'changeDetails', 'changeType', ['changes'], 'path'));
-      final registry = Registry(parentId: entry.key, transactions: transactions);
-      entry.value[registry.metadata.id] = registry;
+    // Итого 3 случая:
+    // 1. Новый пользователь, новый домен - создаем всё с нуля
+    // 2. Новый логин старого пользователя - нужно подтянуть существующие реестры из у/р репозитория,
+    //    поверх них создать новую транзакцию
+    // 3. Все уже есть - пытаемся создать транзакцию поверх локальной головы,
+    //    при ошибке записи в у/р репозиторий читаем у/р состояние и ребейзим свои изменения на новую голову.
+    //    Локально изменения сохраняем сразу. При ребейзе переписываем локальные данные.
+    // В случае ребейза нужно послать собитые на перерисовку в bloc.
+    for (var parentEntry in paretnItems.entries) {
+      final parent = parentEntry.key;
+      final children = parentEntry.value;
+      var registry =
+         // Реестр уже существует, сценарий 3
+        _localStorage.getRegistry(parentId: parent.id, count: 1)
+        // Реестра еще нет, 
+        // Нет, тут, кажется, ситуация посложнее. Наверное, при логине старого пользователя нужно подтянуть все домены и реестры.
+        // Назовем такую ситуацию - "получить контекст пользователя" (get_user_context()).
+        // И тогда они не будут пустыми. Можно поверх них писать транзакции.
+        // Тогда ситуация отсутствия реестра будет только в том случае, если пользователь или домен только что создан.
+        // Создаем новый реестр с нулевой транзакцией.
+        ?? Registry(parentId: parent.id);
+      registry.addNewTransaction(
+        Transaction.next(
+          registry.lastTransaction, 
+          me.id,
+          '\$session - \$app - \$device',
+          'creation',
+          children.keys.toList(),
+          'path'
+        )
+      );
+      // Созраняем реестр в локальное хранилище
+      _localStorage.storeItem(registry);
+      // Добавляем реестр к остальным объектам, которые будут сохранены в у/р хранилище
+      parentEntry.value[registry.id!] = registry;
     }
     // Для типов моделей, относящихся в пользователям создаем запись в реестр пользователя.
 
     // Записываем по транзакции на каждый реестр. Можно пачкой за один раз.
     // todo: сделать асинхронную запись
-    var allItems = Map.fromEntries(domainItems.values.expand((map) => map.entries));
+    var allItems = Map.fromEntries(paretnItems.values.expand((map) => map.entries));
+    
+    // Тут надо ловить исключение запрета доступа записи в базу и откатывать текущую транзакцию.
     return _saveToAllRemoteStorages(allItems);
   }
 }

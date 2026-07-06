@@ -142,5 +142,92 @@ void main() async {
       expect(result, testItem);
     });
 
+    test('Write item with registry', () async {
+      final testItems = {
+        'test_user_id': User(name: 'test_user_1'),
+        'test_user_registry_id': Registry(
+          id: 'test_user_registry_id',
+          parentId: 'test_user_id',
+          transactions: {
+            0: Transaction.zero(
+              'test_originator_id',
+              'test_change_details',
+              'test_change_type',
+              <String>['test_change'],
+              'test_path'
+            )
+          }
+        )
+      };
+      final stored = await storage.storeItems(testItems);
+      expect(stored, testItems.length);
+      final result = storage.getRegistry(parentId: 'test_user_id');
+      // final result = storage.getRegistry(id: 'test_user_registry_id');
+      expect(result?.metadata, (testItems['test_user_registry_id'] as Registry).metadata);
+      expect(result?.transactions, (testItems['test_user_registry_id'] as Registry).transactions);
+    });
+
+    test('Write and read many transactions', () async {
+      var registry = Registry(
+        id: 'test_user_registry_id',
+        parentId: 'test_parent_id',
+        transactions: {
+          0: Transaction.zero(
+            'test_originator_id',
+            'test_change_details',
+            'test_change_type',
+            <String>['test_first_change'],
+            'test_path'
+          )
+        }
+      );
+      // First attempt
+      var stored = await storage.storeItems({registry.id!: registry});
+      expect(stored, 1);
+      var readRegistry = storage.getRegistry(parentId: 'test_parent_id', count: 1);
+      expect(readRegistry, registry);
+      expect(readRegistry?.transactions.length, 1);
+      expect(readRegistry?.lastTransaction, registry.lastTransaction);
+      expect(readRegistry?.lastTransaction!.changes[0], 'test_first_change');
+
+      // Second attempt
+      registry = readRegistry!;
+      var newIndex = registry.transactions.keys.last + 1;
+      registry.addNewTransaction(Transaction.next(
+        registry.lastTransaction,
+        'test_originator_id',
+        'test_change_details',
+        'test_change_type',
+        <String>['test_second_change'],
+        'test_path'
+      ));
+      stored = await storage.storeItems({registry.id!: registry});
+      expect(stored, 2);
+      readRegistry = storage.getRegistry(parentId: 'test_parent_id', count: 1);
+      // expect(readRegistry, registry);
+      expect(readRegistry?.transactions.length, 1);
+      expect(readRegistry?.lastTransaction, registry.lastTransaction);
+      expect(readRegistry?.lastTransaction!.changes[0], 'test_second_change');
+
+      // Third attempt
+      registry = readRegistry!;
+      newIndex = registry.transactions.keys.last + 1;
+      registry.addNewTransaction(Transaction.next(
+        registry.lastTransaction,
+        'test_originator_id',
+        'test_change_details',
+        'test_change_type',
+        <String>['test_third_change'],
+        'test_path'
+      ));
+      stored = await storage.storeItems({registry.id!: registry});
+      expect(stored, 2);
+      readRegistry = storage.getRegistry(parentId: 'test_parent_id', count: 1);
+      // expect(readRegistry, registry);
+      expect(readRegistry?.transactions.length, 1);
+      expect(readRegistry?.lastTransaction, registry.lastTransaction);
+      expect(readRegistry?.lastTransaction!.changes[0], 'test_third_change');
+    });
+
   });
 }

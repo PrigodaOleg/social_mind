@@ -61,4 +61,6 @@ abstract class LocalStorage {
   Future<void> deleteItem(String id) async {
     // await _commonBox.delete(id);
   }
+
+  Registry? getRegistry({String? id, String? parentId, int count = 5}) {}
 }

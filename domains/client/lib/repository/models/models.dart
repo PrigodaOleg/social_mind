@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:closers/repository/repository/repository.dart';
 import 'package:uuid/uuid.dart';
+import 'package:hashlib/hashlib.dart';
 
 part 'user.dart';
 part 'domain.dart';

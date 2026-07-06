@@ -45,6 +45,16 @@ class OperationalBox {
   String? data;
 }
 
+@collection
+class RegistryBox {
+  late int id;
+  @Index(unique: true, hash: true, composite: ['transactionIndex'])
+  String? registryId;
+  String? parentId;
+  int? transactionIndex;
+  String? ttransaction;
+}
+
 class IsarStorage extends LocalStorage {
   IsarStorage();
 
@@ -62,7 +72,7 @@ class IsarStorage extends LocalStorage {
       : IsarEngine.isar;
     if (kIsWeb) await Isar.initialize();
     isar = Isar.open(
-      schemas: [OperationalBoxSchema, ModelBoxSchema],
+      schemas: [OperationalBoxSchema, ModelBoxSchema, RegistryBoxSchema],
       directory: dir,
       engine: engine
     );
@@ -159,7 +169,7 @@ class IsarStorage extends LocalStorage {
       }
     });
     return items;
-   }
+  }
 
    Future<void> storeItem(dynamic item) async {
     if (item is Model) {
@@ -172,11 +182,24 @@ class IsarStorage extends LocalStorage {
           ..modelData = serializedItem
         );
       });
+    } else if (item is Registry) {
+      List<RegistryBox> rawRegistry = [];
+      for (final t in item.transactions.entries) {
+        rawRegistry.add(RegistryBox()
+          ..id = isar.registryBoxs.autoIncrement()
+          ..parentId = item.parentId
+          ..registryId = item.id
+          ..transactionIndex = t.key
+          ..ttransaction = jsonEncode(t.value)
+        );
+      }
+      isar.write((isar) {
+        isar.registryBoxs.putAll(rawRegistry);
+      });
     }
   }
 
   Future<int> storeItems(Map<String, dynamic> items) async {
-    // await _commonBox.putAll(items);
     final rawModels = items
       .entries
       .where((entry) => entry.value is Model)
@@ -184,12 +207,54 @@ class IsarStorage extends LocalStorage {
         ..id = isar.modelBoxs.autoIncrement()
         ..modelId = entry.key
         ..modelData = jsonEncode(entry.value)
-    ).toList();
-    isar.write((isar) => isar.modelBoxs.putAll(rawModels));
-    return rawModels.length;
+      ).toList();
+    List<RegistryBox> rawRegistry = [];
+    for (final r in items.entries.where((entry) => entry.value is Registry)) {
+      for (final t in r.value.transactions.entries) {
+        rawRegistry.add(RegistryBox()
+          ..id = isar.registryBoxs.autoIncrement()
+          ..parentId = r.value.metadata.parentId
+          ..registryId = r.key
+          ..transactionIndex = t.key
+          ..ttransaction = jsonEncode(t.value)
+        );
+      }
+    }
+    isar.write((isar) {
+      isar.modelBoxs.putAll(rawModels);
+      isar.registryBoxs.putAll(rawRegistry);
+    });
+    return rawModels.length + rawRegistry.length;
   }
 
   Future<void> deleteItem(String id) async {
     isar.write((isar) => isar.modelBoxs.where().modelIdEqualTo(id).deleteFirst());
+  }
+
+  /// Reads registry by [id] or [parentId] with [count] of last   s if these are exists.
+  @override
+  Registry? getRegistry({String? id, String? parentId, int count = 5}) {
+    // Get item by parent ID
+    String? registryId;
+    String? registryParentId;
+    Map<String, dynamic> transactions = Map.fromEntries(isar
+      .registryBoxs
+      .where()
+      .parentIdEqualTo(parentId)
+      // .registryIdEqualTo(id)
+      // .sortByTransactionIndex()
+      .sortByTransactionIndexDesc()
+      .findAll(limit: count)
+      .where((e) => e.ttransaction != null)
+      .map((e) {
+        registryId = e.registryId;
+        registryParentId = e.parentId;
+        return MapEntry(e.transactionIndex!.toString(), jsonDecode(e.ttransaction!));
+      }));
+    if (transactions.isNotEmpty) {
+      return Registry.fromJson({
+        'transactions': transactions,
+        'metadata': <String, dynamic>{'id': registryId ?? id, 'parentId': registryParentId ?? parentId}}); // todo: bullshit
+    }
   }
 }
