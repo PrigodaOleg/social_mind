@@ -5,6 +5,16 @@ export 'firebase_realtime_database.dart';
 import 'package:closers/repository/models/models.dart';
 
 
+class RemoteStoragePermissionDeniedException implements Exception {
+  final String message;
+  final int statusCode;
+
+  RemoteStoragePermissionDeniedException(this.message, this.statusCode);
+
+  @override
+  String toString() => 'RemoteStoragePermissionDeniedException ($statusCode): $message';
+}
+
 abstract class RemoteStorage {  // todo: abstract?
   RemoteStorage();
 

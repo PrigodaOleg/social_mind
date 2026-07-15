@@ -121,12 +121,60 @@ class FirebaseStorage extends RemoteStorage {
           updates['registries/${item.id}/metadata'] = item.metadata.toJson();
           int lastTransactionIndex = item.transactions.keys.last;
           updates['registries/${item.id}/lastIdx'] = lastTransactionIndex;
-          updates['registries/${item.id}/transactions/$lastTransactionIndex'] = item.transactions[lastTransactionIndex]!.toJson();
+          for (MapEntry<String, dynamic> field in item.transactions[lastTransactionIndex]!.toJson().entries) {
+            if (field.value is List) {
+              for (String value in field.value) {
+                updates['registries/${item.id}/transactions/$lastTransactionIndex/${field.key}/$value'] = '';
+              }
+            }
+            else {
+              updates['registries/${item.id}/transactions/$lastTransactionIndex/${field.key}'] = field.value;
+            }
+          }
         }
       }
       database.update(updates);
-    } catch (error) {
-      print(error);
+    } on FirebaseException catch (e) {
+      switch (e.code) {
+        case 'permission-denied':
+          // Отказано в доступе.
+          // Операция чтения или записи была заблокирована Правилами безопасности (Security Rules) вашей базы данных.
+          throw RemoteStoragePermissionDeniedException(e.code, 0);
+        case 'unavailable':
+          // Сервис временно недоступен.
+          // Это может указывать на временные неполадки на стороне сервера Firebase.
+        case 'network-error':
+          // Ошибка сети.
+          // Запрос не удалось отправить или завершить из-за проблем с интернет-соединением на устройстве пользователя.
+        case 'disconnected':
+          // Соединение разорвано.
+          // Выполнение операции было прервано из-за потери подключения к сети прямо во время транзакции.
+        case 'expired-token':
+          // Токен авторизации устарел.
+          // Обычно Firebase SDK обновляет его автоматически,
+          // но если этого не произошло, потребуется обновить сессию пользователя.
+        case 'invalid-token':
+          // Недопустимый токен.
+          // Токен авторизации поврежден, неверно сформирован или был отозван.
+        case 'max-retries':
+          // Превышено число попыток.
+          // Данная ошибка возникает при использовании транзакций (runTransaction),
+          // если слишком много клиентов одновременно пытаются изменить один и те же данные.
+        case 'overridden-by-set':
+          // Переопределено записью.
+          // Транзакция была отменена, так как другой метод записи
+          // (например, set()) обновил данные по этому же пути раньше, чем завершилась транзакция.
+        case 'write-cancelled':
+          // Запись отменена.
+          // Запись данных была прервана на локальном уровне до отправки на сервер.
+        case 'unknown':
+          // Неизвестная ошибка.
+          // Системное исключение, происхождение которого не удалось классифицировать.
+        default:
+          print("Firebase Error: ${e.code} — ${e.message}");
+      }
+    } catch (e) {
+      print('Unknown Firebase Error: $e');
     }
     return items.length;
   }

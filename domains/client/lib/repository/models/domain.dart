@@ -10,17 +10,20 @@ class Domain extends Model {
     super.description,
     this.isPersonal = false,
     required this.originatorId,
+    registryId,
     List<String>? participantsIds,
     List<String>? observersIds,
     Map<String, String>? models
   }) :
     participantsIds = participantsIds ?? <String>[],
     observersIds = observersIds ?? <String>[],
+    registryId = registryId ?? '',
     models = models ?? <String, String>{};
   
   Domain.fromJson(super.json) :
     isPersonal = (json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? []) as String,
+    registryId = (json['registryId'] ?? []) as String,
     participantsIds = List<String>.from(json['participantsIds'] ?? []),
     observersIds = List<String>.from(json['observersIds'] ?? []),
     models = Map<String, String>.from(json['models'] ?? {}),
@@ -42,6 +45,8 @@ class Domain extends Model {
   @HiveField(9)
   List<String> observersIds;
 
+  String registryId;
+
   // Model ID: Model Type
   @HiveField(10)
   Map<String, String> models;
@@ -52,6 +57,7 @@ class Domain extends Model {
     String? description,
     bool? isPersonal,
     String? originatorId,
+    String? registryId,
     List<String>? participantsIds,
     List<String>? observersIds,
     Map<String, String>? models
@@ -62,6 +68,7 @@ class Domain extends Model {
       description: description ?? this.description,
       isPersonal: isPersonal ?? this.isPersonal,
       originatorId: originatorId ?? this.originatorId,
+      registryId: registryId ?? this.registryId,
       participantsIds: participantsIds ?? this.participantsIds,
       observersIds: observersIds ?? this.observersIds,
       models: models ?? this.models,
@@ -72,6 +79,7 @@ class Domain extends Model {
   Map<String, dynamic> toJson() => super.toJson()..addAll({
     "isPersonal": isPersonal,
     "originatorId": originatorId,
+    "registryId": registryId,
     "participantsIds": participantsIds,
     "observersIds": observersIds,
     "models": models,
@@ -92,5 +100,5 @@ class Domain extends Model {
   // }
 
   @override
-  List<Object> get props => super.props + [isPersonal, originatorId, participantsIds, observersIds, models];
+  List<Object> get props => super.props + [isPersonal, originatorId, registryId, participantsIds, observersIds, models];
 }

@@ -7,13 +7,16 @@ class User extends Model {
   User({
     super.id,
     required this.name,
+    registryId,
     List<String>? domainsIds
   }) :
-    domainsIds = domainsIds ?? <String>[];
+    domainsIds = domainsIds ?? <String>[],
+    registryId = registryId ?? '';
 
   User.fromJson(super.json) :
     name = json['name'] as String,
     domainsIds = List<String>.from(json['domainsIds'] ?? []),
+    registryId = (json['registryId'] ?? []) as String,
     super.fromJson();
     
   @override
@@ -25,6 +28,8 @@ class User extends Model {
 
   @HiveField(7)
   List<String> domainsIds;
+
+  String registryId;
 
   Map<String, dynamic> settings = {
     'remote_storages': <String, dynamic>{
@@ -49,7 +54,8 @@ class User extends Model {
   @override
   Map<String, dynamic> toJson() => super.toJson()..addAll({
     "name": name,
-    "domainsIds": domainsIds
+    "domainsIds": domainsIds,
+    "registryId": registryId
   });
 
   @override
@@ -81,5 +87,5 @@ class User extends Model {
   }
 
   @override
-  List<Object> get props => super.props + [name, domainsIds];
+  List<Object> get props => super.props + [name, domainsIds, registryId];
 }

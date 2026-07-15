@@ -7,6 +7,12 @@
     "registries": {
       "$rid": {
         ".validate": "$rid != null",
+        "metadata": {
+          ".validate": "
+          	newData.hasChildren(['id'])
+          	&& newData.child('id').val() == $rid
+        	"
+        },
         "transactions": {
           "$tidx": {
             ".validate": "
@@ -15,11 +21,57 @@
                   || (!data.parent().parent().child('lastIdx').exists() && $tidx == '0'))
             ",
             "changes": {
-              "$chidx": {
-                ".validate": "newData.parent().parent().parent().parent().parent().parent().child('models').child(newData.val()).val() != null"
+              "$chid": {
+                ".validate": "newData.parent().parent().parent().parent().parent().parent().child('models').child($chid).val() != null"
               }
             }
           }
+        }
+      }
+    },
+    "models": {
+      "$mid": {
+      	".validate": "
+      		newData.hasChildren(['id'])
+        	&& newData.child('id').val() == $mid
+        	&& ((newData.child('registryId').exists() && newData.parent().parent()
+               .child('registries')
+               .child(newData.child('registryId').val())
+               .child('transactions')
+               .child(newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val() + '')
+               .child('changes')
+               .child($mid).exists()
+              )
+              || newData.hasChild('parents'))
+      	",
+        "parents": {
+          "$pid": {
+            ".validate": "
+            	newData.parent().parent().parent().hasChild($pid)
+            	&& ((newData.parent().parent().parent().child($pid).hasChild('children')
+            	&& newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
+                || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
+            			&& newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid)))
+            "
+          }          
+        },
+        "children": {
+          "$chid": {
+          	".validate": "
+          		newData.parent().parent().parent().hasChild($chid)
+            	&& newData.parent().parent().parent().child($chid).hasChild('parents')
+            	&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          	"
+        	}
+        },
+        "domainsIds": {
+          "$did": {
+          	".validate": "
+          		newData.parent().parent().parent().hasChild($did)
+            	&& newData.parent().parent().parent().child($did).hasChild('parents')
+            	&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          	"
+        	}
         }
       }
     }
