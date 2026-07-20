@@ -30,11 +30,29 @@ class ModelBox {
   // todo: переделать на бинарный режим
 
   late int id;
-  @Index(unique: true, hash: true, name: 'byModelId')
+  @Index(unique: true, hash: true, composite: ['historyIdx'])
   String? modelId;
+  int? historyIdx;
   String? modelData; // serialized model
   ModelContainer? model; // binary
   String? rootParentId; // domain or used id
+
+  ModelBox copyWith({
+    int? id,
+    String? modelId,
+    int? historyIdx,
+    String? modelData,
+    ModelContainer? model,
+    String? rootParentId
+  }) {
+    return ModelBox()
+      ..id = id ?? this.id
+      ..modelId = modelId ?? this.modelId
+      ..historyIdx = historyIdx ?? this.historyIdx
+      ..modelData = modelData ?? this.modelData
+      ..model = model ?? this.model
+      ..rootParentId = rootParentId ?? this.rootParentId;
+  }
 }
 
 @collection
@@ -55,6 +73,20 @@ class RegistryBox {
   String? ttransaction;
 }
 
+@collection
+class HistoryQueueHeadIdx {
+  // Фиксируем ID = 0, чтобы в таблице всегда была ровно одна запись
+  int id = 0; 
+  // начальное значение 1, потому что 0 - обозначает актуальные данные
+  int value = 1;
+}
+
+@collection
+class HistoryQueueTailIdx {
+  int id = 0; 
+  int value = 1;
+}
+
 class IsarStorage extends LocalStorage {
   IsarStorage();
 
@@ -72,17 +104,24 @@ class IsarStorage extends LocalStorage {
       : IsarEngine.isar;
     if (kIsWeb) await Isar.initialize();
     isar = Isar.open(
-      schemas: [OperationalBoxSchema, ModelBoxSchema, RegistryBoxSchema],
+      schemas: [
+        OperationalBoxSchema,
+        ModelBoxSchema,
+        RegistryBoxSchema,
+        HistoryQueueHeadIdxSchema,
+        HistoryQueueTailIdxSchema],
       directory: dir,
       engine: engine
     );
   }
 
   // todo: Нужно уменьшить количество интерфейсов для operational box
+  @override
   String? getUserId() {
     return isar.operationalBoxs.where().nameEqualTo('userId').findFirst()?.data.toString();
   }
 
+  @override
   Future<void> setUserId(String userId) async {
     isar.write((isar) {
       isar.operationalBoxs.put(
@@ -94,10 +133,12 @@ class IsarStorage extends LocalStorage {
     });
   }
 
+  @override
   String? getOperational(String key) {
     return isar.operationalBoxs.where().nameEqualTo(key).findFirst()?.data.toString();
   }
 
+  @override
   Future<void> setOperational(String key, String value) async {
     isar.write((isar) {
       isar.operationalBoxs.put(
@@ -109,6 +150,7 @@ class IsarStorage extends LocalStorage {
     });
   }
 
+  @override
   dynamic getOpItem(String id) {
     String? serializedItem = isar.operationalBoxs.where().nameEqualTo(id).findFirst()?.data;
     if (serializedItem != null) {
@@ -124,6 +166,7 @@ class IsarStorage extends LocalStorage {
     }
   }
 
+  @override
   Future<void> storeOpItem(String id, dynamic item) async {
     isar.write((isar) {
       if (item is Model || item is NavStackEntry || item is List<NavStackEntry>) {
@@ -141,7 +184,7 @@ class IsarStorage extends LocalStorage {
   @override
   dynamic getItem({required String id}) {
     // Get item by ID
-    String? serializedItem = isar.modelBoxs.where().modelIdEqualTo(id).findFirst()?.modelData;
+    String? serializedItem = isar.modelBoxs.where().modelIdEqualTo(id).historyIdxEqualTo(0).findFirst()?.modelData;
     if (serializedItem != null) {
       final json = jsonDecode(serializedItem);
       return models[json['type']]?.call(json);
@@ -158,7 +201,7 @@ class IsarStorage extends LocalStorage {
       .where()
       .anyOf(
         ids,
-        (q, String id) => q.modelIdEqualTo(id)
+        (q, String id) => q.modelIdEqualTo(id).historyIdxEqualTo(0)
       )
       .findAll();
     final List<String?> serializedItems = rawModels.map((model) => model.modelData).toList();
@@ -171,7 +214,8 @@ class IsarStorage extends LocalStorage {
     return items;
   }
 
-   Future<void> storeItem(dynamic item) async {
+   @override
+  Future<void> storeItem(dynamic item) async {
     if (item is Model) {
       String? serializedItem = jsonEncode(item);
       isar.write((isar) {
@@ -179,6 +223,15 @@ class IsarStorage extends LocalStorage {
           ModelBox()
           ..id = isar.modelBoxs.autoIncrement()
           ..modelId = item.id
+          ..historyIdx = 0
+          ..modelData = serializedItem
+        );
+        final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
+        isar.modelBoxs.put(
+          ModelBox()
+          ..id = isar.modelBoxs.autoIncrement()
+          ..modelId = item.id
+          ..historyIdx = tailIdx.value
           ..modelData = serializedItem
         );
       });
@@ -199,6 +252,7 @@ class IsarStorage extends LocalStorage {
     }
   }
 
+  @override
   Future<int> storeItems(Map<String, dynamic> items) async {
     final rawModels = items
       .entries
@@ -206,6 +260,7 @@ class IsarStorage extends LocalStorage {
       .map((entry) => ModelBox()
         ..id = isar.modelBoxs.autoIncrement()
         ..modelId = entry.key
+        ..historyIdx = 0
         ..modelData = jsonEncode(entry.value)
       ).toList();
     List<RegistryBox> rawRegistry = [];
@@ -223,12 +278,19 @@ class IsarStorage extends LocalStorage {
     isar.write((isar) {
       isar.modelBoxs.putAll(rawModels);
       isar.registryBoxs.putAll(rawRegistry);
+      final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
+      final rawHistoricalModels = rawModels.map((e) => e.copyWith(
+        historyIdx: tailIdx.value,
+        id: isar.modelBoxs.autoIncrement())
+      ).toList();
+      isar.modelBoxs.putAll(rawHistoricalModels);
     });
     return rawModels.length + rawRegistry.length;
   }
 
+  @override
   Future<void> deleteItem(String id) async {
-    isar.write((isar) => isar.modelBoxs.where().modelIdEqualTo(id).deleteFirst());
+    isar.write((isar) => isar.modelBoxs.where().modelIdEqualTo(id).historyIdxEqualTo(0).deleteFirst());
   }
 
   /// Reads registry by [id] or [parentId] with [count] of last   s if these are exists.
@@ -256,5 +318,72 @@ class IsarStorage extends LocalStorage {
         'transactions': transactions,
         'metadata': <String, dynamic>{'id': registryId ?? id, 'parentId': registryParentId ?? parentId}}); // todo: bullshit
     }
+  }
+
+  @override
+  Map<String, dynamic> getNextItemsFromHistoryQueue() {
+
+    Map<String, dynamic> items = {};
+
+    isar.write((isar) {
+      var headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+      var tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
+
+      // Сперва извлекаем все элементы из базы
+      final List<ModelBox> rawModels = isar.modelBoxs.where().historyIdxEqualTo(headIdx.value).findAll();
+
+      // Если их нет, и счетчики равны - сбрасываем счетчики
+      if (rawModels.isEmpty && headIdx.value >= tailIdx.value) {
+        headIdx = HistoryQueueHeadIdx();
+        tailIdx = HistoryQueueTailIdx();
+      } else {
+        // Инкрементируем tailIdx
+        tailIdx.value += 1;
+      }
+
+      // Если они есть, конструируем из них объекты
+      final List<String?> serializedItems = rawModels.map((model) => model.modelData).toList();
+      serializedItems.forEach((String? serializedItem) {
+        if (serializedItem != null) {
+          final json = jsonDecode(serializedItem);
+          items[json['id']] = models[json['type']]?.call(json);
+        }
+      });
+
+      isar.historyQueueHeadIdxs.put(headIdx);
+      isar.historyQueueTailIdxs.put(tailIdx);
+    });
+    return items;
+  }
+
+  // Increments history queue head index and deletes these historical data.
+  @override
+  void clearHistoryQueueHead() {
+    isar.write((isar) {
+      var headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+      var tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
+
+      // Удаляем все модели с текущим headIdx
+      isar.modelBoxs.where().historyIdxEqualTo(headIdx.value).deleteAll();
+
+      // Счетчик головы не может быть больше счетчика хвоста
+      if (headIdx.value >= tailIdx.value) {
+        // Если так, то накопленные элементы мы уже удалили, поэтому можно сбросить и счетчики
+        headIdx = HistoryQueueHeadIdx();
+        tailIdx = HistoryQueueTailIdx();
+      } else {
+        // В штатном режиме инкрементируем голову и пробуем сбросить счетчики
+        headIdx.value += 1;
+        if (headIdx.value == tailIdx.value) {
+          // Если накопленных элементов больше нет, то сбрасываем счетчики
+          if (isar.modelBoxs.where().historyIdxEqualTo(tailIdx.value).findFirst() != null) {
+            headIdx = HistoryQueueHeadIdx();
+            tailIdx = HistoryQueueTailIdx();
+          }
+        }
+      }
+      isar.historyQueueTailIdxs.put(tailIdx);
+      isar.historyQueueHeadIdxs.put(headIdx);
+    });
   }
 }

@@ -139,7 +139,7 @@ class FirebaseStorage extends RemoteStorage {
         case 'permission-denied':
           // Отказано в доступе.
           // Операция чтения или записи была заблокирована Правилами безопасности (Security Rules) вашей базы данных.
-          throw RemoteStoragePermissionDeniedException(e.code, 0);
+          throw RemoteStorageWriteCollision(e.code, 0);
         case 'unavailable':
           // Сервис временно недоступен.
           // Это может указывать на временные неполадки на стороне сервера Firebase.

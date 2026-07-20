@@ -86,6 +86,20 @@ class User extends Model {
     }
   }
 
+  User copyWith({
+    String? id,
+    String? name,
+    String? registryId,
+    List<String>? domainsIds
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      registryId: registryId ?? this.registryId,
+      domainsIds: domainsIds ?? this.domainsIds,
+    );
+  }
+
   @override
   List<Object> get props => super.props + [name, domainsIds, registryId];
 }
