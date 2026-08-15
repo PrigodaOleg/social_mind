@@ -1,13 +1,11 @@
 import 'dart:io';
 
-import 'package:closers/repository/navigation/navigation_stack.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/services.dart';
-
-import 'package:isar_plus/isar_plus.dart';
-import 'package:closers/repository/models/models.dart';
-
 import 'package:closers/local_storage/isar/isar_storage.dart';
+import 'package:closers/repository/models/models.dart';
+import 'package:closers/repository/navigation/navigation_stack.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:isar_plus/isar_plus.dart';
 
 void main() async {
 
@@ -230,6 +228,7 @@ void main() async {
     });
 
     test('Check history of one item', () async {
+      storage.clearHistoryQueueHead();
       // Сперва просто пишем и читаем с проверкой истории
       final testItem0 = User(name: 'test_user');
       await storage.storeItem(testItem0);
@@ -269,6 +268,7 @@ void main() async {
     });
 
     test('Check history of many items', () async {
+      storage.clearHistoryQueueHead();
       // Сперва просто пишем и читаем с проверкой истории
       final testItem0 = User(name: 'test_user');
       await storage.storeItems({testItem0.id: testItem0});
