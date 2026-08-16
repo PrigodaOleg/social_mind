@@ -5,14 +5,14 @@ export 'firebase_realtime_database.dart';
 import 'package:closers/repository/models/models.dart';
 
 
-class RemoteStoragePermissionDeniedException implements Exception {
+class RemoteStorageWriteCollision implements Exception {
   final String message;
   final int statusCode;
 
-  RemoteStoragePermissionDeniedException(this.message, this.statusCode);
+  RemoteStorageWriteCollision(this.message, this.statusCode);
 
   @override
-  String toString() => 'RemoteStoragePermissionDeniedException ($statusCode): $message';
+  String toString() => 'RemoteStorageWriteCollision ($statusCode): $message';
 }
 
 abstract class RemoteStorage {  // todo: abstract?
@@ -32,9 +32,9 @@ abstract class RemoteStorage {  // todo: abstract?
 
   Future<dynamic> getItem({required String id}) async {}
 
-  Future<Map<String, dynamic>> getItems(List ids) async {
+  Future<Map<String, Model>> getItems(List ids) async {
     // Get items by list of IDs
-    Map<String, dynamic> items = {};
+    Map<String, Model> items = {};
     return items;
   }
   
@@ -44,5 +44,15 @@ abstract class RemoteStorage {  // todo: abstract?
 
   Future<int> deleteItems(Map<String, dynamic> items) async {
     return 0;
+  }
+
+  Future<Registry?> readRegistry(String id, {int count = 1}) async {}
+
+  Future<Map<String, Registry>> readRegistries({
+    List<String>? ids,
+    List<(String id, int? count)>? idsCounts,
+    int count = 1
+  }) async {
+    return {};
   }
 }

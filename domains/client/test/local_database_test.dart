@@ -1,13 +1,11 @@
 import 'dart:io';
 
-import 'package:closers/repository/navigation/navigation_stack.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/services.dart';
-
-import 'package:isar_plus/isar_plus.dart';
-import 'package:closers/repository/models/models.dart';
-
 import 'package:closers/local_storage/isar/isar_storage.dart';
+import 'package:closers/repository/models/models.dart';
+import 'package:closers/repository/navigation/navigation_stack.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:isar_plus/isar_plus.dart';
 
 void main() async {
 
@@ -227,6 +225,87 @@ void main() async {
       expect(readRegistry?.transactions.length, 1);
       expect(readRegistry?.lastTransaction, registry.lastTransaction);
       expect(readRegistry?.lastTransaction!.changes[0], 'test_third_change');
+    });
+
+    test('Check history of one item', () async {
+      storage.clearHistoryQueueHead();
+      // Сперва просто пишем и читаем с проверкой истории
+      final testItem0 = User(name: 'test_user');
+      await storage.storeItem(testItem0);
+      final result0 = storage.getItem(id: testItem0.id);
+      expect(result0, testItem0);
+      final historicalResult0 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult0.length, 1);
+      expect(historicalResult0[testItem0.id], testItem0);
+
+      // Потом меняем объект, и также проверяем историю, она должна сохраниться с первого раза
+      final testItem1 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_1';
+      await storage.storeItem(testItem1);
+      final result1 = storage.getItem(id: testItem0.id);
+      expect(result1, testItem1);
+      final historicalResult1 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult1.length, 1);
+      expect(historicalResult1[testItem0.id], testItem0);
+      storage.clearHistoryQueueHead();
+
+      // Потом меняем 2 раза, а история должна сохраниться от первого, потом от третьего
+      final testItem2 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_2';
+      await storage.storeItem(testItem2);
+      final result2 = storage.getItem(id: testItem0.id);
+      expect(result2, testItem2);
+      final testItem3 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_3';
+      await storage.storeItem(testItem3);
+      final result3 = storage.getItem(id: testItem0.id);
+      expect(result3, testItem3);
+      final historicalResult2 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult2.length, 1);
+      expect(historicalResult2[testItem0.id], testItem1);
+      storage.clearHistoryQueueHead();
+      final historicalResult3 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult3.length, 1);
+      expect(historicalResult3[testItem0.id], testItem3); // Тут должен быть последний
+      storage.clearHistoryQueueHead();
+    });
+
+    test('Check history of many items', () async {
+      storage.clearHistoryQueueHead();
+      // Сперва просто пишем и читаем с проверкой истории
+      final testItem0 = User(name: 'test_user');
+      await storage.storeItems({testItem0.id: testItem0});
+      final result0 = storage.getItems([testItem0.id]);
+      expect(result0.length, 1);
+      expect(result0[testItem0.id], testItem0);
+      final historicalResult0 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult0.length, 1);
+      expect(historicalResult0[testItem0.id], testItem0);
+
+      // Потом меняем объект, и также проверяем историю, она должна сохраниться с первого раза
+      final testItem1 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_1';
+      await storage.storeItems({testItem1.id: testItem1});
+      final result1 = storage.getItems([testItem0.id]);
+      expect(result1[testItem0.id], testItem1);
+      final historicalResult1 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult1.length, 1);
+      expect(historicalResult1[testItem0.id], testItem0);
+      storage.clearHistoryQueueHead();
+
+      // // Потом меняем 2 раза, а история должна сохраниться от первого, потом от третьего
+      final testItem2 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_2';
+      await storage.storeItems({testItem2.id: testItem2});
+      final result2 = storage.getItems([testItem0.id]);
+      expect(result2[testItem0.id], testItem2);
+      final testItem3 = User.fromJson(testItem0.toJson())..registryId = 'changed_test_user_3';
+      await storage.storeItems({testItem3.id: testItem3});
+      final result3 = storage.getItems([testItem0.id]);
+      expect(result3[testItem0.id], testItem3);
+      final historicalResult2 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult2.length, 1);
+      expect(historicalResult2[testItem0.id], testItem1);
+      storage.clearHistoryQueueHead();
+      final historicalResult3 = storage.getNextItemsFromHistoryQueue();
+      expect(historicalResult3.length, 1);
+      expect(historicalResult3[testItem0.id], testItem3); // Тут должен быть последний
+      storage.clearHistoryQueueHead();
     });
 
   });

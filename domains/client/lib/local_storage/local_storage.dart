@@ -17,50 +17,42 @@ abstract class LocalStorage {
 
   Future<void> init() async {}
 
-  String? getUserId() {
-    // return _operationalBox.get('userId');
-  }
+  String? getUserId() {}
 
-  Future<void> setUserId(String userId) async {
-    // return await _operationalBox.put('userId', userId);
-  }
+  Future<void> setUserId(String userId) async {}
 
-  String? getOperational(String key) {
-    // return _operationalBox.get(key);
-  }
+  String? getOperational(String key) {}
 
-  Future<void> setOperational(String key, String value) async {
-    // return await _operationalBox.put(key, value);
-  }
+  Future<void> setOperational(String key, String value) async {}
 
-  dynamic getOpItem(String id) {
-    // return _operationalBox.get(id);
-  }
+  dynamic getOpItem(String id) {}
 
-  Future<void> storeOpItem(String id, dynamic item) async {
-    // await _operationalBox.put(id, item);
-  }
+  Future<void> storeOpItem(String id, dynamic item) async {}
 
   dynamic getItem({required String id}) async {}
 
+  // Get items by list of IDs
   Map<String, T> getItems<T>(List<String> ids) {
-    // Get items by list of IDs
     Map<String, T> items = {};
     return items;
   }
 
-  Future<void> storeItem(dynamic item) async {
-    // await _commonBox.put(item.id, item);
-  }
+  Future<void> storeItem(dynamic item) async {}
 
   Future<int> storeItems(Map<String, dynamic> items) async {
-    // await _commonBox.putAll(items);
     return items.length;
   }
 
-  Future<void> deleteItem(String id) async {
-    // await _commonBox.delete(id);
-  }
+  Future<void> deleteItem(String id) async {}
 
   Registry? getRegistry({String? id, String? parentId, int count = 5}) {}
+
+  // Gets all items from history queue head with increment of tail index.
+  // So new history items will be put in new tail
+  Map<String, dynamic> getNextItemsFromHistoryQueue() {
+    return <String, dynamic>{};
+  }
+
+  // Increments history queue head index and deletes these historical data.
+  void clearHistoryQueueHead() {}
 }

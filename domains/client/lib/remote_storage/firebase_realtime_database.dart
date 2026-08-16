@@ -53,9 +53,9 @@ class FirebaseStorage extends RemoteStorage {
   }
 
   @override
-  Future<Map<String, dynamic>> getItems(List ids) async {
+  Future<Map<String, Model>> getItems(List ids) async {
     // Get items by list of IDs
-    Map<String, dynamic> items = {};
+    Map<String, Model> items = {};
     if (ids.isNotEmpty) {
       database.child('models/${ids[0]}').onChildChanged.listen((event) {
         if (event.snapshot.key!.isNotEmpty) {
@@ -139,7 +139,7 @@ class FirebaseStorage extends RemoteStorage {
         case 'permission-denied':
           // Отказано в доступе.
           // Операция чтения или записи была заблокирована Правилами безопасности (Security Rules) вашей базы данных.
-          throw RemoteStoragePermissionDeniedException(e.code, 0);
+          throw RemoteStorageWriteCollision(e.code, 0);
         case 'unavailable':
           // Сервис временно недоступен.
           // Это может указывать на временные неполадки на стороне сервера Firebase.
@@ -192,9 +192,10 @@ class FirebaseStorage extends RemoteStorage {
     return items.length;
   }
 
-  Future<Map<String, dynamic>> readRegistry(String id, {int take = 1}) async {
+  @override
+  Future<Registry?> readRegistry(String id, {int count = 1}) async {
     final ref = database.child('registries/$id/transactions');
-    final takeQuery = ref.limitToLast(take);
+    final takeQuery = ref.limitToLast(count);
     final metaRef = database.child('registries/$id/metadata');
     final List<DataSnapshot> snapshots = await Future.wait([takeQuery.get(), metaRef.get()]);
     for (DataSnapshot snapshot in snapshots) {
@@ -206,6 +207,6 @@ class FirebaseStorage extends RemoteStorage {
       registry['transactions'][child.key] = child.value;
     }
     // registry['transactions'] = snapshots[0].children.map((e) => e.value).toList();
-    return registry;
+    return Registry.fromJson(registry);
   }
 }

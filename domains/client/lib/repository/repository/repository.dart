@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-
-import 'package:hashlib/hashlib.dart';
+import 'dart:math';
 
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
+import 'package:flutter/widgets.dart';
+import 'package:hashlib/hashlib.dart';
 
 import '../models/models.dart';
 import '../navigation/navigation_stack.dart';
@@ -14,6 +15,17 @@ import '../navigation/navigation_stack.dart';
 typedef SyncListener = void Function(String id, dynamic syncedItem);
 typedef PeriodicCallback = void Function(int left);
 typedef DoneCallback = void Function();
+
+
+class RebaseCollision implements Exception {
+  final String message;
+  final int statusCode;
+
+  RebaseCollision(this.message, this.statusCode);
+
+  @override
+  String toString() => 'RebaseCollision ($statusCode): $message';
+}
 
 
 class Timer {
@@ -74,7 +86,14 @@ class Timer {
 //          Merge conflicts solves according user chosen merge politic.
 class Repository {
   static late Repository instance;
-  Repository();
+  Repository({
+    LocalStorage? localStorage,
+    Map<String, RemoteStorage>? remoteStorages
+  }) :
+  _localStorage = localStorage ?? IsarStorage(),
+  // _localStorage = localStorage ?? HiveStorage()
+  _remoteStorages = remoteStorages ?? <String, RemoteStorage>{}
+  ;
 
   bool late = true;
 
@@ -86,12 +105,12 @@ class Repository {
   late int defaultSyncSubscriber;
 
   // Локальное хранилище есть всегда, это основное хранилище
-  late final LocalStorage _localStorage;
+  final LocalStorage _localStorage;
 
-  // Удаленное хранилище позволяет хранить состояние 
+  // Удаленное хранилище позволяет хранить состояние
   // Их может быть много
   // Какие именно доступны - нужно узнать из пользовательских настроек
-  final Map<String, RemoteStorage> _remoteStorages = {};
+  final Map<String, RemoteStorage> _remoteStorages;
 
   // Холодное хранилище предназначено для бесконечно долгого хранения данных
   // Их может быть много
@@ -119,8 +138,6 @@ class Repository {
   };
 
   Future<void> init() async {
-    // _localStorage = HiveStorage();
-    _localStorage = IsarStorage();
     await _localStorage.init();
     await initRemoteStorages();
     await authRemoteStorages();
@@ -269,7 +286,7 @@ class Repository {
     }
 
     // Отправляем локальные изменения в удаленное хранилище
-    int saved = await _saveItemsConsistently(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
+    int saved = await syncWithRemoteStorage(Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))));
     // Вызываем для каждого синхронизированного элемента событие для слушателя
     while (outgoingChanges.isNotEmpty) {
       String id = outgoingChanges.first.id;
@@ -463,11 +480,11 @@ class Repository {
     return items;
   }
 
-  Future<int> _saveToAllRemoteStorages(Map<String, dynamic> items) async {
+  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries) async {
     int count = 0;
     // todo: Сейчас сохраняет тупым перебором все remote storage'ы. Нужно сделать более умный способ
     for (var rStorage in _remoteStorages.entries) {
-      count += await rStorage.value.saveItems(items);
+      count += await rStorage.value.saveItems({...items,  ...registries});
     }
     return count; // todo: Тут вообще возвращается не пойми что
   }
@@ -496,8 +513,142 @@ class Repository {
   }
 
   // Реализация консистентной записи с использованием реестра изменений
-  Future<int> _saveItemsConsistently(Map<String, dynamic> items) async {
-    // Проходим по моделям и определяем, к каким доменам они относятся.
+  @visibleForTesting
+  Future<int> syncWithRemoteStorage(Map<String, Model> localItems) async {
+
+    // Так как мы начинаем собирать новую транзакцию,
+    // то прекращаем сбор исторических данных для текущей локальной копии
+    final oldItems = _localStorage.getNextItemsFromHistoryQueue();
+
+    // Проходим по моделям и определяем, к каким доменам/пользователям они относятся.
+    Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(localItems);
+
+    var localRegistries = _getRegistries(parentItems.keys.toList());
+
+    var remoteRegistries = <String, Registry>{};
+    var latestRemoteRegistries = <String, Registry>{};
+
+    var localchanges = localItems;
+    var remoteChanges = <String, Model>{};
+
+    var localUpdates = localItems;
+    var remoteUpdates = <String, Model>{};
+
+    // Флаг, который указывает на то, что мы подозреваем, что в УХ появились новые данные.
+    // В первый раз надеемся на то, что данные в ЛХ актуальны
+    bool isRemoteRegistriesActual = true;
+
+    // Будем пробовать создавать транзакции много раз, пока не отправим их удачно,
+    // или пока не обнаружим отсутствие прав на запись (пока индексы транзакций меняются при перечитывании).
+    do {
+      if (isRemoteRegistriesActual == false) {
+        latestRemoteRegistries = await _remoteStorages.values.first.readRegistries(ids: localRegistries.keys.toList());
+        if (_isIndexesEqual(remoteRegistries, latestRemoteRegistries)) {
+          // Индексы не изменились, значит нет прав на запись
+          _rollbackLastTransaction(oldItems, localRegistries);
+          _accessDeniedCallback(localchanges);
+          return 0;
+        }
+        remoteRegistries = await _getRemoteRegistries(localRegistries, remoteRegistries, latestRemoteRegistries);
+        remoteChanges = await _getRemoteChanges(remoteRegistries);
+        isRemoteRegistriesActual = true;
+        try {
+          (localUpdates, remoteUpdates) = _rebaseTransaction(localchanges, remoteChanges, oldItems.cast<String, Model>()); // TODO: сделать нормальный тип
+        } on RebaseCollision catch (e) {
+          // получилось некрасиво с этим исключением...
+        }
+      } else {
+        remoteUpdates = localUpdates;
+      }
+      remoteRegistries = _buildTransactions(remoteRegistries, remoteUpdates);
+      try {
+        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())));
+        // Залилось
+        localRegistries = remoteRegistries;
+        if (localUpdates.isNotEmpty) _localStorage.storeItems({...localUpdates, ...localRegistries});
+        _localStorage.clearHistoryQueueHead();
+      } on RemoteStorageWriteCollision catch (e) {
+        // Не залилось
+        isRemoteRegistriesActual = false;
+        remoteRegistries.forEach((id, registry) => registry.removeLastTransaction());
+        localUpdates = <String, Model>{};
+      }
+
+    } while (!_isIndexesEqual(localRegistries, remoteRegistries) || isRemoteRegistriesActual == false);
+
+    return localItems.length;
+  }
+
+  // Реализация консистентной записи с использованием реестра изменений
+  // Future<int> _saveItemsConsistently(Map<String, dynamic> localItems) async {
+
+  //   // Так как мы начинаем собирать новую транзакцию,
+  //   // то прекращаем сбор исторических данных для текущей локальной копии
+  //   final oldItems = _localStorage.getNextItemsFromHistoryQueue();
+
+  //   // Проходим по моделям и определяем, к каким доменам/пользователям они относятся.
+  //   Map<Model, Map<String, dynamic>> paretnItems = _clusterItemsByParent(localItems);
+
+  //   // Для каждого домена создаем запись в реестре событий.
+  //   Map<String, Registry> localRegistries;
+  //   (paretnItems, localRegistries) = _generateTransactions(paretnItems);
+
+  //   // Записываем по транзакции на каждый реестр. Можно пачкой за один раз.
+  //   // todo: сделать асинхронную запись
+  //   var allItems = Map.fromEntries(paretnItems.values.expand((map) => map.entries));
+    
+  //   try {
+  //     // Пытаемся произвести запись в удаленный репозиторий
+  //     _saveToAllRemoteStorages(allItems);
+  //     // Если получилось, то удаляем исторические данные
+  //     _localStorage.clearHistoryQueueHead();
+  //   } on RemoteStorageWriteCollision catch (e) {
+  //     // Тут надо откатывать текущую транзакцию.
+
+  //     // Попробовать перечитать данные из удаленного хранилища (реестры),
+  //     // посмотреть, нет ли обновлений в записываемых объектов,
+  //     // даже если они есть, попытаться их смержить, если изменения не конфликтующие,
+  //     // приготовить заново транзакцию с обновленными записями в реестры.
+  //     // Так можно пробовать несколько раз при условии, что перечитываемые реестры меняются.
+  //     // Если не меняются, то кидает ошибку записи в базу.
+  //     // Если конфликт в данных, кидаем колбэк в UI о необходимости переделать объекты.
+  //     // Кидаем колбек в UI при каждом перечитывании/обновлении данных (если реестры меняются).
+      
+  //     // Итого, тут мы можем только откатить транзакцию и перевыбросить исключение на уровень повыше
+  //     // о необходимости делать приседания, описаные выше (потому что новую транзакцию надо собирать заново).
+
+  //     // Идея записывать изменения сразу в основную коллекцию
+  //     // и параллельно вести журнал истории изменений (Event Sourcing / Change Log).
+  //     // Он обеспечивает мгновенный отклик интерфейса (Optimistic UI) и гарантирует,
+  //     // что данные не потеряются при внезапном закрытии приложения.
+  //     // Если сервер отклонит операцию (из-за сети или коллизии),
+  //     // приложение сможет точно восстановить хронологию по цепочке шагов.
+
+  //     // Итого2, пытаемся перечитать данные из УР, ребейзить и пытаться снова собрать и записать транзакцию
+  //     // Пытаемся много раз пока изменяется порядковый номер транзакции (то есть пока извне поступают свежие данные)
+  //     // _getRemoteRegistries()
+  //     final remoteRegistries = await _remoteStorages.values.first.readRegistries(localRegistries.keys.toList());
+  //     final remoteItems = _getUpdatesByRegistries(localRegistries, remoteRegistries);
+      
+  //     // В результате ребейза рождается пачка изменений для ЛХ, а также пачка изменений для УХ.
+  //     // Пачку для УХ пытаемся отправить. Если не получается, повторяем итерации до тех пор,
+  //     // пока при перечитывании отличается индекс голов списка транзакций.
+  //     final (localRebasedItems, remoteRebasedItems) = _rebaseTransaction(localItems, remoteItems);
+
+  //     // Если ребейз не удался, то откатываем из ЛР текущие изменения, и шлем в UI колбек с его измененными данными
+  //     // и измененными данными из УР, чтобы он сам принял решение как и что менять.
+  //     _rollbackLastTransaction(oldItems, localRegistries);
+  //     // _findAndSendCollisionCallback(localItems, remoteItems)
+
+  //     // Если порядковый номер транзакции не изменился, а данные все равно не пишутся,
+  //     // значит у пользователя был отозван доступ на запись, нужно прекратить попытки внесения изменений
+  //     // и послать в UI колбек с ошибкой доступа.
+  //     // throw AccessDenied();
+  //   }
+  //   return 0;
+  // }
+
+  Map<Model, Map<String, dynamic>> _clusterItemsByParent(Map<String, dynamic> items) {
     Map<Model, Map<String, dynamic>> paretnItems = {};
     for (var entry in items.entries) {
       final parent = _getParent(entry.value);
@@ -507,7 +658,10 @@ class Repository {
         print('No domain found for ${entry.value.runtimeType} ${entry.key}'); // todo: handle users
       }
     }
-    // Для каждого домена создаем запись в реестре событий.
+    return paretnItems;
+  }
+
+  (Map<Model, Map<String, dynamic>>, Map<String, Registry>) _generateTransactions(Map<Model, Map<String, dynamic>> parentItems) {
     // Реестр, скорее всего, итак уже есть, кроме случаев, когда мы создали нового пользователя, или залогинились в первый раз
     // на новом устройстрве.
     // В таком случае, создаем новую транзакцию поверх последней валидной.
@@ -522,7 +676,8 @@ class Repository {
     //    при ошибке записи в у/р репозиторий читаем у/р состояние и ребейзим свои изменения на новую голову.
     //    Локально изменения сохраняем сразу. При ребейзе переписываем локальные данные.
     // В случае ребейза нужно послать собитые на перерисовку в bloc.
-    for (var parentEntry in paretnItems.entries) {
+    var registries = <String, Registry>{};
+    for (var parentEntry in parentItems.entries) {
       final parent = parentEntry.key;
       final children = parentEntry.value;
       var registry =
@@ -551,29 +706,267 @@ class Repository {
       _localStorage.storeItems({registry.id!: registry, parent.id: parent});
       // Добавляем реестр к остальным объектам, которые будут сохранены в у/р хранилище
       parentEntry.value[registry.id!] = registry;
+      registries[registry.id!] = registry;
     }
-    // Для типов моделей, относящихся в пользователям создаем запись в реестр пользователя.
+    return (parentItems, registries);
+  }
 
-    // Записываем по транзакции на каждый реестр. Можно пачкой за один раз.
-    // todo: сделать асинхронную запись
-    var allItems = Map.fromEntries(paretnItems.values.expand((map) => map.entries));
-    
-    try {
-      return _saveToAllRemoteStorages(allItems);
-    } on RemoteStoragePermissionDeniedException catch (e) {
-      // Тут надо откатывать текущую транзакцию.
+  // Map<String, Model> _getUpdatesByRegistries(
+  //   Map<String, Registry> localRegistries,
+  //   Map<String, Registry> remoteRegistries
+  // ) {
+  //   // Тут берем все локальные реестры, смотрим какие у них последние транзакции, потом читаем удаленные реестры,
+  //   // смотрим их последние транзакции, сравниваем индексы, дочитываем недостающие, если они есть,
+  //   // и считываем все недостающие локально транзакции.
+  //   // После этого по спискам изменений в транзакциях читаем все новые состояния элементов, возвращаем их.
+  //     // Тут проблемка с тем, сколько последних транзакций надо читать.
+  //     // List<String> idsToGetUpdates = remoteRegistries.values.expand((reg) => reg.lastTransaction.changes).toList();
+  //   return <String, Model>{};
+  // }
 
-      // Попробовать перечитать данные из удаленного хранилища (реестры),
-      // посмотреть, нет ли обновлений в записываемых объектов,
-      // даже если они есть, попытаться их смержить, если изменения не конфликтующие,
-      // приготовить заново транзакцию с обновленными записями в реестры.
-      // Так можно пробовать несколько раз при условии, что перечитываемые реестры меняются.
-      // Если не меняются, то кидает ошибку записи в базу.
-      // Если конфликт в данных, кидаем колбэк в UI о необходимости переделать объекты.
-      // Кидаем колбек в UI при каждом перечитывании/обновлении данных (если реестры меняются).
-      
-      // Итого, тут мы можем только откатить транзакцию и перевыброссить исключение на уровень повыше
-      // о необходимости делать приседания, описаные выше. (потому что новую транзакцию надо собирать заново)
+  // Пробуем смешать данные, если не получили неразрешимой коллизии, то возвращаем изменения, предназначенные для
+  // сохранения в ЛХ и УХ.
+  // Если получается коллизия, то кидаем исключение.
+  // Основные правила ребейза:
+  // 1. Если объект новый, то просто сохраняем его в ЛХ и УХ.
+  // 2. Если объект изменен (есть и в ЛХ и в УХ), то сравниваем по полям объекта.
+  // 3. Чтобы понять, какие поля мы изменили, сравниваем каждое поле с таким же объектом из oldItems.
+  // 4. Если поле не менялось, то берем новое значение из объекта из remoteItems.
+  // 5. Если поле изменилось, смотрим, изменилось ли оно в УХ, если нет, то берем новое значение из объекта из localItems,
+  //    если да, то мы обнаружили конфликт, накапливаем их и кидаем исключение.
+  // 6. Для списков также смотрим старое значение, если мы не трогали список, то берем его из remoteItems.
+  // 7. Если мы трогали список, то сравниваем его со списком из remoteItems. Если список изменился, 
+  //    сравниваем элементы списка. Если он только расширился, то спокойно мержим список.
+  //    todo: если мы изменили элемент, как понять, с каким элементом из remoteItems его нужно сравниваеть?
+  // 8. Для словарей проверяем по ключам на предмет расширения, мержим расширения.
+  // 9. Если значения по одинаковым ключам изменились, рекурсивно ребейзим то, что внутри значения то вышеописанным правилам.
+  (Map<String, Model>, Map<String, Model>) _rebaseTransaction(
+    Map<String, Model> localItems,
+    Map<String, Model> remoteItems,
+    Map<String, Model> oldItems
+  ) {
+    var localModels = <String, Model>{};
+    var remoteModels = <String, Model>{};
+    var conflicts = <String>{};
+    for (final modelId in localItems.keys) {
+      if (remoteItems.containsKey(modelId)) {
+        conflicts.add(modelId);
+      } else{
+        remoteModels[modelId] = localItems[modelId]!;
+      }
     }
+    for (final modelId in remoteItems.keys) {
+      if (localItems.containsKey(modelId)) {
+        conflicts.add(modelId);
+      } else {
+        localModels[modelId] = remoteItems[modelId]!;
+      }
+    }
+    for (final modelId in conflicts) {
+      final localModel = localItems[modelId]!;
+      final remoteModel = remoteItems[modelId]!;  
+      final oldModel = oldItems[modelId];
+      if (localModel != remoteModel) {
+        final rebasedModel = _rebaseModel(localModel, remoteModel, oldModel);
+        localModels[modelId] = rebasedModel;
+        remoteModels[modelId] = rebasedModel;
+      } else {
+        localModels[modelId] = localModel;
+        remoteModels[modelId] = remoteModel;
+      }
+    }
+    return (localModels, remoteModels);
+  }
+
+  Model _rebaseModel(Model localModel, Model remoteModel, Model? oldModel) {
+    if (localModel == remoteModel) return localModel;
+    final oldMap = oldModel?.toJson() ?? {};
+    final localMap = localModel.toJson();
+    var remoteMap = remoteModel.toJson();
+    final fields = <String>{...localMap.keys, ...remoteMap.keys};
+    for (final field in fields) {
+      if (oldMap.containsKey(field) && oldMap[field] == localMap[field]) {
+        // поле не изменилось
+        continue;
+      }
+      if (remoteMap.containsKey(field)) {
+        if (localMap.containsKey(field)) {
+          // поле изменилось в обоих местах
+          if (remoteMap[field] != localMap[field]) {
+            // нужно решить конфликт
+            if (remoteMap[field] is Map) {
+              remoteMap[field] = _rebaseMap(remoteMap[field], localMap[field]);
+            } else if (remoteMap[field] is List) {
+              remoteMap[field] = {...remoteMap[field], ...(localMap[field] as List)}.toList();
+            } else {
+              // в остальных случаях нужно спросить пользователя
+              // todo: пока берем удаленную версию, локальные изменения теряем
+            }
+          }
+        } 
+      } else {
+        remoteMap[field] = localMap[field];
+      }
+    }
+    return _remoteStorages.values.first.models[remoteModel.type]!(remoteMap);
+  }
+
+  Map<String, dynamic> _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
+    final keys = <String>{...remoteMap.keys, ...localMap.keys};
+    for (final key in keys) {
+      if (remoteMap.containsKey(key) && localMap.containsKey(key)) {
+        if (remoteMap[key] is Map && localMap[key] is Map) {
+          remoteMap[key] = _rebaseMap(remoteMap[key], localMap[key]);
+        } else if ( remoteMap[key] is List && localMap[key] is List) {
+          remoteMap[key] = {...remoteMap[key], ...(localMap[key] as List)}.toList();
+        } else {
+          if (remoteMap[key] != localMap[key]) {
+            // нужно решить конфликт
+            // todo: пока берем удаленную версию, локальные изменения теряем
+          }
+        }
+      } else if (localMap.containsKey(key)) {
+        remoteMap[key] = localMap[key];
+      }
+    }
+    return remoteMap;
+  }
+
+  void _rollbackLastTransaction(Map<String, dynamic> oldItems, Map<String, Registry> registries) {
+    // Что такое последняя транзакция?
+    // Работа репозитория устроена так, что поступающие изменения сразу сохраняются в локальное хранилище.
+    // При этом репозиторий накапливает эти изменения за некоторый период времени, зависящий от действий пользователя,
+    // группирует эти изменения в пачки, после чего пытается выгрузить их в удаленный репозиторий в виде транзакции.
+    // Эта транзакция может оказаться неудачной, и подлежащей пересборке. В таком случае, нужно будет откатить всю эту пачку.
+    // Соответственно, откат транзакции означает - откат пачки изменений, накопленной между синхронизациями.
+    // Соответственно, в локальном репозитории история изменений также должна храниться в виде транзакций,
+    // разделенных событиями синхронизации.
+    // При этом, в репозитории есть также методы, выполняющие синхронизацию мгновенно.
+    // Получается, что в локальном репозитории накапливается цепочка/очередь из транзакций.
+    // Откатывать мы хотим её голову. Новые транзакции поступают в хвост.
+    _localStorage.storeItems(oldItems);
+    registries.values.forEach((e) => e.removeLastTransaction());
+  }
+
+  Map<String, Registry> _getRegistries(List<Model> items) {
+    var registries = <String, Registry>{};
+    for (final item in items) {
+      final registry =
+         // Реестр уже существует, сценарий 3
+        _localStorage.getRegistry(parentId: item.id, count: 1)
+        // Реестра еще нет, 
+        // Нет, тут, кажется, ситуация посложнее. Наверное, при логине старого пользователя нужно подтянуть все домены и реестры.
+        // Назовем такую ситуацию - "получить контекст пользователя" (get_user_context()).
+        // И тогда они не будут пустыми. Можно поверх них писать транзакции.
+        // Тогда ситуация отсутствия реестра будет только в том случае, если пользователь или домен только что создан.
+        // Создаем новый реестр с нулевой транзакцией.
+        ?? Registry(parentId: item.id);
+      // Линкуем реестр к контейнеру и сохраняем в локальное хранилище
+      if (item is Domain) item.registryId = registry.id!;
+      if (item is User) item.registryId = registry.id!;
+      registries[registry.id!] = registry;
+    }
+    return registries;
+  }
+
+  bool _isIndexesEqual(Map<String, Registry> a, Map<String, Registry> b) {
+    if (a.length != b.length) return false;
+    if (!a.keys.every((key) => b.keys.contains(key))) return false;
+    for (final id in a.keys) {
+      if (a[id]?.lastTransactionIndex != b[id]?.lastTransactionIndex) return false;
+    }
+    return true;
+  }
+
+  // Уведомляем пользователя, что по неизвестной причине ему недоступна операция модификации объектов
+  void _accessDeniedCallback(Map<String, dynamic> items) {}
+
+  // Вычисляем и читаем опережающие цепочки транзакций по всем реестрам
+  // Базовые индексы берем из [localRegistries], известные индексы вычисляем из объединения
+  // [remoteRegistries] и [knownFragment]. Причем, так как мы не знаем, появились ли новые транзакции в УХ,
+  // то считываем немного больше, и контролируем, попали ли базовые индексы цепочки с новыми индексами.
+  // Если нет, то дочитываем еще. Если да, то склеиваем все цепочки и возвращаем все реестры.
+  Future<Map<String, Registry>> _getRemoteRegistries(
+    Map<String, Registry> localRegistries,
+    Map<String, Registry> remoteRegistries,
+    Map<String, Registry> knownFragment
+  ) async {
+    List<(String, int)> registriesIdsToRead = [];
+    for (final localRegistry in localRegistries.values) {
+      final lastLocalIndex = localRegistry.lastTransactionIndex ?? -1;
+      final lastRemoteIndex = remoteRegistries[localRegistry.id]?.lastTransactionIndex ?? -1;
+      final firstRemoteIndex = knownFragment[localRegistry.id]?.transactions.keys.reduce(min) ?? -1;
+      final lastFragmentIndex = knownFragment[localRegistry.id]?.lastTransactionIndex ?? -1;
+      final firstFragmentIndex = knownFragment[localRegistry.id]?.transactions.keys.reduce(min) ?? -1;
+      // Просто проверяем, является ли [knownFragment] бесшовным продолжением [remoteRegistries]
+      // Если нет, то отбрасываем его, поскольку все равно перечитывать надо будет всё
+      int latestRemoteIndex = lastLocalIndex;
+      if (latestRemoteIndex >= firstRemoteIndex - 1) latestRemoteIndex = lastRemoteIndex;
+      if (latestRemoteIndex >= firstFragmentIndex - 1) latestRemoteIndex = lastFragmentIndex;
+      // Читать будем чуть больше, чтобы транзакции точно склеились
+      final count = latestRemoteIndex - lastLocalIndex + 2;
+      registriesIdsToRead.add((localRegistry.id!, count));
+    }
+    return await _remoteStorages.values.first.readRegistries(idsCounts: registriesIdsToRead);
+  }
+
+  // Читаем из удаленного репозитория все изменения, перечисленные в [registries]
+  Future<Map<String, Model>> _getRemoteChanges(Map<String, Registry> registries) async {
+    Set<String> allModels = {};
+    for (final registry in registries.values) {
+      registry.transactions.values.forEach((transaction) => allModels.addAll(transaction.changes));
+    }
+    return await _remoteStorages.values.first.getItems(allModels.toList());
+  }
+
+  // Создаем новые транзакции для каждого реестра в [registries].
+  // Тут есть вопрос - как понять, какие из этих изменений к каким реестрам относятся?
+  // Заново производить поиск (пока да)?
+  // [registries] - свежайшие реестры, на основе которых мы будем делать новые транзакции.
+  // [items] - собственно изменения, которые должны войти в транзакции. Однако, тут есть некооторые сложности.
+  // А именно, не факт, что для каждого изменения найдется реестр. Не факт, что [registries] не пусты.
+  // Получается, что нам все-таки нужно сравнивать с локальными/старыми реестрами.
+  Map<String, Registry> _buildTransactions(Map<String, Registry> registries, Map<String, Model> items) {
+    Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
+    for (final pItemEntry in parentItems.entries) {
+      final pItem = pItemEntry.key;
+      final pItemItems = pItemEntry.value;
+      var oldRegistry = _localStorage.getRegistry(parentId: pItem.id);
+      Registry? recentRegistry;
+      if (pItem is User) recentRegistry = registries[pItem.registryId];
+      if (pItem is Domain) recentRegistry = registries[pItem.registryId];
+      // todo: кажется, забыли про случай, когда нового реестра нет локально (но мы почему-то вносим в него изменения, странно ...)
+      final lastOldIndex = oldRegistry?.lastTransactionIndex ?? -1;
+      final lastRecentIndex = recentRegistry?.lastTransactionIndex ?? -1;
+      Map<int, Transaction> actualTransactionChain = {};
+      if (recentRegistry != null) {
+        if (lastRecentIndex < lastOldIndex) {
+          // добавляем в recentRegistry цепочку старых транзакций из oldRegistry
+          oldRegistry = _localStorage.getRegistry(id: pItem.id, count: lastOldIndex - lastRecentIndex);
+          actualTransactionChain = oldRegistry?.transactions ?? {};
+        }
+      } else if (oldRegistry != null) {
+        // старый реестр наиболее актуален
+        recentRegistry = oldRegistry.copyWith();
+      } else {
+        // создаем новый реестр
+        recentRegistry = Registry(parentId: pItem.id);
+        if (pItem is User) pItem.registryId = recentRegistry.id!;
+        if (pItem is Domain) pItem.registryId = recentRegistry.id!;
+      }
+      recentRegistry.transactions.addAll(actualTransactionChain);
+      recentRegistry.addNewTransaction(
+        Transaction.next(
+          recentRegistry.lastTransaction, 
+          me.id,
+          '\$session - \$app - \$device',
+          'creation',
+          pItemItems.keys.toList(),
+          'path'
+        )
+      );
+      registries[recentRegistry.id!] = recentRegistry;
+    }
+    return registries;
   }
 }
