@@ -4,13 +4,10 @@ import 'ui/ui.dart';
 import 'ui/navigation.dart';
 import 'repository/repository.dart';
 
-
 class App extends StatelessWidget {
   const App({super.key});
 
-  
   Future<List<NavStackEntry>?> locateUser(Repository repository) async {
-
     // This is the origin point of working with repository
     await repository.init();
 
@@ -32,7 +29,8 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      onGenerateTitle: (context) => AppLocalizations.of(context).applicationTitle,
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context).applicationTitle,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepPurple,
@@ -42,26 +40,27 @@ class App extends StatelessWidget {
       ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      routerDelegate: AppRouterDelegate(
-        initialRoute: (
-          path: SplashScreen.routeName,
-          constructor: SplashScreen.new,
-          args: {
-            'nextRoute': LoginPage.routeName,
-            'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
-            'backgroundTask': locateUser
-          }
-        ),
-        unknownRoute: (args: {}, constructor: UnknownPage.new, path: UnknownPage.routeName),
-        routes: {
-          LoginPage.routeName: LoginPage.new,
-          HomePage.routeName: HomePage.new,
-          DomainListPage.routeName: DomainListPage.new,
-          DomainContentPage.routeName: DomainContentPage.new,
-          TaskListPage.routeName: TaskListPage.new,
-          ContactListPage.routeName: ContactListPage.new
+      routerDelegate: AppRouterDelegate(initialRoute: (
+        path: SplashScreen.routeName,
+        constructor: SplashScreen.new,
+        args: {
+          'nextRoute': LoginPage.routeName,
+          'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
+          'backgroundTask': locateUser
         }
-      ),
+      ), unknownRoute: (
+        args: {},
+        constructor: UnknownPage.new,
+        path: UnknownPage.routeName
+      ), routes: {
+        LoginPage.routeName: LoginPage.new,
+        HomePage.routeName: HomePage.new,
+        DomainListPage.routeName: DomainListPage.new,
+        DomainContentPage.routeName: DomainContentPage.new,
+        TaskListPage.routeName: TaskListPage.new,
+        ContactListPage.routeName: ContactListPage.new,
+        UserProfilePage.routeName: UserProfilePage.new
+      }),
       routeInformationParser: AppRouteInformationParser(),
     );
   }
