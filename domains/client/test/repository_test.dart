@@ -7,11 +7,17 @@ class MockLocalStorage extends LocalStorage {
   Map<String, Model> lastModels = {};
   Map<String, Registry> lastRegistries = {};
   Map<String, dynamic> get lastItems => {...lastModels, ...lastRegistries};
+  Map<String, Model> oldModels = {};
 
   @override
   Future<int> storeItems(Map<String, dynamic> items) async {
     for (final item in items.values) {
-      if (item is Model) lastModels[item.id] = item;
+      if (item is Model) {
+        if (lastModels.containsKey(item.id)) {
+          oldModels[item.id] = models[item.type]!(lastModels[item.id]!.toJson());
+        }
+        lastModels[item.id] = item;
+      }
       if (item is Registry) {
         if (lastRegistries.containsKey(item.id)) {
           lastRegistries[item.id!]?.transactions.addAll(item.transactions);
@@ -38,6 +44,10 @@ class MockLocalStorage extends LocalStorage {
     if (id != null) return lastRegistries[id];
     if (parentId != null) return lastRegistries[(lastModels[parentId] as User?)?.registryId];
     return null;
+  }
+
+  Map<String, dynamic> getNextItemsFromHistoryQueue() {
+    return oldModels..clear();
   }
 }
 
@@ -159,6 +169,44 @@ void main() {
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain1'), true);
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain2'), true);
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain3'), true);
+    });
+
+    test('syncWithRemoteStorage rebase with conflict', () async {
+      final localStorage = MockLocalStorage();
+      final remoteStorage = MockRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
+      User? localConflictUser;
+      User? remoteConflictUser;
+      final listenerId = r.addSyncListener(
+        (id, syncedItem) => print(syncedItem),
+        (localChanges, remoteChanges) {
+          if (localChanges.isNotEmpty && remoteChanges.isNotEmpty) {
+            localConflictUser = localChanges.values.first as User?;
+            remoteConflictUser = remoteChanges.values.first as User?;
+          }
+        }
+      );
+      final user1 = User(name: 'test_user');
+      r.subscribeToSync(user1.id, listenerId);
+      await r.syncWithRemoteStorage({user1.id: user1});
+      final user2 = user1.copyWith(name: 'test_user_2');
+      remoteStorage.lastRegistries.values.last.addNewTransaction(
+        Transaction.next(
+          remoteStorage.lastRegistries.values.last.lastTransaction,
+          user2.id,
+          'changeDetails',
+          'changeType',
+          [user2.id],
+          'path',
+        )
+      );
+      remoteStorage.saveItems({user2.id: user2});
+      final user3 = user1.copyWith(name: 'test_user_3');
+      await r.syncWithRemoteStorage({user3.id: user3});
+      expect((localStorage.lastModels[user1.id] as User?)?.name, 'test_user'); // the local changes have been cancelled
+      expect((remoteStorage.lastModels[user1.id] as User?)?.name, 'test_user_2');
+      expect(localConflictUser?.name, 'test_user_3');
+      expect(remoteConflictUser?.name, 'test_user_2');
     });
 
   });
