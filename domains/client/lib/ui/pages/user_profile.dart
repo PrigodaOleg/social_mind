@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:closers/state/state.dart';
 import 'package:closers/state/user_profile/user_profile.dart';
-import '../widgets/profile_item_tile.dart.dart';
-import '../../l10n/app_localizations.dart';
+import '../widgets/profile_item_tile.dart';
+import '../l10n/app_localizations.dart';
 import 'package:closers/repository/repository.dart';
-
 
 class UserProfilePage extends StatelessWidget {
   static const routeName = '/user_profile';
@@ -17,10 +16,10 @@ class UserProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => TaskListBloc(
+      create: (context) => ProfilePageBloc(
         repository: repository,
         parentId: id ?? repository.myId ?? '',
-      )..add(const TaskListStateInitRequested()),
+      )..add(const ProfilePageStateInitRequested()),
       child: const UserProfileView(),
     );
   }
@@ -33,9 +32,9 @@ class UserProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final t = Theme.of(context);
-    final b = BlocProvider.of<TaskListBloc>(context);
+    final b = BlocProvider.of<ProfilePageBloc>(context);
     // final repo = context.read(Repository);
-    return BlocBuilder<TaskListBloc, TaskListState>(
+    return BlocBuilder<ProfilePageBloc, ProfilePageState>(
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
@@ -44,10 +43,9 @@ class UserProfileView extends StatelessWidget {
           ),
           body: ListView(
             children: [
-              for (final (index, task) in state.tasks.values.indexed)
-                TaskListTile(
-                  title: task.title,
-                  value: task.isCompleted,
+              for(final (index,record) in state.userProfileRecords.entries.indexed)
+                ProfileItemTile(
+                  title: record.value['text'],
                   backgroundColor: index.isEven
                       ? t.colorScheme.surface
                       : Color.lerp(
@@ -55,29 +53,18 @@ class UserProfileView extends StatelessWidget {
                           t.colorScheme.primary,
                           0.07,
                         ),
-                  onValueChanged: (bool? isComplited) {
-                    b.add(
-                      TaskCompletionRequested(
-                        task: task,
-                        isComplited: isComplited ?? false,
-                      ),
-                    );
-                  },
                   onTitleSubmitted: (submittedText) {
-                    b.add(
-                      TaskSubmitionRequested(
-                        task: task,
-                        submittedText: submittedText,
-                      ),
+                    context.read<ProfilePageBloc>().add(
+                    ProfileRecordSubmitRequested(recordKey: record.key, changedText: submittedText),
                     );
                   },
                   onTitleChanged: (changedText) {
-                    context.read<TaskListBloc>().add(
-                      TaskChangingRequested(
-                        task: task,
-                        changedText: changedText,
-                      ),
-                    );
+                    context.read<ProfilePageBloc>().add(
+                          ProfileRecordChangingRequested(
+                            recordKey: record.key,
+                            changedText: changedText,
+                          ),
+                        );
                   },
                 ),
             ],

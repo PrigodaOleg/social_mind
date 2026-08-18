@@ -4,8 +4,6 @@ class ProfileItemTile extends StatelessWidget {
   const ProfileItemTile({
     super.key,
     required this.title,
-    required this.value,
-    required this.onValueChanged,
     this.onTitleSubmitted,
     this.onTitleChanged,
     this.onTitleEditingComplete,
@@ -15,8 +13,6 @@ class ProfileItemTile extends StatelessWidget {
   });
 
   final String title;
-  final bool value;
-  final ValueChanged<bool>? onValueChanged;
   final ValueChanged<String>? onTitleSubmitted;
   final ValueChanged<String>? onTitleChanged;
   final VoidCallback? onTitleEditingComplete;

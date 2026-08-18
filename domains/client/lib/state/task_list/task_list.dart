@@ -2,12 +2,9 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:closers/repository/repository.dart';
 
-
 class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
-  TaskListBloc({
-    required this.repository,
-    required this.parentId
-    }) : super(const TaskListState()) {
+  TaskListBloc({required this.repository, required this.parentId})
+      : super(const TaskListState()) {
     on<TaskListStateInitRequested>(_onStateInit);
     on<TaskAddRequested>(_onTaskAdd);
     on<TaskCompletionRequested>(_onComplited);
@@ -28,7 +25,8 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     Map<String, Task> tasks = {};
     if (parent != null) tasks = repository.getModels<Task>(parent.ids<Task>());
     final placeholderTask = Task(originatorId: selfUserId);
-    emit(state.copyWith(tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
+    emit(state.copyWith(
+        tasks: () => tasks..addAll({placeholderTask.id: placeholderTask})));
   }
 
   Future<void> _onTaskAdd(
@@ -36,9 +34,11 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     Emitter<TaskListState> emit,
   ) async {
     final newTask = Task(originatorId: selfUserId);
-    emit(state.copyWith(tasks: () => Map<String, Task>.from(state.tasks)..addAll({newTask.id: newTask})));
+    emit(state.copyWith(
+        tasks: () => Map<String, Task>.from(state.tasks)
+          ..addAll({newTask.id: newTask})));
   }
-  
+
   Future<void> _onComplited(
     TaskCompletionRequested event,
     Emitter<TaskListState> emit,
@@ -48,9 +48,10 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     }
     final changedTask = event.task.copyWith(isCompleted: event.isComplited);
     await repository.saveModel(changedTask);
-    emit(state.copyWith(tasks: () => state.tasks..update(changedTask.id, (v) => changedTask)));
+    emit(state.copyWith(
+        tasks: () => state.tasks..update(changedTask.id, (v) => changedTask)));
   }
-  
+
   Future<void> _onSubmitted(
     TaskSubmitionRequested event,
     Emitter<TaskListState> emit,
@@ -60,11 +61,12 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     parent!.linkTo(changedTask);
     // await repository.saveModel(changedTask);
     final placeholderTask = Task(originatorId: selfUserId);
-    emit(state.copyWith(tasks: () => state.tasks
-      ..update(changedTask.id, (task) => changedTask)
-      ..addAll({placeholderTask.id: placeholderTask})));
+    emit(state.copyWith(
+        tasks: () => state.tasks
+          ..update(changedTask.id, (task) => changedTask)
+          ..addAll({placeholderTask.id: placeholderTask})));
   }
-  
+
   Future<void> _onChanged(
     TaskChangingRequested event,
     Emitter<TaskListState> emit,
@@ -77,12 +79,10 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
 }
 
 class TaskListState {
-  const TaskListState({
-    this.tasks = const {}
-  });
+  const TaskListState({this.tasks = const {}});
   final Map<String, Task> tasks;
 
-  // Iterable<Task> get allTasks => 
+  // Iterable<Task> get allTasks =>
 
   TaskListState copyWith({
     Map<String, Task> Function()? tasks,
@@ -93,7 +93,7 @@ class TaskListState {
   }
 }
 
-sealed class TaskEvent extends Equatable{
+sealed class TaskEvent extends Equatable {
   const TaskEvent();
 
   @override
@@ -105,10 +105,8 @@ final class TaskListStateInitRequested extends TaskEvent {
 }
 
 final class TaskCompletionRequested extends TaskEvent {
-  const TaskCompletionRequested({
-    required this.task,
-    required this.isComplited
-  });
+  const TaskCompletionRequested(
+      {required this.task, required this.isComplited});
   final Task task;
   final bool isComplited;
 }
@@ -118,19 +116,14 @@ final class TaskAddRequested extends TaskEvent {
 }
 
 final class TaskSubmitionRequested extends TaskEvent {
-  const TaskSubmitionRequested({
-    required this.task,
-    required this.submittedText
-  });
+  const TaskSubmitionRequested(
+      {required this.task, required this.submittedText});
   final Task task;
   final String submittedText;
 }
 
 final class TaskChangingRequested extends TaskEvent {
-  const TaskChangingRequested({
-    required this.task,
-    required this.changedText
-  });
+  const TaskChangingRequested({required this.task, required this.changedText});
   final Task task;
   final String changedText;
 }
