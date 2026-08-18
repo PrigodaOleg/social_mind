@@ -14,6 +14,7 @@ import '../navigation/navigation_stack.dart';
 
 typedef SyncListener = void Function(String id, dynamic syncedItem);
 typedef MergeConflictListener = void Function(Map<String, Model> localChanges, Map<String, Model> remoteChanges);
+typedef AccessDeniedListener = void Function(Map<String, dynamic> items);
 typedef PeriodicCallback = void Function(int left);
 typedef DoneCallback = void Function();
 
@@ -129,6 +130,8 @@ class Repository {
   // Listeners to incoming changes
   var syncListeners = <int, SyncListener>{};  // by subscribers
   var mergeConflictListeners = <int, MergeConflictListener>{};  // by subscribers
+  // Уведомляется, когда удаленное хранилище отказывает в записи изменений (нет прав доступа)
+  var accessDeniedListeners = <int, AccessDeniedListener>{};  // by subscribers
   var syncBackIndex = <int, Set<String>>{}; // for find all IDs by subscriber
   int subscribersCounter = 0;
   var incomingSyncIds = <String, Set<int>>{};  // with set of subscribers
@@ -143,7 +146,7 @@ class Repository {
     await _localStorage.init();
     await initRemoteStorages();
     await authRemoteStorages();
-    defaultSyncSubscriber = addSyncListener(_defaultSyncListener, _defaultMergeConflictListener);
+    defaultSyncSubscriber = addSyncListener(_defaultSyncListener, _defaultMergeConflictListener, _defaultAccessDeniedListener);
     _sync = Timer(_delayedSync);
     _sync.start();
     instance = this;
@@ -208,10 +211,12 @@ class Repository {
 
   int addSyncListener(
     SyncListener syncListener,
-    MergeConflictListener mergeConflictListener
+    MergeConflictListener mergeConflictListener,
+    [AccessDeniedListener? accessDeniedListener]
   ) {
     syncListeners[subscribersCounter] = syncListener;
     mergeConflictListeners[subscribersCounter] = mergeConflictListener;
+    if (accessDeniedListener != null) accessDeniedListeners[subscribersCounter] = accessDeniedListener;
     return subscribersCounter++;
   }
 
@@ -234,6 +239,10 @@ class Repository {
   void _defaultMergeConflictListener(Map<String, Model> localItems, Map<String, Model> remoteItems) {
     print('Merge conflict detected for items: $localItems');
     print('Remote items: $remoteItems');
+  }
+
+  void _defaultAccessDeniedListener(Map<String, dynamic> items) {
+    print('Access denied for items: $items');
   }
 
   void _delayedSync() async {
@@ -841,7 +850,23 @@ class Repository {
   }
 
   // Уведомляем пользователя, что по неизвестной причине ему недоступна операция модификации объектов
-  void _accessDeniedCallback(Map<String, dynamic> items) {}
+  // Оповещаем только тех слушателей, которые подписаны на конкретные ID из [items]
+  void _accessDeniedCallback(Map<String, dynamic> items) {
+    var itemsByListener = <int, Map<String, dynamic>>{};
+    var involvedListenerIds = <int>{};
+    for (final id in items.keys) {
+      final listeners = incomingSyncIds[id];
+      if (listeners == null) continue;
+      involvedListenerIds.addAll(listeners);
+      for (final listenerId in listeners) {
+        itemsByListener[listenerId] ??= {};
+        itemsByListener[listenerId]?[id] = items[id];
+      }
+    }
+    for (final listenerId in involvedListenerIds) {
+      accessDeniedListeners[listenerId]?.call(itemsByListener[listenerId] ?? {});
+    }
+  }
 
   void _informListenersMergeConflict(
     Map<String, Model> localItems,
