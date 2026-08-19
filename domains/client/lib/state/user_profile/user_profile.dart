@@ -20,10 +20,13 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
   ) async {
     final parent = repository.getModel<Model>(parentId);
     if (parent != null) {
-      UserProfile? userProfile = repository
-          .getModels<UserProfile>(parent.ids<UserProfile>())
-          .values
-          .first;
+      UserProfile userProfile;
+      if (repository.getModels<UserProfile>(parent.ids<UserProfile>())
+          case final models when models.isNotEmpty) {
+        userProfile = models.values.first;
+      } else {
+        userProfile = UserProfile(originatorId: parent.id);
+      }
       Map<String, Map<String, dynamic>> profileRecords = {};
       profileRecords = userProfile.getRecords();
       emit(state.copyWith(userProfileRecords: () => profileRecords));
@@ -80,11 +83,12 @@ final class ProfileRecordChangingRequested extends ProfileEvent {
   final String recordKey;
   final String changedText;
 }
-final class ProfileRecordSubmitRequested extends ProfileEvent{
-const ProfileRecordSubmitRequested({
+
+final class ProfileRecordSubmitRequested extends ProfileEvent {
+  const ProfileRecordSubmitRequested({
     required this.recordKey,
     required this.changedText,
-    });
+  });
   final String recordKey;
   final String changedText;
 }
