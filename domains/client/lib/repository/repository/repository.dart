@@ -568,6 +568,7 @@ class Repository {
         if (_isIndexesEqual(remoteRegistries, latestRemoteRegistries)) {
           // Индексы не изменились, значит нет прав на запись
           _rollbackLastTransaction(oldItems, localRegistries);
+          _localStorage.clearHistoryQueueHead();
           _accessDeniedCallback(localchanges);
           return 0; // Ошибка доступа
         }
@@ -577,6 +578,7 @@ class Repository {
         (localUpdates, remoteUpdates, mergeConflict) = _rebaseTransaction(localchanges, remoteChanges, oldItems.cast<String, Model>());
         if (mergeConflict) {
           _rollbackLastTransaction(oldItems, localRegistries);
+          _localStorage.clearHistoryQueueHead();
           _informListenersMergeConflict(localUpdates, remoteUpdates);
           return 0; // Конфликт слияния
         }

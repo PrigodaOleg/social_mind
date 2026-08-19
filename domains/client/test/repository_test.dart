@@ -8,6 +8,7 @@ class MockLocalStorage extends LocalStorage {
   Map<String, Registry> lastRegistries = {};
   Map<String, dynamic> get lastItems => {...lastModels, ...lastRegistries};
   Map<String, Model> oldModels = {};
+  int clearHistoryQueueHeadCallCount = 0;
 
   @override
   Future<int> storeItems(Map<String, dynamic> items) async {
@@ -48,6 +49,11 @@ class MockLocalStorage extends LocalStorage {
 
   Map<String, dynamic> getNextItemsFromHistoryQueue() {
     return oldModels..clear();
+  }
+
+  @override
+  void clearHistoryQueueHead() {
+    clearHistoryQueueHeadCallCount++;
   }
 }
 
@@ -126,6 +132,8 @@ void main() {
       expect(localStorage.lastRegistries[user.registryId]?.lastTransaction?.changes.contains(user.id), true);
       expect(remoteStorage.lastItems.length, 2);
       expect(remoteStorage.lastRegistries[user.registryId]?.lastTransaction?.changes.contains(user.id), true);
+      // Успешная транзакция должна вычистить обработанный хвост истории
+      expect(localStorage.clearHistoryQueueHeadCallCount, 1);
     });
 
     test('syncWithRemoteStorage re-simple', () async {
@@ -206,6 +214,8 @@ void main() {
       expect((remoteStorage.lastModels[user1.id] as User?)?.name, 'test_user_2');
       expect(localConflictUser?.name, 'test_user_3');
       expect(remoteConflictUser?.name, 'test_user_2');
+      // Конфликт слияния тоже должен вычищать обработанный хвост истории, а не копить его
+      expect(localStorage.clearHistoryQueueHeadCallCount, 2); // первый успешный sync + конфликтующий sync
     });
 
     test('syncWithRemoteStorage access denied', () async {
@@ -236,6 +246,7 @@ void main() {
       await r.syncWithRemoteStorage({user.id: user});
       expect(deniedItemsForSubscriber, null);
       expect(deniedItemsForUnrelatedSubscriber, null);
+      expect(localStorage.clearHistoryQueueHeadCallCount, 1); // первый успешный sync
 
       remoteStorage.deny = true;
       user = user.copyWith(name: 'test_user_2');
@@ -249,6 +260,8 @@ void main() {
       expect(deniedItemsForUnrelatedSubscriber, null);
       // Локальные изменения должны быть откачены, так как запись была отклонена
       expect((localStorage.lastModels[user.id] as User?)?.name, 'test_user');
+      // Отказ в доступе тоже должен вычищать обработанный хвост истории, а не копить его
+      expect(localStorage.clearHistoryQueueHeadCallCount, 2);
     });
 
   });
