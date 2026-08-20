@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:flutter/material.dart';
+
 import '../ui.dart';
 
 
@@ -11,6 +12,7 @@ class LoginUserExistingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String? userId;
+    String? secret;
     final n = Navigator.of(context);
     final l = AppLocalizations.of(context);
     return Scaffold(
@@ -26,11 +28,15 @@ class LoginUserExistingPage extends StatelessWidget {
             ),
             onSubmitted: (value) async {
               userId = value;
-              if (userId?.isNotEmpty ?? false) {
+              if (userId?.isEmpty ?? false) {return;}
+              if (secret?.isEmpty ?? false) {return;}
+              if (await repository.tryLogin(userId!, secret!)) {
                 User? tryingUser = await repository.getModelNow<User>(userId!);
                 if (tryingUser != null) {
                   n.pop(tryingUser);
                 }
+              } else {
+                print('login $userId failed');
               }
             },
             onChanged: (value) {
@@ -38,17 +44,43 @@ class LoginUserExistingPage extends StatelessWidget {
             },
             
           ),
+          TextField(
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              hintText: l.loginPutIdHintText,
+              labelText: 'Secret',
+            ),
+            onSubmitted: (value) async {
+              secret = value;
+              if (userId?.isEmpty ?? false) {return;}
+              if (secret?.isEmpty ?? false) {return;}
+              if (await repository.tryLogin(userId!, secret!)) {
+                User? tryingUser = await repository.getModelNow<User>(userId!);
+                if (tryingUser != null) {
+                  n.pop(tryingUser);
+                }
+              } else {
+                print('login $userId failed');
+              }
+            },
+            onChanged: (value) {
+              secret = value;
+            },
+          ),
           Row(
             children: [
               const BackButton(),
               IconButton(
                 onPressed: () async {
-                  if (userId?.isNotEmpty ?? false) {
+                  if (userId?.isEmpty ?? false) {return;}
+                  if (secret?.isEmpty ?? false) {return;}
+                  if (await repository.tryLogin(userId!, secret!)) {
                     User? tryingUser = await repository.getModelNow<User>(userId!);
-                    print(tryingUser?.name);
                     if (null != tryingUser) {
                       n.pop(tryingUser);
                     }
+                  } else {
+                    print('login $userId failed');
                   }
                 },
                 icon: const Icon(Icons.check),
