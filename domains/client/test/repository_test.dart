@@ -7,11 +7,18 @@ class MockLocalStorage extends LocalStorage {
   Map<String, Model> lastModels = {};
   Map<String, Registry> lastRegistries = {};
   Map<String, dynamic> get lastItems => {...lastModels, ...lastRegistries};
+  Map<String, Model> oldModels = {};
+  int clearHistoryQueueHeadCallCount = 0;
 
   @override
   Future<int> storeItems(Map<String, dynamic> items) async {
     for (final item in items.values) {
-      if (item is Model) lastModels[item.id] = item;
+      if (item is Model) {
+        if (lastModels.containsKey(item.id)) {
+          oldModels[item.id] = models[item.type]!(lastModels[item.id]!.toJson());
+        }
+        lastModels[item.id] = item;
+      }
       if (item is Registry) {
         if (lastRegistries.containsKey(item.id)) {
           lastRegistries[item.id!]?.transactions.addAll(item.transactions);
@@ -38,6 +45,15 @@ class MockLocalStorage extends LocalStorage {
     if (id != null) return lastRegistries[id];
     if (parentId != null) return lastRegistries[(lastModels[parentId] as User?)?.registryId];
     return null;
+  }
+
+  Map<String, dynamic> getNextItemsFromHistoryQueue() {
+    return oldModels..clear();
+  }
+
+  @override
+  void clearHistoryQueueHead() {
+    clearHistoryQueueHeadCallCount++;
   }
 }
 
@@ -74,6 +90,34 @@ class MockRemoteStorage extends RemoteStorage {
   Future<Map<String, Model>> getItems(List ids) async {
     return Map.fromEntries(lastModels.entries.where((e) => ids.contains(e.key)).map((e) => MapEntry(e.key, models[e.value.type]!(e.value.toJson()))));
   }
+
+  void externalChange(Map<String, Model> items) {
+    items.forEach((id, item) {
+      lastRegistries.values.last.addNewTransaction(
+        Transaction.next(
+          lastRegistries.values.last.lastTransaction,
+          id,
+          'changeDetails',
+          'changeType',
+          [id],
+          'path',
+        )
+      );
+      saveItems({id: item});
+    });
+  }
+}
+
+class DenyingRemoteStorage extends MockRemoteStorage {
+  bool deny = false;
+
+  @override
+  Future<int> saveItems(Map<String, dynamic> items) async {
+    if (deny) {
+      throw RemoteStorageWriteCollision('access denied', 403);
+    }
+    return super.saveItems(items);
+  }
 }
 
 void main() {
@@ -88,6 +132,8 @@ void main() {
       expect(localStorage.lastRegistries[user.registryId]?.lastTransaction?.changes.contains(user.id), true);
       expect(remoteStorage.lastItems.length, 2);
       expect(remoteStorage.lastRegistries[user.registryId]?.lastTransaction?.changes.contains(user.id), true);
+      // Успешная транзакция должна вычистить обработанный хвост истории
+      expect(localStorage.clearHistoryQueueHeadCallCount, 1);
     });
 
     test('syncWithRemoteStorage re-simple', () async {
@@ -109,16 +155,7 @@ void main() {
       final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
       final user = User(name: 'test_user');
       await r.syncWithRemoteStorage({user.id: user});
-      remoteStorage.lastRegistries.values.last.addNewTransaction(
-        Transaction.next(
-          remoteStorage.lastRegistries.values.last.lastTransaction,
-          user.id,
-          'changeDetails',
-          'changeType',
-          [user.id],
-          'path'
-        )
-      );
+      remoteStorage.externalChange({user.id: user});
       expect(localStorage.lastRegistries[user.registryId]?.lastTransactionIndex, 0);
       expect(remoteStorage.lastRegistries[user.registryId]?.lastTransactionIndex, 1);
       await r.syncWithRemoteStorage({user.id: user});
@@ -142,23 +179,89 @@ void main() {
       var user = User(name: 'test_user', domainsIds: ['domain1']);
       await r.syncWithRemoteStorage({user.id: user});
       user = user.copyWith(name: 'test_user_2', domainsIds: [...user.domainsIds, 'domain2']);
-      remoteStorage.lastRegistries.values.last.addNewTransaction(
-        Transaction.next(
-          remoteStorage.lastRegistries.values.last.lastTransaction,
-          user.id,
-          'changeDetails',
-          'changeType',
-          [user.id],
-          'path'
-        )
-      );
-      remoteStorage.saveItems({user.id: user});
+      remoteStorage.externalChange({user.id: user});
       user = user.copyWith(domainsIds: ['domain3']);
       await r.syncWithRemoteStorage({user.id: user});
       expect((remoteStorage.lastModels[user.id] as User?)?.name, 'test_user_2');
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain1'), true);
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain2'), true);
       expect((remoteStorage.lastModels[user.id] as User?)?.domainsIds.contains('domain3'), true);
+    });
+
+    test('syncWithRemoteStorage rebase with conflict', () async {
+      final localStorage = MockLocalStorage();
+      final remoteStorage = MockRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
+      User? localConflictUser;
+      User? remoteConflictUser;
+      final listenerId = r.addSyncListener(
+        (id, syncedItem) => print(syncedItem),
+        (localChanges, remoteChanges) {
+          if (localChanges.isNotEmpty && remoteChanges.isNotEmpty) {
+            localConflictUser = localChanges.values.first as User?;
+            remoteConflictUser = remoteChanges.values.first as User?;
+          }
+        }
+      );
+      final user1 = User(name: 'test_user');
+      r.subscribeToSync(user1.id, listenerId);
+      await r.syncWithRemoteStorage({user1.id: user1});
+      final user2 = user1.copyWith(name: 'test_user_2');
+      remoteStorage.externalChange({user2.id: user2});
+      final user3 = user1.copyWith(name: 'test_user_3');
+      await r.syncWithRemoteStorage({user3.id: user3});
+      expect((localStorage.lastModels[user1.id] as User?)?.name, 'test_user'); // the local changes have been cancelled
+      expect((remoteStorage.lastModels[user1.id] as User?)?.name, 'test_user_2');
+      expect(localConflictUser?.name, 'test_user_3');
+      expect(remoteConflictUser?.name, 'test_user_2');
+      // Конфликт слияния тоже должен вычищать обработанный хвост истории, а не копить его
+      expect(localStorage.clearHistoryQueueHeadCallCount, 2); // первый успешный sync + конфликтующий sync
+    });
+
+    test('syncWithRemoteStorage access denied', () async {
+      final localStorage = MockLocalStorage();
+      final remoteStorage = DenyingRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
+
+      Map<String, dynamic>? deniedItemsForSubscriber;
+      final subscriberId = r.addSyncListener(
+        (id, syncedItem) => print(syncedItem),
+        (localChanges, remoteChanges) {},
+        (items) {
+          deniedItemsForSubscriber = items;
+        }
+      );
+      // Слушатель, не подписанный на изменяемую модель, не должен получать колбэк
+      Map<String, dynamic>? deniedItemsForUnrelatedSubscriber;
+      r.addSyncListener(
+        (id, syncedItem) => print(syncedItem),
+        (localChanges, remoteChanges) {},
+        (items) {
+          deniedItemsForUnrelatedSubscriber = items;
+        }
+      );
+
+      var user = User(name: 'test_user');
+      r.subscribeToSync(user.id, subscriberId);
+      await r.syncWithRemoteStorage({user.id: user});
+      expect(deniedItemsForSubscriber, null);
+      expect(deniedItemsForUnrelatedSubscriber, null);
+      expect(localStorage.clearHistoryQueueHeadCallCount, 1); // первый успешный sync
+
+      remoteStorage.deny = true;
+      user = user.copyWith(name: 'test_user_2');
+      final result = await r.syncWithRemoteStorage({user.id: user});
+
+      expect(result, 0);
+      expect(deniedItemsForSubscriber, isNotNull);
+      expect(deniedItemsForSubscriber?.containsKey(user.id), true);
+      expect((deniedItemsForSubscriber?[user.id] as User?)?.name, 'test_user_2');
+      // Не подписанный слушатель не должен быть оповещен
+      expect(deniedItemsForUnrelatedSubscriber, null);
+      // Локальные изменения должны быть откачены, так как запись была отклонена
+      expect((localStorage.lastModels[user.id] as User?)?.name, 'test_user');
+      // Отказ в доступе тоже должен вычищать обработанный хвост истории, а не копить его
+      expect(localStorage.clearHistoryQueueHeadCallCount, 2);
     });
 
   });
