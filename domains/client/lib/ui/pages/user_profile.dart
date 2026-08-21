@@ -18,7 +18,7 @@ class UserProfilePage extends StatelessWidget {
     return BlocProvider(
       create: (context) => ProfilePageBloc(
         repository: repository,
-        parentId: id ?? repository.myId ?? '',
+        userId: id ?? repository.myId ?? '',
       )..add(const ProfilePageStateInitRequested()),
       child: const UserProfileView(),
     );
@@ -43,9 +43,9 @@ class UserProfileView extends StatelessWidget {
           ),
           body: ListView(
             children: [
-              for(final (index,record) in state.userProfileRecords.entries.indexed)
+              for(final (index,record) in state.userProfileRecords.indexed)
                 ProfileItemTile(
-                  title: record.value['text'],
+                  title: record['value'],
                   backgroundColor: index.isEven
                       ? t.colorScheme.surface
                       : Color.lerp(
@@ -55,13 +55,13 @@ class UserProfileView extends StatelessWidget {
                         ),
                   onTitleSubmitted: (submittedText) {
                     context.read<ProfilePageBloc>().add(
-                    ProfileRecordSubmitRequested(recordKey: record.key, changedText: submittedText),
+                    ProfileRecordSubmitRequested(recordIndex: index, changedText: submittedText),
                     );
                   },
                   onTitleChanged: (changedText) {
                     context.read<ProfilePageBloc>().add(
                           ProfileRecordChangingRequested(
-                            recordKey: record.key,
+                            recordIndex: index,
                             changedText: changedText,
                           ),
                         );

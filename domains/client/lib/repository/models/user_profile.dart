@@ -35,7 +35,7 @@ class UserProfile extends Model {
   Map<String, Map<String, dynamic>> getRecords() {
     return {
       'firstName': {
-        'text': 'artem',
+        'text': '$firstName',
         'isRedactable': true,
         'hint': 'first name',
       },

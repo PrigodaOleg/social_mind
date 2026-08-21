@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:closers/repository/repository.dart';
 
 class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
-  ProfilePageBloc({required this.repository, required this.parentId})
+  ProfilePageBloc({required this.repository, required this.userId})
       : super(ProfilePageState()) {
     on<ProfilePageStateInitRequested>(_onStateInit);
     on<ProfileRecordChangingRequested>(_onChanged);
@@ -11,25 +11,16 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
   }
 
   final Repository repository;
-  // final String userId;
-  final String parentId;
+  final String userId;
 
   Future<void> _onStateInit(
     ProfilePageStateInitRequested event,
     Emitter<ProfilePageState> emit,
   ) async {
-    final parent = repository.getModel<Model>(parentId);
-    if (parent != null) {
-      UserProfile userProfile;
-      if (repository.getModels<UserProfile>(parent.ids<UserProfile>())
-          case final models when models.isNotEmpty) {
-        userProfile = models.values.first;
-      } else {
-        userProfile = UserProfile(originatorId: parent.id);
-      }
-      Map<String, Map<String, dynamic>> profileRecords = {};
-      profileRecords = userProfile.getRecords();
-      emit(state.copyWith(userProfileRecords: () => profileRecords));
+    final user = repository.getModel<User>(userId);
+    if (user != null) {
+      List<Map<String, dynamic>> userProfileRecords = user.propsList();
+      emit(state.copyWith(userProfileRecords: () => userProfileRecords ));
     }
   }
 
@@ -37,23 +28,21 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
     ProfileRecordChangingRequested event,
     Emitter<ProfilePageState> emit,
   ) async {
-    final recordKey = event.recordKey;
+    final recordIndex = event.recordIndex;
     var stateRecords = state.userProfileRecords;
-    stateRecords.update(recordKey, (innerRecords) {
-      innerRecords['text'] = event.changedText;
-      return innerRecords;
-    });
-    emit(state.copyWith(userProfileRecords: () => stateRecords));
+    final record = stateRecords[recordIndex];
+    record['value'] = event.changedText;
+    emit(state.copyWith(userProfileRecords: () => stateRecords ));
   }
 }
 
 class ProfilePageState {
-  const ProfilePageState({this.userProfileRecords = const {}});
+  const ProfilePageState({this.userProfileRecords = const []});
 
-  final Map<String, Map<String, dynamic>> userProfileRecords;
+  final List<Map<String,dynamic>> userProfileRecords;
 
   ProfilePageState copyWith({
-    Map<String, Map<String, dynamic>> Function()? userProfileRecords,
+    List<Map<String,dynamic>> Function()? userProfileRecords,
   }) {
     return ProfilePageState(
       userProfileRecords: userProfileRecords != null
@@ -76,19 +65,19 @@ final class ProfilePageStateInitRequested extends ProfileEvent {
 
 final class ProfileRecordChangingRequested extends ProfileEvent {
   const ProfileRecordChangingRequested({
-    required this.recordKey,
+    required this.recordIndex,
     required this.changedText,
   });
 
-  final String recordKey;
+  final int recordIndex;
   final String changedText;
 }
 
 final class ProfileRecordSubmitRequested extends ProfileEvent {
   const ProfileRecordSubmitRequested({
-    required this.recordKey,
+    required this.recordIndex,
     required this.changedText,
   });
-  final String recordKey;
+  final int recordIndex;
   final String changedText;
 }
