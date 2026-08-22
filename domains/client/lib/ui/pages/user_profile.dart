@@ -46,6 +46,7 @@ class UserProfileView extends StatelessWidget {
               for(final (index,record) in state.userProfileRecords.indexed)
                 ProfileItemTile(
                   title: record['value'],
+                  isEditable: record['isEditable'],
                   backgroundColor: index.isEven
                       ? t.colorScheme.surface
                       : Color.lerp(

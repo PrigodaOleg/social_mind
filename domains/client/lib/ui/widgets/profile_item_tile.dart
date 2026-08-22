@@ -4,6 +4,7 @@ class ProfileItemTile extends StatelessWidget {
   const ProfileItemTile({
     super.key,
     required this.title,
+    required this.isEditable,
     this.onTitleSubmitted,
     this.onTitleChanged,
     this.onTitleEditingComplete,
@@ -13,6 +14,7 @@ class ProfileItemTile extends StatelessWidget {
   });
 
   final String title;
+  final bool isEditable;
   final ValueChanged<String>? onTitleSubmitted;
   final ValueChanged<String>? onTitleChanged;
   final VoidCallback? onTitleEditingComplete;
@@ -31,6 +33,7 @@ class ProfileItemTile extends StatelessWidget {
           Expanded(
             child: TextFormField(
               initialValue: title,
+              enabled: isEditable,
               autofocus: true,
               maxLines: null,
               keyboardType: TextInputType.text,

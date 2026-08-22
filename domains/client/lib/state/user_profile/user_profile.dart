@@ -7,6 +7,7 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
       : super(ProfilePageState()) {
     on<ProfilePageStateInitRequested>(_onStateInit);
     on<ProfileRecordChangingRequested>(_onChanged);
+    on<ProfileRecordSubmitRequested>(_onRecordSubmit);
     //todo submit requested event
   }
 
@@ -33,6 +34,22 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
     final record = stateRecords[recordIndex];
     record['value'] = event.changedText;
     emit(state.copyWith(userProfileRecords: () => stateRecords ));
+  }
+
+  Future<void> _onRecordSubmit(
+  ProfileRecordSubmitRequested event,
+  Emitter<ProfilePageState> emit,
+  )async {
+    final recordIndex = event.recordIndex;
+    var stateRecords = state.userProfileRecords;
+    final record = stateRecords[recordIndex];
+    record['value'] = event.changedText;
+    final user = repository.getModel<User>(userId);
+    if(user != null){
+      final updatedUser = user.copyWithList(stateRecords);
+      repository.saveModel(updatedUser);
+      emit(state.copyWith(userProfileRecords: () => stateRecords ));
+    }
   }
 }
 

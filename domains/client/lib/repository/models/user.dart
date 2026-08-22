@@ -131,7 +131,34 @@ class User extends Model {
   }
 
   //todo
-  // User copyWithList(List<Map<String,dynamic>> list)
+  User copyWithList(List<Map<String,dynamic>> list){
+
+    String? name;
+    String? avatarUrl;
+    String? firstName;
+    String? lastName;
+    String? description;
+   
+   for(final record in list){
+     final propId = record['propId'];
+     switch(propId){
+     case 'name': name = record['value'];
+     case 'avatarUrl': avatarUrl = record['value'];
+     case 'firstName': firstName = record['value'];
+     case 'lastName': lastName = record['value'];
+     case 'description': description = record['value'];
+     }
+   }
+    return copyWith(
+      name: name,
+      avatarUrl: avatarUrl,
+      firstName: firstName,
+      lastName: lastName,
+      description: description,
+    );
+
+
+  }
 
   @override
   List<Object> get props => super.props + [name, domainsIds, registryId, avatarUrl, firstName, lastName, description];
