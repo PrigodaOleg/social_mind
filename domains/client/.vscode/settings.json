@@ -21,5 +21,8 @@
         "**/.dart_tool": true,
         "**/.packages": true,
         "**/build": true
+    },
+    "extensions.experimental.affinity": {
+        
     }
 }

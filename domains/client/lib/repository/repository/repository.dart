@@ -13,6 +13,8 @@ import '../navigation/navigation_stack.dart';
 
 
 typedef SyncListener = void Function(String id, dynamic syncedItem);
+typedef MergeConflictListener = void Function(Map<String, Model> localChanges, Map<String, Model> remoteChanges);
+typedef AccessDeniedListener = void Function(Map<String, dynamic> items);
 typedef PeriodicCallback = void Function(int left);
 typedef DoneCallback = void Function();
 
@@ -127,6 +129,9 @@ class Repository {
 
   // Listeners to incoming changes
   var syncListeners = <int, SyncListener>{};  // by subscribers
+  var mergeConflictListeners = <int, MergeConflictListener>{};  // by subscribers
+  // Уведомляется, когда удаленное хранилище отказывает в записи изменений (нет прав доступа)
+  var accessDeniedListeners = <int, AccessDeniedListener>{};  // by subscribers
   var syncBackIndex = <int, Set<String>>{}; // for find all IDs by subscriber
   int subscribersCounter = 0;
   var incomingSyncIds = <String, Set<int>>{};  // with set of subscribers
@@ -141,7 +146,7 @@ class Repository {
     await _localStorage.init();
     await initRemoteStorages();
     await authRemoteStorages();
-    defaultSyncSubscriber = addSyncListener(_defaultSyncListener);
+    defaultSyncSubscriber = addSyncListener(_defaultSyncListener, _defaultMergeConflictListener, _defaultAccessDeniedListener);
     _sync = Timer(_delayedSync);
     _sync.start();
     instance = this;
@@ -204,8 +209,14 @@ class Repository {
     return success;
   }
 
-  int addSyncListener(SyncListener syncListener) {
+  int addSyncListener(
+    SyncListener syncListener,
+    MergeConflictListener mergeConflictListener,
+    [AccessDeniedListener? accessDeniedListener]
+  ) {
     syncListeners[subscribersCounter] = syncListener;
+    mergeConflictListeners[subscribersCounter] = mergeConflictListener;
+    if (accessDeniedListener != null) accessDeniedListeners[subscribersCounter] = accessDeniedListener;
     return subscribersCounter++;
   }
 
@@ -223,6 +234,15 @@ class Repository {
 
   void _defaultSyncListener(String id, dynamic syncedItem) async {
     await _localStorage.storeItem(syncedItem);
+  }
+
+  void _defaultMergeConflictListener(Map<String, Model> localItems, Map<String, Model> remoteItems) {
+    print('Merge conflict detected for items: $localItems');
+    print('Remote items: $remoteItems');
+  }
+
+  void _defaultAccessDeniedListener(Map<String, dynamic> items) {
+    print('Access denied for items: $items');
   }
 
   void _delayedSync() async {
@@ -534,6 +554,8 @@ class Repository {
     var localUpdates = localItems;
     var remoteUpdates = <String, Model>{};
 
+    bool mergeConflict = false;
+
     // Флаг, который указывает на то, что мы подозреваем, что в УХ появились новые данные.
     // В первый раз надеемся на то, что данные в ЛХ актуальны
     bool isRemoteRegistriesActual = true;
@@ -546,16 +568,19 @@ class Repository {
         if (_isIndexesEqual(remoteRegistries, latestRemoteRegistries)) {
           // Индексы не изменились, значит нет прав на запись
           _rollbackLastTransaction(oldItems, localRegistries);
+          _localStorage.clearHistoryQueueHead();
           _accessDeniedCallback(localchanges);
-          return 0;
+          return 0; // Ошибка доступа
         }
         remoteRegistries = await _getRemoteRegistries(localRegistries, remoteRegistries, latestRemoteRegistries);
         remoteChanges = await _getRemoteChanges(remoteRegistries);
         isRemoteRegistriesActual = true;
-        try {
-          (localUpdates, remoteUpdates) = _rebaseTransaction(localchanges, remoteChanges, oldItems.cast<String, Model>()); // TODO: сделать нормальный тип
-        } on RebaseCollision catch (e) {
-          // получилось некрасиво с этим исключением...
+        (localUpdates, remoteUpdates, mergeConflict) = _rebaseTransaction(localchanges, remoteChanges, oldItems.cast<String, Model>());
+        if (mergeConflict) {
+          _rollbackLastTransaction(oldItems, localRegistries);
+          _localStorage.clearHistoryQueueHead();
+          _informListenersMergeConflict(localUpdates, remoteUpdates);
+          return 0; // Конфликт слияния
         }
       } else {
         remoteUpdates = localUpdates;
@@ -578,75 +603,6 @@ class Repository {
 
     return localItems.length;
   }
-
-  // Реализация консистентной записи с использованием реестра изменений
-  // Future<int> _saveItemsConsistently(Map<String, dynamic> localItems) async {
-
-  //   // Так как мы начинаем собирать новую транзакцию,
-  //   // то прекращаем сбор исторических данных для текущей локальной копии
-  //   final oldItems = _localStorage.getNextItemsFromHistoryQueue();
-
-  //   // Проходим по моделям и определяем, к каким доменам/пользователям они относятся.
-  //   Map<Model, Map<String, dynamic>> paretnItems = _clusterItemsByParent(localItems);
-
-  //   // Для каждого домена создаем запись в реестре событий.
-  //   Map<String, Registry> localRegistries;
-  //   (paretnItems, localRegistries) = _generateTransactions(paretnItems);
-
-  //   // Записываем по транзакции на каждый реестр. Можно пачкой за один раз.
-  //   // todo: сделать асинхронную запись
-  //   var allItems = Map.fromEntries(paretnItems.values.expand((map) => map.entries));
-    
-  //   try {
-  //     // Пытаемся произвести запись в удаленный репозиторий
-  //     _saveToAllRemoteStorages(allItems);
-  //     // Если получилось, то удаляем исторические данные
-  //     _localStorage.clearHistoryQueueHead();
-  //   } on RemoteStorageWriteCollision catch (e) {
-  //     // Тут надо откатывать текущую транзакцию.
-
-  //     // Попробовать перечитать данные из удаленного хранилища (реестры),
-  //     // посмотреть, нет ли обновлений в записываемых объектов,
-  //     // даже если они есть, попытаться их смержить, если изменения не конфликтующие,
-  //     // приготовить заново транзакцию с обновленными записями в реестры.
-  //     // Так можно пробовать несколько раз при условии, что перечитываемые реестры меняются.
-  //     // Если не меняются, то кидает ошибку записи в базу.
-  //     // Если конфликт в данных, кидаем колбэк в UI о необходимости переделать объекты.
-  //     // Кидаем колбек в UI при каждом перечитывании/обновлении данных (если реестры меняются).
-      
-  //     // Итого, тут мы можем только откатить транзакцию и перевыбросить исключение на уровень повыше
-  //     // о необходимости делать приседания, описаные выше (потому что новую транзакцию надо собирать заново).
-
-  //     // Идея записывать изменения сразу в основную коллекцию
-  //     // и параллельно вести журнал истории изменений (Event Sourcing / Change Log).
-  //     // Он обеспечивает мгновенный отклик интерфейса (Optimistic UI) и гарантирует,
-  //     // что данные не потеряются при внезапном закрытии приложения.
-  //     // Если сервер отклонит операцию (из-за сети или коллизии),
-  //     // приложение сможет точно восстановить хронологию по цепочке шагов.
-
-  //     // Итого2, пытаемся перечитать данные из УР, ребейзить и пытаться снова собрать и записать транзакцию
-  //     // Пытаемся много раз пока изменяется порядковый номер транзакции (то есть пока извне поступают свежие данные)
-  //     // _getRemoteRegistries()
-  //     final remoteRegistries = await _remoteStorages.values.first.readRegistries(localRegistries.keys.toList());
-  //     final remoteItems = _getUpdatesByRegistries(localRegistries, remoteRegistries);
-      
-  //     // В результате ребейза рождается пачка изменений для ЛХ, а также пачка изменений для УХ.
-  //     // Пачку для УХ пытаемся отправить. Если не получается, повторяем итерации до тех пор,
-  //     // пока при перечитывании отличается индекс голов списка транзакций.
-  //     final (localRebasedItems, remoteRebasedItems) = _rebaseTransaction(localItems, remoteItems);
-
-  //     // Если ребейз не удался, то откатываем из ЛР текущие изменения, и шлем в UI колбек с его измененными данными
-  //     // и измененными данными из УР, чтобы он сам принял решение как и что менять.
-  //     _rollbackLastTransaction(oldItems, localRegistries);
-  //     // _findAndSendCollisionCallback(localItems, remoteItems)
-
-  //     // Если порядковый номер транзакции не изменился, а данные все равно не пишутся,
-  //     // значит у пользователя был отозван доступ на запись, нужно прекратить попытки внесения изменений
-  //     // и послать в UI колбек с ошибкой доступа.
-  //     // throw AccessDenied();
-  //   }
-  //   return 0;
-  // }
 
   Map<Model, Map<String, dynamic>> _clusterItemsByParent(Map<String, dynamic> items) {
     Map<Model, Map<String, dynamic>> paretnItems = {};
@@ -740,7 +696,7 @@ class Repository {
   //    todo: если мы изменили элемент, как понять, с каким элементом из remoteItems его нужно сравниваеть?
   // 8. Для словарей проверяем по ключам на предмет расширения, мержим расширения.
   // 9. Если значения по одинаковым ключам изменились, рекурсивно ребейзим то, что внутри значения то вышеописанным правилам.
-  (Map<String, Model>, Map<String, Model>) _rebaseTransaction(
+  (Map<String, Model>, Map<String, Model>, bool) _rebaseTransaction(
     Map<String, Model> localItems,
     Map<String, Model> remoteItems,
     Map<String, Model> oldItems
@@ -748,6 +704,7 @@ class Repository {
     var localModels = <String, Model>{};
     var remoteModels = <String, Model>{};
     var conflicts = <String>{};
+    var insolubleConflicts = <String>[];
     for (final modelId in localItems.keys) {
       if (remoteItems.containsKey(modelId)) {
         conflicts.add(modelId);
@@ -768,6 +725,10 @@ class Repository {
       final oldModel = oldItems[modelId];
       if (localModel != remoteModel) {
         final rebasedModel = _rebaseModel(localModel, remoteModel, oldModel);
+        if (rebasedModel == null) {
+          insolubleConflicts.add(modelId);
+          continue;
+        }
         localModels[modelId] = rebasedModel;
         remoteModels[modelId] = rebasedModel;
       } else {
@@ -775,10 +736,18 @@ class Repository {
         remoteModels[modelId] = remoteModel;
       }
     }
-    return (localModels, remoteModels);
+    if (insolubleConflicts.isEmpty) {
+      return (localModels, remoteModels, false);
+    } else {
+      return (
+        Map.fromEntries(localItems.entries.where((e) => insolubleConflicts.contains(e.key))),
+        Map.fromEntries(remoteItems.entries.where((e) => insolubleConflicts.contains(e.key))),
+        true
+      );
+    }
   }
 
-  Model _rebaseModel(Model localModel, Model remoteModel, Model? oldModel) {
+  Model? _rebaseModel(Model localModel, Model remoteModel, Model? oldModel) {
     if (localModel == remoteModel) return localModel;
     final oldMap = oldModel?.toJson() ?? {};
     final localMap = localModel.toJson();
@@ -801,6 +770,7 @@ class Repository {
             } else {
               // в остальных случаях нужно спросить пользователя
               // todo: пока берем удаленную версию, локальные изменения теряем
+              return null;
             }
           }
         } 
@@ -811,18 +781,21 @@ class Repository {
     return _remoteStorages.values.first.models[remoteModel.type]!(remoteMap);
   }
 
-  Map<String, dynamic> _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
+  Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
     final keys = <String>{...remoteMap.keys, ...localMap.keys};
     for (final key in keys) {
       if (remoteMap.containsKey(key) && localMap.containsKey(key)) {
         if (remoteMap[key] is Map && localMap[key] is Map) {
-          remoteMap[key] = _rebaseMap(remoteMap[key], localMap[key]);
+          final rebasedMap = _rebaseMap(remoteMap[key], localMap[key]);
+          if (rebasedMap == null) return null;
+          remoteMap[key] = rebasedMap;
         } else if ( remoteMap[key] is List && localMap[key] is List) {
           remoteMap[key] = {...remoteMap[key], ...(localMap[key] as List)}.toList();
         } else {
           if (remoteMap[key] != localMap[key]) {
             // нужно решить конфликт
             // todo: пока берем удаленную версию, локальные изменения теряем
+            return null;
           }
         }
       } else if (localMap.containsKey(key)) {
@@ -879,7 +852,47 @@ class Repository {
   }
 
   // Уведомляем пользователя, что по неизвестной причине ему недоступна операция модификации объектов
-  void _accessDeniedCallback(Map<String, dynamic> items) {}
+  // Оповещаем только тех слушателей, которые подписаны на конкретные ID из [items]
+  void _accessDeniedCallback(Map<String, dynamic> items) {
+    var itemsByListener = <int, Map<String, dynamic>>{};
+    var involvedListenerIds = <int>{};
+    for (final id in items.keys) {
+      final listeners = incomingSyncIds[id];
+      if (listeners == null) continue;
+      involvedListenerIds.addAll(listeners);
+      for (final listenerId in listeners) {
+        itemsByListener[listenerId] ??= {};
+        itemsByListener[listenerId]?[id] = items[id];
+      }
+    }
+    for (final listenerId in involvedListenerIds) {
+      accessDeniedListeners[listenerId]?.call(itemsByListener[listenerId] ?? {});
+    }
+  }
+
+  void _informListenersMergeConflict(
+    Map<String, Model> localItems,
+    Map<String, Model> remoteItems,
+  ) {
+    // Нужно отправить всем слушателям все прослушиваемые конфликтующие модели, на которые они подписаны
+    var localModelsByListeners = <int, Map<String, Model>>{};
+    var remoteModelsByListeners = <int, Map<String, Model>>{};
+    var involvedListenerIds = <int>{};
+    for (final modelId in incomingSyncIds.keys) {
+      final listeners = incomingSyncIds[modelId];
+      if (listeners == null) continue;
+      involvedListenerIds.addAll(listeners);
+      for (final listenerId in listeners) {
+        localModelsByListeners[listenerId] ??= {};
+        remoteModelsByListeners[listenerId] ??= {};
+        localModelsByListeners[listenerId]?[modelId] = localItems[modelId]!;
+        remoteModelsByListeners[listenerId]?[modelId] = remoteItems[modelId]!;
+      }
+    }
+    for (final listenerId in involvedListenerIds) {
+      mergeConflictListeners[listenerId]?.call(localModelsByListeners[listenerId] ?? {}, remoteModelsByListeners[listenerId] ?? {});
+    }
+  }
 
   // Вычисляем и читаем опережающие цепочки транзакций по всем реестрам
   // Базовые индексы берем из [localRegistries], известные индексы вычисляем из объединения

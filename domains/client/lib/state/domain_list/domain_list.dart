@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:equatable/equatable.dart';
 
 
 class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
@@ -32,16 +32,23 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     DomainListStateInitRequested event,
     Emitter<DomainListState> emit,
   ) async {
-    listenerId = _repo.addSyncListener((id, item) {
-      if (!isClosed) {
-        switch (item) {
-          case Domain _:
-            add(DomainSyncRequested(domains: {id: item}));
-            break;
-          default:
+    listenerId = _repo.addSyncListener(
+      (id, item) {
+        if (!isClosed) {
+          switch (item) {
+            case Domain _:
+              add(DomainSyncRequested(domains: {id: item}));
+              break;
+            default:
+          }
+        }
+      },
+      (localChanges, remoteChanges) {
+        if (!isClosed) {
+          print('DomainListBloc: localChanges=$localChanges, remoteChanges=$remoteChanges');
         }
       }
-    });
+    );
     User me = _repo.me;
     Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
     emit(state.copyWith(domains: () => domains));

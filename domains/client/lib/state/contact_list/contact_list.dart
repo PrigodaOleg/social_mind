@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:equatable/equatable.dart';
 
 
 class ContactListBloc extends Bloc<ContactEvent, ContactListState> {
@@ -32,19 +32,26 @@ class ContactListBloc extends Bloc<ContactEvent, ContactListState> {
   ) async {
     // При открытии страницы с контактами регистрируем обратный вызов на изменение моделей.
     // Причем, нас интересует только изменение пользователей или доменов.
-    listenerId = _repo.addSyncListener((id, item) {
-      if (!isClosed) {
-        switch (item) {
-          case User _:
-            add(ContactUserSyncRequested(contacts: {id: item}));
-            break;
-          case Domain _:
-            add(ContactDomainSyncRequested(domains: {id: item}));
-            break;
-          default:
+    listenerId = _repo.addSyncListener(
+      (id, item) {
+        if (!isClosed) {
+          switch (item) {
+            case User _:
+              add(ContactUserSyncRequested(contacts: {id: item}));
+              break;
+            case Domain _:
+              add(ContactDomainSyncRequested(domains: {id: item}));
+              break;
+            default:
+          }
+        }
+      },
+      (localChanges, remoteChanges) {
+        if (!isClosed) {
+          print('ContactListBloc: localChanges=$localChanges, remoteChanges=$remoteChanges');
         }
       }
-    });
+    );
     User me = _repo.me;
     _repo.subscribeToSync(me.id, listenerId);
     Map<String, Domain> contactDomains = _repo.getModels<Domain>(me.domainsIds, listenerId);

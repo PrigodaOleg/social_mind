@@ -11,7 +11,6 @@ part 'user.dart';
 part 'domain.dart';
 part 'task.dart';
 part 'registry.dart';
-part 'user_profile.dart';
 // part 'models.g.dart';
 
 @HiveType(typeId: 3)
