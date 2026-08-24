@@ -15,7 +15,7 @@ class User extends Model {
 
   User.fromJson(super.json) :
     name = json['name'] as String,
-    domainsIds = List<String>.from(json['domainsIds'] ?? []),
+    domainsIds = List<String>.from(json['domainsIds'] is List ? json['domainsIds'] : json['domainsIds']?.keys ?? []),
     registryId = (json['registryId'] ?? []) as String,
     super.fromJson();
     
