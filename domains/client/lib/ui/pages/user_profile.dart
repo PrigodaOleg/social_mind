@@ -40,36 +40,59 @@ class UserProfileView extends StatelessWidget {
             title: Text(l.userProfilePageName),
           ),
           body: ListView(
+
             children: [
-              for(final (index,record) in state.userProfileRecords.indexed)
-                ProfileItemTile(
-                  title: record['value'],
-                  isEditable: record['isEditable'],
-                  backgroundColor: index.isEven
-                      ? t.colorScheme.surface
-                      : Color.lerp(
-                          t.colorScheme.surface,
-                          t.colorScheme.primary,
-                          0.07,
-                        ),
-                  onTitleSubmitted: (submittedText) {
-                    context.read<ProfilePageBloc>().add(
-                    ProfileRecordSubmitRequested(recordIndex: index, changedText: submittedText),
-                    );
-                  },
-                  onTitleChanged: (changedText) {
-                    context.read<ProfilePageBloc>().add(
-                          ProfileRecordChangingRequested(
-                            recordIndex: index,
-                            changedText: changedText,
-                          ),
-                        );
-                  },
-                ),
+
+              // AvatarSection(image: 
+              // state.userProfileRecords.firstWhere((record)=>record.containsKey('avatarUrl'))['avatarUrl']),
+              for (final (index, record) in state.userProfileRecords.indexed)
+
+                    ProfileItemTile(
+                        title: record['value'],
+                        labelText: record['propId'],
+                        isEditable: record['isEditable'],
+                        backgroundColor: index.isEven
+                            ? t.colorScheme.surface
+                            : Color.lerp(
+                                t.colorScheme.surface,
+                                t.colorScheme.primary,
+                                0.07,
+                              ),
+                        onTitleSubmitted: (submittedText) {
+                          context.read<ProfilePageBloc>().add(
+                                ProfileRecordSubmitRequested(
+                                    recordIndex: index,
+                                    changedText: submittedText),
+                              );
+                        },
+                        onTitleChanged: (changedText) {
+                          context.read<ProfilePageBloc>().add(
+                                ProfileRecordChangingRequested(
+                                  recordIndex: index,
+                                  changedText: changedText,
+                                ),
+                              );
+                        },
+                      ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class AvatarSection extends StatelessWidget {
+  const AvatarSection({super.key, required this.image});
+
+  final String image;
+
+  @override
+  Widget build(BuildContext context) {
+    // return Image.asset(image, width: 600, height: 240, fit: BoxFit.cover);
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10),
+      child: CircleAvatar(backgroundImage: AssetImage(image)),
     );
   }
 }

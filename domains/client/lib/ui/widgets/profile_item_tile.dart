@@ -4,6 +4,7 @@ class ProfileItemTile extends StatelessWidget {
   const ProfileItemTile({
     super.key,
     required this.title,
+    required this.labelText,
     required this.isEditable,
     this.onTitleSubmitted,
     this.onTitleChanged,
@@ -14,6 +15,7 @@ class ProfileItemTile extends StatelessWidget {
   });
 
   final String title;
+  final String labelText;
   final bool isEditable;
   final ValueChanged<String>? onTitleSubmitted;
   final ValueChanged<String>? onTitleChanged;
@@ -43,6 +45,7 @@ class ProfileItemTile extends StatelessWidget {
                 contentPadding: const EdgeInsets.all(0.0),
                 filled: true,
                 fillColor: backgroundColor,
+                labelText: labelText,
               ),
               onChanged: (value) => onTitleChanged?.call(value),
               onFieldSubmitted: (value) => onTitleSubmitted?.call(value),
