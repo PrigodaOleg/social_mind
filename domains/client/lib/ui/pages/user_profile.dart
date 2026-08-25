@@ -32,14 +32,12 @@ class UserProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final t = Theme.of(context);
-    final b = BlocProvider.of<ProfilePageBloc>(context);
-    // final repo = context.read(Repository);
     return BlocBuilder<ProfilePageBloc, ProfilePageState>(
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: t.colorScheme.inversePrimary,
-            title: Text(l.taskListPageName),
+            title: Text(l.userProfilePageName),
           ),
           body: ListView(
             children: [

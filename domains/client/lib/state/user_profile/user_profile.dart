@@ -8,7 +8,6 @@ class ProfilePageBloc extends Bloc<ProfileEvent, ProfilePageState> {
     on<ProfilePageStateInitRequested>(_onStateInit);
     on<ProfileRecordChangingRequested>(_onChanged);
     on<ProfileRecordSubmitRequested>(_onRecordSubmit);
-    //todo submit requested event
   }
 
   final Repository repository;

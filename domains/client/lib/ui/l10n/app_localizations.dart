@@ -113,6 +113,12 @@ abstract class AppLocalizations {
   /// **'Дела'**
   String get taskListPageName;
 
+  /// No description provided for @userProfilePageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Профиль'**
+  String get userProfilePageName;
+
   /// No description provided for @domainListPageName.
   ///
   /// In ru, this message translates to:

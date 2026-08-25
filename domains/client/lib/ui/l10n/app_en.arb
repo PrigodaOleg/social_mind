@@ -2,6 +2,7 @@
     "applicationTitle": "Closers",
     "homePageName": "Home",
     "taskListPageName": "Tasks",
+    "userProfilePageName": "Profile",
     "domainListPageName": "Closee groups",
     "addTaskHint": "Add new task",
     "loginHelloLabel": "Hi there",

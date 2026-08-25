@@ -18,6 +18,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskListPageName => 'Tasks';
 
   @override
+  String get userProfilePageName => 'Profile';
+
+  @override
   String get domainListPageName => 'Closee groups';
 
   @override
