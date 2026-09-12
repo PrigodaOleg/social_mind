@@ -35,7 +35,8 @@ class ProfileItemTile extends StatelessWidget {
           Expanded(
             child: TextFormField(
               initialValue: title,
-              enabled: isEditable,
+              readOnly: !isEditable,
+              enableInteractiveSelection: true,
               autofocus: true,
               maxLines: null,
               keyboardType: TextInputType.text,
