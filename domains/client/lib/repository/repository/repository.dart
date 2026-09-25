@@ -144,8 +144,10 @@ class Repository {
 
   Future<void> init() async {
     await _localStorage.init();
-    await initRemoteStorages();
-    await authRemoteStorages();
+    if (myId != null) {
+      await initRemoteStorages();
+      await authRemoteStorages();
+    }
     defaultSyncSubscriber = addSyncListener(_defaultSyncListener, _defaultMergeConflictListener, _defaultAccessDeniedListener);
     _sync = Timer(_delayedSync);
     _sync.start();
@@ -154,7 +156,6 @@ class Repository {
   }
 
   Future<void> initRemoteStorages() async {
-    if (myId == null) return;
     for (var storage in me.settings.getDeep('remote_storages', defaultValue: {}).entries) {
       _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
     }
@@ -170,7 +171,6 @@ class Repository {
   }
 
   Future<void> authRemoteStorages() async {
-    if (myId == null) return;
     for (var storage in _remoteStorages.entries) {
       var passwordFieldName = 'remote_storages.${storage.key}.hashed_password';
       String? password = me.secrets.getDeep(passwordFieldName);
@@ -204,6 +204,27 @@ class Repository {
           print('User creation for storage ${storage.key} error: $e');
           success = false;
         }
+      }
+    }
+    return success;
+  }
+
+  Future<bool> tryLogin(String userId, String secret) async {
+    bool success = true;
+    final dummyUser = User(name: ''); // todo: некрасиво, настройки по-умолчанию должны где-то храниться и быть доступны для ввода до попытки логина
+    for (var storage in dummyUser.settings.getDeep('remote_storages', defaultValue: {}).entries) {
+      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+    }
+    for (var storage in _remoteStorages.entries) {
+      var instanceFieldName = 'remote_storages.${storage.key}.instance';
+      String? instance = dummyUser.settings.getDeep(instanceFieldName);
+      if (instance != null) {
+        if (!await storage.value.init(instance)) success = false;  // todo: wrap in try-catch and show error message to user
+        String password = scrypt(utf8.encode(secret), utf8.encode('${storage.key}$instance')).toString();
+        if (!await storage.value.auth(userId, password)) success = false;  // todo: wrap in try-catch and show error message to user
+      } else {
+        success = false;
+        print('No parameter $instanceFieldName is specified for ${storage.key}');
       }
     }
     return success;
@@ -316,7 +337,7 @@ class Repository {
 
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
     var idsToSync = incomingSyncIds.keys.toSet().difference(syncedThisTime).toList();
-    var syncedModels = await _remoteStorages['FirebaseRealtimeDatabase']!.getItems(idsToSync);
+    var syncedModels = await _remoteStorages.values.first.getItems(idsToSync);
     // Вот тут, внимание(!), сохраняем приехвашие изменения в локальное хранилище, хотя надо делать слияние
     await _localStorage.storeItems(syncedModels);
     // Вызываем для каждого синхронизированного элемента событие для слушателя
@@ -330,7 +351,7 @@ class Repository {
 
   void _findAndCallListeners(String id) async {
     incomingSyncIds[id]?.forEach((subscriberId) async {
-      Model? model = await _remoteStorages['FirebaseRealtimeDatabase']!.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
+      Model? model = await _remoteStorages.values.first.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
       model?.sync = SyncStatus.synced;
       syncedThisTime.add(id); // todo: тут ошибка - если в удаленном репозитории такой модели нет, то ее надо либо туда загрузить, либо удалить тут, тихо промолчать нельзя
       // print(model);
@@ -394,7 +415,7 @@ class Repository {
 
   Future<T?> getModelNow<T>(String modelId) async {
     T? model = _localStorage.getItem(id: modelId);
-    model = model ?? await _remoteStorages['FirebaseRealtimeDatabase']!.getItem(id: modelId);
+    model = model ?? await _remoteStorages.values.first.getItem(id: modelId);
     return model;
   }
 
@@ -446,6 +467,14 @@ class Repository {
     _localStorage.storeItem(me).then((value) => _syncModel(me));
     // _syncModel(me);
     myId = me.id; // actually its async, so no call ME immediately after that? wait for second
+  }
+
+  Future<Model> asyncSetMe(Model me) async {
+    await _localStorage.storeItem(me);
+    myId = me.id;
+    await initRemoteStorages();
+    await authRemoteStorages();
+    return me;
   }
 
   // # Settings

@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+
 import '../ui.dart';
 import 'login_user_create.dart';
 import 'login_user_existing.dart';
@@ -46,9 +47,9 @@ class LoginPage extends StatelessWidget {
                   );
                   if (isPerformed == true) {
                     repository.me = blankUser;
-                    repository.initRemoteStorages();
+                    await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
                     String secret = const Uuid().v4();
-                    repository.createUserRemoteStorages(secret);
+                    await repository.createUserRemoteStorages(secret);
                     repository.me.secret = secret;
                     n.pushReplacementNamed(HomePage.routeName);
                   }
@@ -66,6 +67,7 @@ class LoginPage extends StatelessWidget {
                   );
                   if (null != tryingUser) {
                     repository.me = tryingUser;
+                    // await repository.asyncSetMe(tryingUser); // todo: тут мы замораживаем UI
                     // Тут наверное надо подтянуть из репозитория историю навигации
                     n.pushReplacementNamed(HomePage.routeName);
                   }
@@ -90,6 +92,8 @@ class LoginPage extends StatelessWidget {
                   );
                   if (isPerformed == false) return;
                   repository.me = tryingUser;
+                  await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
+                  await repository.createUserRemoteStorages(tryingUser.secret);
                   n.pushReplacementNamed(HomePage.routeName);
                 },
                 child: Text(l.loginNewUserButtonText),

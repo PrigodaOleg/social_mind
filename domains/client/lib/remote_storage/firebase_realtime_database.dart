@@ -1,9 +1,8 @@
 import 'package:closers/remote_storage/remote_storage.dart';
-import 'package:firebase_database/firebase_database.dart'; // https://firebase.google.com/docs/database/flutter/start
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:closers/repository/models/models.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart'; // https://firebase.google.com/docs/database/flutter/start
 
 
 class FirebaseStorage extends RemoteStorage {
@@ -14,26 +13,29 @@ class FirebaseStorage extends RemoteStorage {
   late FirebaseApp app;
 
   @override
-  Future<void> init(String instance) async {
+  Future<bool> init(String instance) async {
     // Connect and get instance
     app = Firebase.app(instance);
     database = FirebaseDatabase.instanceFor(app: app).ref();
+    return true;
   }
 
   @override
-  Future<void> createUserAndAuth(String login, String password, {String? claim}) async {
+  Future<bool> createUserAndAuth(String login, String password, {String? claim}) async {
     final auth = FirebaseAuth.instanceFor(app: app);
     UserCredential userCredential = await auth.createUserWithEmailAndPassword(email: '$login$emailSuffix', password: password);
     if (claim != null) {
       await auth.currentUser?.updateDisplayName(claim);
       await auth.currentUser?.getIdToken(true);
     }
+    return true; // todo: обработать исключения
   }
 
   @override
-  Future<void> auth(String login, String password) async {
+  Future<bool> auth(String login, String password) async {
     final auth = FirebaseAuth.instanceFor(app: app);
     UserCredential userCredential = await auth.signInWithEmailAndPassword(email: '$login$emailSuffix', password: password);
+    return true;
   }
 
   @override

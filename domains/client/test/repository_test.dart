@@ -120,7 +120,241 @@ class DenyingRemoteStorage extends MockRemoteStorage {
   }
 }
 
+// Records the arguments passed to init/auth/createUserAndAuth so tests can assert on them,
+// and lets tests force each call to succeed or fail.
+class TrackingRemoteStorage extends RemoteStorage {
+  String? initInstance;
+  bool initResult = true;
+
+  String? authLogin;
+  String? authPassword;
+  bool authResult = true;
+
+  String? createLogin;
+  String? createPassword;
+  bool throwOnCreate = false;
+
+  @override
+  Future<bool> init(String instance) async {
+    initInstance = instance;
+    return initResult;
+  }
+
+  @override
+  Future<bool> auth(String login, String password) async {
+    authLogin = login;
+    authPassword = password;
+    return authResult;
+  }
+
+  @override
+  Future<bool> createUserAndAuth(String login, String password) async {
+    if (throwOnCreate) {
+      throw Exception('createUserAndAuth failed');
+    }
+    createLogin = login;
+    createPassword = password;
+    return true;
+  }
+}
+
+// A minimal LocalStorage that lets tests directly set the "logged in" local user (or none at all).
+class ConfigurableLocalStorage extends LocalStorage {
+  User? meUser;
+  bool initCalled = false;
+
+  @override
+  Future<void> init() async {
+    initCalled = true;
+  }
+
+  @override
+  String? getUserId() => meUser?.id;
+
+  @override
+  dynamic getItem({required String id}) {
+    if (meUser != null && id == meUser!.id) return meUser;
+    return null;
+  }
+}
+
+// initRemoteStorages/tryLogin build remote storages from a hardcoded 'FirebaseRealtimeDatabase' key
+// via knownRemoteStorages, which normally constructs a real FirebaseStorage. This subclass swaps that
+// factory for a TrackingRemoteStorage so tests never touch Firebase.
+class TestRepository extends Repository {
+  TestRepository({
+    super.localStorage,
+    super.remoteStorages,
+    required this.testStorage,
+  });
+
+  final RemoteStorage testStorage;
+
+  @override
+  late final knownRemoteStorages = <String, Function()>{
+    'FirebaseRealtimeDatabase': () => testStorage,
+  };
+}
+
 void main() {
+  group('Repository init', () {
+    test('init initializes local storage', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: TrackingRemoteStorage());
+      await r.init();
+      expect(localStorage.initCalled, true);
+      expect(r.late, false);
+    });
+
+    test('init skips remote storage init/auth when no local user is set', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      await r.init();
+      expect(tracking.initInstance, null);
+      expect(tracking.authLogin, null);
+      expect(r.syncListeners.containsKey(r.defaultSyncSubscriber), true);
+    });
+
+    test('init initializes and authenticates remote storages when local user exists', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage();
+      final user = User(id: 'me', name: 'me');
+      user.secrets = {'remote_storages': {'FirebaseRealtimeDatabase': {'hashed_password': 'storedpw'}}};
+      localStorage.meUser = user;
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      await r.init();
+      expect(tracking.initInstance, 'closers-cd24f'); // default instance from User.settings
+      expect(tracking.authLogin, 'me');
+      expect(tracking.authPassword, 'storedpw');
+    });
+  });
+
+  group('Repository initRemoteStorages', () {
+    test('initializes configured remote storage with instance from settings', () async {
+      final localStorage = ConfigurableLocalStorage()..meUser = User(id: 'me', name: 'me');
+      final tracking = TrackingRemoteStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      await r.initRemoteStorages();
+      expect(tracking.initInstance, 'closers-cd24f');
+    });
+
+    test('does not call init when instance setting is missing', () async {
+      final user = User(id: 'me', name: 'me');
+      user.settings = {'remote_storages': {'FirebaseRealtimeDatabase': <String, dynamic>{}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final tracking = TrackingRemoteStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      await r.initRemoteStorages();
+      expect(tracking.initInstance, null);
+    });
+  });
+
+  group('Repository authRemoteStorages', () {
+    test('authenticates using stored hashed password', () async {
+      final user = User(id: 'me', name: 'me');
+      user.secrets = {'remote_storages': {'MockStorage': {'hashed_password': 'pw1'}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final tracking = TrackingRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'MockStorage': tracking});
+      await r.authRemoteStorages();
+      expect(tracking.authLogin, 'me');
+      expect(tracking.authPassword, 'pw1');
+    });
+
+    test('skips auth when no password is stored', () async {
+      final user = User(id: 'me', name: 'me');
+      user.secrets = {'remote_storages': {'MockStorage': <String, dynamic>{}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final tracking = TrackingRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'MockStorage': tracking});
+      await r.authRemoteStorages();
+      expect(tracking.authLogin, null);
+    });
+  });
+
+  group('Repository createUserRemoteStorages', () {
+    test('throws when local user is not initialized', () async {
+      final localStorage = ConfigurableLocalStorage(); // no meUser -> myId is null
+      final r = Repository(localStorage: localStorage, remoteStorages: {});
+      expect(() => r.createUserRemoteStorages('secret'), throwsException);
+    });
+
+    test('derives and stores a new password when none exists', () async {
+      final user = User(id: 'me', name: 'me');
+      user.settings = {'remote_storages': {'MockStorage': {'instance': 'inst1'}}};
+      user.secrets = {'remote_storages': {'MockStorage': <String, dynamic>{}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final tracking = TrackingRemoteStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {'MockStorage': tracking});
+
+      final success = await r.createUserRemoteStorages('mysecret');
+
+      expect(success, true);
+      expect(tracking.createLogin, 'me');
+      expect(tracking.createPassword, isNotNull);
+      expect(user.secrets.getDeep('remote_storages.MockStorage.hashed_password'), tracking.createPassword);
+    });
+
+    test('throws when secret is not provided and no password exists', () async {
+      final user = User(id: 'me', name: 'me');
+      user.secrets = {'remote_storages': {'MockStorage': <String, dynamic>{}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final r = Repository(localStorage: localStorage, remoteStorages: {'MockStorage': TrackingRemoteStorage()});
+      expect(r.createUserRemoteStorages(null), throwsException);
+    });
+
+    test('reuses existing password and reports failure when createUserAndAuth throws', () async {
+      final user = User(id: 'me', name: 'me');
+      user.secrets = {'remote_storages': {'MockStorage': {'hashed_password': 'existingpw'}}};
+      final localStorage = ConfigurableLocalStorage()..meUser = user;
+      final tracking = TrackingRemoteStorage()..throwOnCreate = true;
+      final r = Repository(localStorage: localStorage, remoteStorages: {'MockStorage': tracking});
+
+      final success = await r.createUserRemoteStorages(null);
+
+      expect(success, false);
+    });
+  });
+
+  group('Repository tryLogin', () {
+    test('succeeds and authenticates the configured storage', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+
+      final success = await r.tryLogin('user123', 'mysecret');
+
+      expect(success, true);
+      expect(tracking.initInstance, 'closers-cd24f');
+      expect(tracking.authLogin, 'user123');
+      expect(tracking.authPassword, isNotNull);
+      expect(tracking.authPassword, isNotEmpty);
+    });
+
+    test('returns false when remote storage init fails', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage()..initResult = false;
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+
+      final success = await r.tryLogin('user123', 'mysecret');
+
+      expect(success, false);
+      expect(tracking.authLogin, 'user123'); // auth is still attempted after a failed init
+    });
+
+    test('returns false when remote storage auth fails', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage()..authResult = false;
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+
+      final success = await r.tryLogin('user123', 'mysecret');
+
+      expect(success, false);
+      expect(tracking.initInstance, 'closers-cd24f');
+    });
+  });
+
   group('Repository', () {
     test('syncWithRemoteStorage simple', () async {
       final localStorage = MockLocalStorage();

@@ -1,5 +1,6 @@
 part of 'models.dart';
 
+
 @HiveType(typeId: 1)
 // ignore: must_be_immutable
 class User extends Model {
@@ -19,16 +20,25 @@ class User extends Model {
         lastName = lastName ?? '',
         description = description ?? '';
 
-  User.fromJson(super.json)
-      : name = json['name'] as String,
-        domainsIds = List<String>.from(json['domainsIds'] ?? []),
-        registryId = (json['registryId'] ?? []) as String,
-        avatarUrl = json['avatarUrl'] as String,
-        firstName = json['firstName'] as String,
-        lastName = json['lastName'] as String,
-        description = json['description'] as String,
-        super.fromJson();
-
+(??)  User.fromJson(super.json)
+(??)      : name = json['name'] as String,
+(??)    domainsIds = List<String>.from(json['domainsIds'] is List ? json['domainsIds'] : json['domainsIds']?.keys ?? []),
+(??)        registryId = (json['registryId'] ?? []) as String,
+(??)        avatarUrl = json['avatarUrl'] as String,
+(??)        firstName = json['firstName'] as String,
+(??)        lastName = json['lastName'] as String,
+(??)        description = json['description'] as String,
+(??)        super.fromJson();
+(??)
+(??)<<<<<<< HEAD
+(??)=======
+(??)  User.fromJson(super.json) :
+(??)    name = json['name'] as String,
+(??)    domainsIds = List<String>.from(json['domainsIds'] is List ? json['domainsIds'] : json['domainsIds']?.keys ?? []),
+(??)    registryId = (json['registryId'] ?? []) as String,
+(??)    super.fromJson();
+(??)    
+(??)>>>>>>> origin/main
   @override
   // ignore: overridden_fields
   final String type = "User";
@@ -41,20 +51,18 @@ class User extends Model {
 
   String registryId;
 
-  String avatarUrl;
-  String firstName;
-  String lastName;
-  String description;
-
   Map<String, dynamic> settings = {
     'remote_storages': <String, dynamic>{
-      'FirebaseRealtimeDatabase': <String, dynamic>{'instance': 'closers-cd24f'}
-    }
+      'FirebaseRealtimeDatabase': <String, dynamic>{
+        'instance': 'closers-cd24f'
+      }}
   };
 
   Map<String, dynamic> secrets = {
     'remote_storages': <String, dynamic>{
-      'FirebaseRealtimeDatabase': <String, dynamic>{'hashed_password': null}
+      'FirebaseRealtimeDatabase': <String, dynamic>{
+        'hashed_password': null
+      }
     }
   };
 
@@ -76,7 +84,10 @@ class User extends Model {
     });
 
   @override
-  void link({Model? to, Model? from}) {
+  void link({
+    Model? to,
+    Model? from
+  }) {
     switch (to) {
       case Domain():
         domainsIds.add(to.id);
@@ -87,7 +98,10 @@ class User extends Model {
   }
 
   @override
-  void unlink({Model? to, Model? from}) {
+  void unlink({
+    Model? to,
+    Model? from
+  }) {
     switch (from) {
       case Domain():
         domainsIds.remove(from.id);
@@ -161,6 +175,5 @@ class User extends Model {
   }
 
   @override
-  List<Object> get props => super.props + [name, domainsIds, registryId, avatarUrl, firstName, lastName, description];
+  List<Object> get props => super.props + [name, domainsIds, registryId];
 }
-
