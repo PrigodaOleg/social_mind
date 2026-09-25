@@ -1,6 +1,7 @@
 {
     "applicationTitle": "Близкие",
     "homePageName": "Доска",
+    "userProfilePageName": "Профиль пользователя",
     "taskListPageName": "Дела",
     "domainListPageName": "Близкие",
     "addTaskHint": "Добавить задачу",

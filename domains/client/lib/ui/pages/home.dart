@@ -66,6 +66,10 @@ class HomeView extends StatelessWidget {
               n.pushNamed(LoginPage.routeName);},
             icon: const Icon(Icons.exit_to_app)
           ),
+          IconButton(
+            onPressed: () {n.pushNamed(UserProfilePage.routeName);},
+            icon: const Icon(Icons.task_alt)
+          ),
         ],
       ),
     );

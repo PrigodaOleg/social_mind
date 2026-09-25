@@ -18,6 +18,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get taskListPageName => 'Дела';
 
   @override
+  String get userProfilePageName => 'Профиль пользователя';
+
+  @override
   String get domainListPageName => 'Близкие';
 
   @override
