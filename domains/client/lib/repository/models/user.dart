@@ -29,6 +29,17 @@ class User extends Model {
         description = json['description'] as String,
         super.fromJson();
 
+    List<String>? domainsIds
+  }) :
+    domainsIds = domainsIds ?? <String>[],
+    registryId = registryId ?? '';
+
+  User.fromJson(super.json) :
+    name = json['name'] as String,
+    domainsIds = List<String>.from(json['domainsIds'] is List ? json['domainsIds'] : json['domainsIds']?.keys ?? []),
+    registryId = (json['registryId'] ?? []) as String,
+    super.fromJson();
+    
   @override
   // ignore: overridden_fields
   final String type = "User";

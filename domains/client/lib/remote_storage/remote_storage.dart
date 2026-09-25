@@ -1,8 +1,8 @@
 library remote_storage;
 
-export 'firebase_realtime_database.dart';
-
 import 'package:closers/repository/models/models.dart';
+
+export 'firebase_realtime_database.dart';
 
 
 class RemoteStorageWriteCollision implements Exception {
@@ -24,11 +24,11 @@ abstract class RemoteStorage {  // todo: abstract?
     'Task': (json) => Task.fromJson(json),
   };
 
-  Future<void> init(String instance) async {}
+  Future<bool> init(String instance) async {return false;}
 
-  Future<void> createUserAndAuth(String login, String password) async {}
+  Future<bool> createUserAndAuth(String login, String password) async {return false;}
 
-  Future<void> auth(String login, String password) async {}
+  Future<bool> auth(String login, String password) async {return false;}
 
   Future<dynamic> getItem({required String id}) async {}
 

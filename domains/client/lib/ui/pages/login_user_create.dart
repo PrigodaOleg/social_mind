@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:flutter/material.dart';
+
+import '../l10n/app_localizations.dart';
 
 class CreateUserPage extends StatefulWidget {
   static const routeName = '/create_user';
@@ -17,6 +18,7 @@ class CreateUserPageState extends State<StatefulWidget> {
   CreateUserPageState(this.repository);
 
   User? user;
+  String? secret;
 
   @override
   Widget build(BuildContext context) {
@@ -38,23 +40,51 @@ class CreateUserPageState extends State<StatefulWidget> {
                 setState(() {
                   user = value.isEmpty ? null : User(name: value);
                 });
+                if (user == null) {return;}
+                if (secret == null) {return;}
+                user!.secret = secret;
                 n.pop(user);
               },
               onChanged: (value) {
                 setState(() {
                   user = value.isEmpty ? null : User(name: value);
-                  print(user?.type);
+                });
+              },
+            ),
+            TextField(
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Please input your secret',
+                labelText: 'Secret'
+              ),
+              onSubmitted: (value) {
+                setState(() {
+                  secret = value;
+                });
+                if (user == null) {return;}
+                if (secret == null) {return;}
+                user!.secret = secret;
+                n.pop(user);
+              },
+              onChanged: (value) {
+                setState(() {
+                  secret = value;
                 });
               },
             ),
             Row(
               children: [
                 BackButton(
-                  onPressed: () => n.pop(false),
+                  onPressed: () => n.pop(),
                 ),
                 IconButton(
                   icon: const Icon(Icons.check),
-                  onPressed: () => n.pop(user),
+                  onPressed: () {
+                    if (user == null) {return;}
+                    if (secret == null) {return;}
+                    user!.secret = secret;
+                    n.pop(user);
+                  },
                 ),
               ],
             )
