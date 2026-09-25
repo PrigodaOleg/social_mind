@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:closers/state/state.dart';
 import 'package:closers/state/user_profile/user_profile.dart';
 import '../widgets/profile_item_tile.dart';
+import '../widgets.dart';
 import '../l10n/app_localizations.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
@@ -65,34 +66,7 @@ class UserProfileView extends StatelessWidget {
                       alignment: Alignment.center,
                       children: [
                         // 1. The Main Circular Profile Image
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(25),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: avatarRadius,
-                            backgroundColor: Colors.blue.shade100,
-                            backgroundImage: imageUrl != null
-                                ? NetworkImage(imageUrl!)
-                                : null,
-                            child: imageUrl == null
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        ),
-
+                        CircularImage(imageRadius:60),
                         // 2. Choose Image Button (Bottom Right)
                         Positioned(
                           bottom: 5,
@@ -103,7 +77,7 @@ class UserProfileView extends StatelessWidget {
                             iconColor: Colors.white,
                             onPressed: () async {
                               updateAvatar();
-                            }, //need an bloc event here
+                            }, //todo need a bloc event here
                           ),
                         ),
                         // 3. Show QR Code Button (Top Right / Alternative Side)
@@ -121,7 +95,7 @@ class UserProfileView extends StatelessWidget {
                                   return qrview(qrImage: qrImage);
                                 },
                               );
-                            }, //need an bloc event here
+                            }, // todo need a bloc event here
                             hasShadow: true,
                           ),
                         ),
