@@ -64,6 +64,16 @@ class OperationalBox {
 }
 
 @collection
+class ImageBox {
+  late int id;
+  @Index(unique:true)
+  String? name;
+  List<byte>? imageBytes;
+}
+
+
+
+@collection
 class RegistryBox {
   late int id;
   @Index(unique: true, hash: true, composite: ['transactionIndex'])
@@ -150,6 +160,20 @@ class IsarStorage extends LocalStorage {
     });
   }
 
+  List<byte>? getImage(String id) {
+    return isar.imageBoxs.where().nameEqualTo(id).findFirst()?.imageBytes;
+  }
+
+  Future<void> storeImage(String id, List<byte> imageBytes) async{
+    isar.write((isar) {
+      isar.imageBoxs.put(
+        ImageBox()
+        ..id = isar.imageBoxs.autoIncrement()
+        ..name = id
+        ..imageBytes = imageBytes
+      );
+    });
+  }
   @override
   dynamic getOpItem(String id) {
     String? serializedItem = isar.operationalBoxs.where().nameEqualTo(id).findFirst()?.data;
