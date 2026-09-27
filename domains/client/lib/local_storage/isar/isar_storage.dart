@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:closers/repository/navigation/navigation_stack.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -160,10 +161,16 @@ class IsarStorage extends LocalStorage {
     });
   }
 
-  List<byte>? getImage(String id) {
-    return isar.imageBoxs.where().nameEqualTo(id).findFirst()?.imageBytes;
+@override
+  Uint8List? getImage(String id) {
+   List<byte>? imageBytes = isar.imageBoxs.where().nameEqualTo(id).findFirst()?.imageBytes;
+   if(imageBytes == null){
+   return null;
+   }
+   return Uint8List.fromList(imageBytes);
   }
 
+@override
   Future<void> storeImage(String id, List<byte> imageBytes) async{
     isar.write((isar) {
       isar.imageBoxs.put(

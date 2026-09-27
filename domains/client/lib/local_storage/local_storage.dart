@@ -3,6 +3,8 @@ library local_storage;
 // export 'hive/hive_storage.dart';
 export 'isar/isar_storage.dart';
 
+import 'dart:typed_data';
+
 import 'package:closers/repository/models/models.dart';
 
 
@@ -24,6 +26,10 @@ abstract class LocalStorage {
   String? getOperational(String key) {}
 
   Future<void> setOperational(String key, String value) async {}
+
+  Uint8List? getImage(String id);
+
+  Future<void> storeImage(String id, Uint8List imageBytes) async {}
 
   dynamic getOpItem(String id) {}
 
