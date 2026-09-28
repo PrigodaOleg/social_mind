@@ -1,9 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 class CircularImage extends StatelessWidget {
-  const CircularImage({super.key, this.imageRadius = 60, this.imageUrl});
+  const CircularImage({super.key, this.imageRadius = 60, this.imageBytes});
   final double imageRadius;
-  final imageUrl;
+  final Uint8List? imageBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +24,8 @@ class CircularImage extends StatelessWidget {
       child: CircleAvatar(
         radius: imageRadius,
         backgroundColor: Colors.blue.shade100,
-        backgroundImage: imageUrl != null ? NetworkImage(imageUrl!) : null,
-        child: imageUrl == null
+        backgroundImage: imageBytes != null ? MemoryImage(imageBytes!) : null,
+        child: imageBytes == null
             ? const Icon(
                 Icons.person,
                 size: 60,

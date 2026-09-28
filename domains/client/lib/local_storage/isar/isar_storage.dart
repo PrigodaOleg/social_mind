@@ -118,6 +118,7 @@ class IsarStorage extends LocalStorage {
       schemas: [
         OperationalBoxSchema,
         ModelBoxSchema,
+        ImageBoxSchema,
         RegistryBoxSchema,
         HistoryQueueHeadIdxSchema,
         HistoryQueueTailIdxSchema],
