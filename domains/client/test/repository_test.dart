@@ -3,12 +3,19 @@ import 'package:closers/remote_storage/remote_storage.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dart:typed_data';
+
 class MockLocalStorage extends LocalStorage {
   Map<String, Model> lastModels = {};
   Map<String, Registry> lastRegistries = {};
   Map<String, dynamic> get lastItems => {...lastModels, ...lastRegistries};
   Map<String, Model> oldModels = {};
   int clearHistoryQueueHeadCallCount = 0;
+
+
+//do we need real testing?
+  @override
+  Uint8List? getImage(String id) => null;
 
   @override
   Future<int> storeItems(Map<String, dynamic> items) async {
@@ -162,6 +169,10 @@ class TrackingRemoteStorage extends RemoteStorage {
 class ConfigurableLocalStorage extends LocalStorage {
   User? meUser;
   bool initCalled = false;
+
+//do we need real testing?
+  @override
+  Uint8List? getImage(String id) => null;
 
   @override
   Future<void> init() async {
