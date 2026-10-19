@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:closers/state/state.dart';
@@ -9,8 +9,6 @@ import '../l10n/app_localizations.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 
 class UserProfilePage extends StatelessWidget {
   static const routeName = '/user_profile';
@@ -47,7 +45,6 @@ class UserProfileView extends StatelessWidget {
           final screenWidth = MediaQuery.of(context).size.width;
           Alignment adaptiveAlignment =
               screenWidth > 600 ? Alignment.topLeft : Alignment.topCenter;
-          const String? imageUrl = null;
           final qrCode = QrCode(4, QrErrorCorrectLevel.L)
             ..addData('Hello, world in QR form!');
           final qrImage = QrImage(qrCode);
@@ -66,7 +63,10 @@ class UserProfileView extends StatelessWidget {
                       alignment: Alignment.center,
                       children: [
                         // 1. The Main Circular Profile Image
-                        CircularImage(imageRadius:60),
+                        CircularImage(
+                          imageRadius: 60,
+                          imageBytes: state.avatarBytes,
+                        ),
                         // 2. Choose Image Button (Bottom Right)
                         Positioned(
                           bottom: 5,
@@ -76,7 +76,19 @@ class UserProfileView extends StatelessWidget {
                             backgroundColor: Colors.blue,
                             iconColor: Colors.white,
                             onPressed: () async {
-                              updateAvatar();
+                              XFile? image = await ImagePicker()
+                                  .pickImage(source: ImageSource.gallery);
+                              if (image != null) {
+                                Uint8List imageBytes =
+                                    await image.readAsBytes();
+                                if (!context.mounted) return;
+                                context
+                                    .read<ProfilePageBloc>()
+                                    .add(ProfileAvatarUpdateRequested(
+                                      avatarDBName: state.avatarDBName,
+                                      avatarBytes: imageBytes,
+                                    ));
+                              }
                             }, //todo need a bloc event here
                           ),
                         ),
@@ -89,7 +101,7 @@ class UserProfileView extends StatelessWidget {
                             backgroundColor: Colors.white,
                             iconColor: Colors.black87,
                             onPressed: () async {
-                              bool? isPerformed = await showModalBottomSheet(
+                              await showModalBottomSheet(
                                 context: context,
                                 builder: (BuildContext context) {
                                   return qrview(qrImage: qrImage);
@@ -110,16 +122,9 @@ class UserProfileView extends StatelessWidget {
                     constraints: BoxConstraints(maxWidth: wideScreenMinWidth),
                     child: ListView.builder(
                         padding: EdgeInsets.only(top: 10, left: 10, right: 10),
-                        itemCount: state.userProfileRecords
-                            .where(
-                                (property) => property['propId'] != 'avatarUrl')
-                            .toList()
-                            .length,
+                        itemCount: state.userProfileRecords.length,
                         itemBuilder: (context, index) {
-                          final visibleListElements = state.userProfileRecords
-                              .where((property) =>
-                                  property['propId'] != 'avatarUrl')
-                              .toList();
+                          final visibleListElements = state.userProfileRecords;
                           final record = visibleListElements[index];
                           return ProfileItemTile(
                             title: record['value'],
@@ -157,22 +162,6 @@ class UserProfileView extends StatelessWidget {
         });
       },
     );
-  }
-
-  Future<void> updateAvatar() async {
-    XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image == null) return;
-
-    // final Directory appDocDir = await getApplicationDocumentsDirectory();
-    final Directory appSupportDir = await getApplicationSupportDirectory();
-
-    final String extension = path.extension(image.path);
-    final String newFileName = 'avatar$extension';
-    final String permanentPath = path.join(appSupportDir.path, newFileName);
-    print(permanentPath);
-
-    final File tempFile = File(image.path);
-    await tempFile.copy(permanentPath);
   }
 
   Widget qrview({required QrImage qrImage}) {

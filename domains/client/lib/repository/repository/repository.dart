@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
@@ -449,6 +450,13 @@ class Repository {
     _sync.postpone();
   }
 
+ Future<void> saveImage(String name, Uint8List imageBytes) async {
+    await _localStorage.storeImage(name, imageBytes);
+  }
+
+Uint8List? getImage(String name) {
+  return _localStorage.getImage(name);
+}
   // Get user associated with this instance of application
   // User must be set already
   User get me {
