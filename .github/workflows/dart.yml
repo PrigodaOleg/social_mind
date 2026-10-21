@@ -98,10 +98,44 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  build-ios:
+    runs-on: macos-latest
 
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
 
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
 
+      # local_database_test.dart initializes the Isar core library from test/,
+      # so provide the macOS binary shipped with isar_plus_flutter_libs.
+      - name: Prepare Isar core library for macOS tests
+        working-directory: ./domains/client
+        run: |
+          cp "$(find "$HOME/.pub-cache" -path '*isar_plus_flutter_libs*/macos/libisar.dylib' | head -n 1)" \
+             test/libisar_macos.dylib
 
+      - name: Run tests
+        working-directory: ./domains/client
+        run: flutter test
 
+      - name: 'Build iOS (no codesign)'
+        working-directory: ./domains/client
+        run: |
+          flutter build ios --release --no-codesign \
+          --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
+          --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
+          --dart-define CLOSERS_IOS_API_KEY=${{ secrets.CLOSERS_IOS_API_KEY }} \
+          --dart-define CLOSERS_IOS_APP_ID=${{ secrets.CLOSERS_IOS_APP_ID }} \
+          --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
 
+      - name: 'Upload iOS app'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'Closers-iOS'
+          path: './domains/client/build/ios/iphoneos/Runner.app'
+        # Upload the built iOS app

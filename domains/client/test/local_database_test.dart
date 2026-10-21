@@ -29,6 +29,7 @@ void main() async {
     // https://github.com/ahmtydn/isar_plus/releases?q=1.2.6&expanded=true
     if (Platform.isWindows) await Isar.initialize('test/isar_windows_x64.dll');
     if (Platform.isLinux) await Isar.initialize('test/libisar_linux_x64.so');
+    if (Platform.isMacOS) await Isar.initialize('test/libisar_macos.dylib');
     storage = IsarStorage();
     await storage.init();
   });
@@ -309,4 +310,4 @@ void main() async {
     });
 
   });
-}
+}
