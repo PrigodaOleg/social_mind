@@ -33,7 +33,7 @@ class App extends StatelessWidget {
           AppLocalizations.of(context).applicationTitle,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: Colors.red,
           // brightness: Brightness.dark,
         ),
         useMaterial3: true,
