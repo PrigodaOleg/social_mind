@@ -123,6 +123,15 @@ jobs:
         working-directory: ./domains/client
         run: flutter test
 
+      - name: Run Firebase emulator integration tests
+        working-directory: ./domains/client
+        env:
+          FLUTTER_WEB_CHROME: /usr/bin/google-chrome-stable
+        run: |
+          npm install -g firebase-tools@latest
+          chmod +x tool/run_firebase_emulator_tests.sh
+          tool/run_firebase_emulator_tests.sh
+
       - name: 'Build iOS (no codesign)'
         working-directory: ./domains/client
         run: |

@@ -83,7 +83,9 @@ class Transaction extends Equatable {
         originatorId = json['originatorId'] as String,
         changeDetails = json['changeDetails'] as String,
         changeType = json['changeType'] as String,
-        changes = List<String>.from(json['changes']),
+        changes = json['changes'] is Map
+            ? (json['changes'] as Map).keys.map((k) => k.toString()).toList()
+            : List<String>.from(json['changes']),
         path = json['path'] as String;
 
   @override
