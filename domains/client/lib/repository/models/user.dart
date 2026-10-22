@@ -24,11 +24,11 @@ class User extends Model {
         domainsIds = List<String>.from(json['domainsIds'] is List
             ? json['domainsIds']
             : json['domainsIds']?.keys ?? []),
-        registryId = (json['registryId'] ?? []) as String,
-        avatarUrl = json['avatarUrl'] as String,
-        firstName = json['firstName'] as String,
-        lastName = json['lastName'] as String,
-        description = json['description'] as String,
+        registryId = (json['registryId'] ?? '') as String,
+        avatarUrl = (json['avatarUrl'] ?? '') as String,
+        firstName = (json['firstName'] ?? '') as String,
+        lastName = (json['lastName'] ?? '') as String,
+        description = (json['description'] ?? '') as String,
         super.fromJson();
 
   @override

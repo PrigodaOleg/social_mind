@@ -115,8 +115,8 @@ class Transaction extends Equatable {
   }) {
     return Transaction(
         id ?? this.id,
-        prevId ?? this.prevId,
         prevHash ?? this.prevHash,
+        prevId ?? this.prevId,
         timeStamp ?? this.timeStamp,
         originatorId ?? this.originatorId,
         changeDetails ?? this.changeDetails,
@@ -196,7 +196,7 @@ class Registry extends Equatable {
   Registry.fromJson(Map<String, dynamic> json)
       : metadata = RegistryMetadata.fromJson(json['metadata']),
         transactions =
-            (json['transactions'] as Map).map((key, value) => MapEntry(int.parse(key), Transaction.fromJson(value)));
+            (json['transactions'] as Map).map((key, value) => MapEntry(int.parse(key as String), Transaction.fromJson(Map<String, dynamic>.from(value as Map))));
 
   Registry copyWith({String? id, String? parentId, Map<int, Transaction>? transactions}) {
     return Registry(
