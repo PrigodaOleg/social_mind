@@ -135,7 +135,7 @@ class FirebaseStorage extends RemoteStorage {
           }
         }
       }
-      database.update(updates);
+      await database.update(updates);
     } on FirebaseException catch (e) {
       switch (e.code) {
         case 'permission-denied':
@@ -204,6 +204,7 @@ class FirebaseStorage extends RemoteStorage {
       print(snapshot.value);
     }
     Map<String, dynamic> registry = {};
+    registry['transactions'] = {};
     registry['metadata'] = Map<String, dynamic>.from(snapshots[1].value as Map);
     for (DataSnapshot child in snapshots[0].children) {
       registry['transactions'][child.key] = child.value;
