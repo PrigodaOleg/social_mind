@@ -30,7 +30,6 @@ jobs:
         with:
           distribution: "temurin"
           java-version: '17'
-        # Set up JDK 12 using the "actions/setup-java" action.
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -39,18 +38,6 @@ jobs:
         working-directory: ./domains/client
         run: flutter pub get
 
-      # Uncomment this step to verify the use of 'dart format' on each commit.
-      # - name: Verify formatting
-      #   run: dart format --output=none --set-exit-if-changed .
-
-      # Consider passing '--fatal-infos' for slightly stricter analysis.
-      #- name: Analyze project source
-      #  working-directory: ./domains/client
-      #  run: flutter analyze
-
-      # Your project will need to have tests in test/ and a dependency on
-      # package:test for this step to succeed. Note that Flutter projects will
-      # want to change this to 'flutter test'.
       - name: Run tests
         working-directory: ./domains/client
         run: flutter test
@@ -71,7 +58,6 @@ jobs:
           --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }} \
           --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
 
-      
       - name: 'Build web app'
         run: |
           flutter build web --release --base-href /social_mind/ \
@@ -87,13 +73,24 @@ jobs:
         with:
           name: 'Closers'
           path: './domains/client/build/app/outputs/flutter-apk/'
-        # Upload the built APK
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: ./domains/client/build/web/
 
+  # ВЫНОСИМ ДЕПЛОЙ В ОТДЕЛЬНУЮ ДЖОБУ С ПРОВЕРКОЙ ВЕТКИ
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' # Деплоить только при пуше/слиянии в main
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
@@ -111,8 +108,6 @@ jobs:
         working-directory: ./domains/client
         run: flutter pub get
 
-      # local_database_test.dart initializes the Isar core library from test/,
-      # so provide the macOS binary shipped with isar_plus_flutter_libs.
       - name: Prepare Isar core library for macOS tests
         working-directory: ./domains/client
         run: |
@@ -147,4 +142,3 @@ jobs:
         with:
           name: 'Closers-iOS'
           path: './domains/client/build/ios/iphoneos/Runner.app'
-        # Upload the built iOS app
