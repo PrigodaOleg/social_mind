@@ -113,27 +113,37 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
                                  'ui': {'enabled': False}}}, f)
     firebase = os.environ.get('FIREBASE_TOOLS',
                               shutil.which('firebase') or 'firebase')
+    
+    # Создаем копию текущего окружения и добавляем флаг CI
+    my_env = os.environ.copy()
+    my_env["CI"] = "true"
+
+    # Запускаем с PIPE для stderr, чтобы прочитать ошибку в случае падения
     proc = subprocess.Popen(
         [firebase, 'emulators:start', '--only', 'database',
          '--project', 'rules-compat-test'],
-        cwd=WORK_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cwd=WORK_DIR, 
+        stdout=subprocess.DEVNULL, 
+        stderr=subprocess.PIPE, # Меняем DEVNULL на PIPE
+        env=my_env,
+        text=True # Чтобы читать стрим как текст, а не байты
+    )
         
     for _ in range(90):
-        # 1. Проверяем, не упал ли процесс Firebase в фоне
         if proc.poll() is not None:
-            raise RuntimeError(f"Firebase CLI неожиданно завершил работу с кодом {proc.returncode}. Возможно, занят порт или кривой JSON.")
+            # Читаем, что именно Firebase успел написать в поток ошибок
+            error_output = proc.stderr.read() if proc.stderr else "Нет данных в stderr"
+            raise RuntimeError(
+                f"Firebase CLI упал с кодом {proc.returncode}.\n"
+                f"--- ЛОГ ОШИБКИ FIREBASE ---\n{error_output}\n---------------------------"
+            )
 
-        # 2. Пытаемся достучаться до эмулятора
         try:
             urllib.request.urlopen(
                 f'http://127.0.0.1:{port}/.json?ns=rules-compat-test',
                 timeout=2)
             return proc
-        except urllib.error.HTTPError:
-            # emulator is up; HTTP error comes from rules, which is fine
-            return proc
-        except Exception:
-            time.sleep(1)
+
 
     proc.terminate()
     raise RuntimeError('RTDB emulator failed to start')
