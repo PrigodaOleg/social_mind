@@ -143,10 +143,15 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
                 f'http://127.0.0.1:{port}/.json?ns=rules-compat-test',
                 timeout=2)
             return proc
-
-
+        except urllib.error.HTTPError:
+            # emulator is up; HTTP error comes from rules, which is fine
+            return proc
+        except Exception:
+            time.sleep(1)
+            
     proc.terminate()
     raise RuntimeError('RTDB emulator failed to start')
+
 
 
 def put_rules(port: int, rules_src: str) -> None:
