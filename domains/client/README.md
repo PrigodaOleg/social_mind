@@ -93,5 +93,26 @@
 cd .\packages\repository\
 dart run build_runner build --delete-conflicting-outputs
 
+
 # Генерация локализации (из ui)
 flutter gen-l10n
+
+# Firebase RTDB правила доступа
+Правила хранятся в `lib/remote_storage/firebase_realtime_database_rules.json`.
+
+- Проверка обратной совместимости (запускается на каждый PR в CI, job
+  `firebase-rules-compat` в `.github/workflows/dart.yml`): новые правила не
+  должны запрещать операции, которые разрешали старые. Локально:
+  `make rules-compat-check` (нужны python3, java, firebase-tools).
+- Деплой правил в прод выполняется автоматически при push в `main`
+  (job `deploy-rules`), после успешной проверки совместимости.
+
+## Секреты
+Для деплоя правил нужен секрет `CLOSERS_FIREBASE_SERVICE_ACCOUNT_JSON` —
+содержимое JSON-ключа сервисного аккаунта Firebase с ролью
+`Firebase Rules Admin` (или `Editor`) для проекта. Его нужно добавить:
+- в GitHub: Settings → Secrets and variables → Actions →
+  `CLOSERS_FIREBASE_SERVICE_ACCOUNT_JSON` (попросите администратора репозитория);
+- локально: в `build.env` (или экспортировать в окружение) для ручного запуска
+  `python3 tool/deploy_firebase_rules.py --env-file build.env`.
+

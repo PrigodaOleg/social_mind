@@ -40,8 +40,12 @@ secrets: ## Скопировать google-services.json в android/app/ (есл�
 		echo "android/app/google-services.json уже существует"; \
 	fi
 
+
 test: ## Запустить тесты
 	flutter test
+
+rules-compat-check: ## Проверка обратной совместимости Firebase RTDB правил (эмулятор; old = origin/main)
+	python3 tool/check_rules_backward_compatibility.py --base origin/main
 
 build-linux: ## Сборка под Linux
 	flutter build linux
