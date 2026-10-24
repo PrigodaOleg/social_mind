@@ -114,28 +114,31 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
     firebase = os.environ.get('FIREBASE_TOOLS',
                               shutil.which('firebase') or 'firebase')
     
-    # Создаем копию текущего окружения и добавляем флаг CI
+    # Создаем копию текущего окружения и добавляем флаг CI, 
+    # чтобы Firebase CLI не задавал интерактивных вопросов в GitHub Actions
     my_env = os.environ.copy()
     my_env["CI"] = "true"
 
-    # Запускаем с PIPE для stderr, чтобы прочитать ошибку в случае падения
+    # Запускаем процесс, перенаправляя оба потока вывода в PIPE
     proc = subprocess.Popen(
         [firebase, 'emulators:start', '--only', 'database',
          '--project', 'rules-compat-test'],
         cwd=WORK_DIR, 
-        stdout=subprocess.DEVNULL, 
-        stderr=subprocess.PIPE, # Меняем DEVNULL на PIPE
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE,
         env=my_env,
-        text=True # Чтобы читать стрим как текст, а не байты
+        text=True
     )
         
     for _ in range(90):
+        # Проверяем, не завершился ли процесс Firebase с ошибкой
         if proc.poll() is not None:
-            # Читаем, что именно Firebase успел написать в поток ошибок
+            stdout_output = proc.stdout.read() if proc.stdout else "Нет данных в stdout"
             error_output = proc.stderr.read() if proc.stderr else "Нет данных в stderr"
             raise RuntimeError(
                 f"Firebase CLI упал с кодом {proc.returncode}.\n"
-                f"--- ЛОГ ОШИБКИ FIREBASE ---\n{error_output}\n---------------------------"
+                f"--- STDOUT FIREBASE ---\n{stdout_output}\n"
+                f"--- STDERR FIREBASE ---\n{error_output}\n---------------------------"
             )
 
         try:
@@ -151,7 +154,6 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
             
     proc.terminate()
     raise RuntimeError('RTDB emulator failed to start')
-
 
 
 def put_rules(port: int, rules_src: str) -> None:
