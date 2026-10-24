@@ -12,11 +12,30 @@ class FirebaseStorage extends RemoteStorage {
   late DatabaseReference database;
   late FirebaseApp app;
 
+  // Подключение к Firebase Local Emulator Suite вместо продакшена.
+  // Включается --dart-define=CLOSERS_FIREBASE_EMULATOR=true (для e2e-тестов
+  // и интерактивной отладки web-версии). Правила БД эмулятор берет из
+  // lib/remote_storage/firebase_realtime_database_rules.json.
+  static const useEmulator =
+      bool.fromEnvironment('CLOSERS_FIREBASE_EMULATOR');
+  static const emulatorHost =
+      String.fromEnvironment('CLOSERS_EMULATOR_HOST', defaultValue: 'localhost');
+  static const emulatorAuthPort =
+      int.fromEnvironment('CLOSERS_EMULATOR_AUTH_PORT', defaultValue: 9099);
+  static const emulatorDbPort =
+      int.fromEnvironment('CLOSERS_EMULATOR_DB_PORT', defaultValue: 9000);
+
   @override
   Future<bool> init(String instance) async {
     // Connect and get instance
     app = Firebase.app(instance);
-    database = FirebaseDatabase.instanceFor(app: app).ref();
+    final db = FirebaseDatabase.instanceFor(app: app);
+    if (useEmulator) {
+      db.useDatabaseEmulator(emulatorHost, emulatorDbPort);
+      await FirebaseAuth.instanceFor(app: app)
+          .useAuthEmulator(emulatorHost, emulatorAuthPort);
+    }
+    database = db.ref();
     return true;
   }
 
@@ -34,8 +53,14 @@ class FirebaseStorage extends RemoteStorage {
   @override
   Future<bool> auth(String login, String password) async {
     final auth = FirebaseAuth.instanceFor(app: app);
-    UserCredential userCredential = await auth.signInWithEmailAndPassword(email: '$login$emailSuffix', password: password);
-    return true;
+    try {
+      UserCredential userCredential = await auth.signInWithEmailAndPassword(email: '$login$emailSuffix', password: password);
+      return true;
+    } on Exception catch (e) {
+      // Неверный пароль/пользователь, пустой email и т.п. — логин не удался.
+      print('Auth for storage failed: $e');
+      return false;
+    }
   }
 
   @override

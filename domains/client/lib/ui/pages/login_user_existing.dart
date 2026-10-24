@@ -28,8 +28,8 @@ class LoginUserExistingPage extends StatelessWidget {
             ),
             onSubmitted: (value) async {
               userId = value;
-              if (userId?.isEmpty ?? false) {return;}
-              if (secret?.isEmpty ?? false) {return;}
+              if (userId?.isEmpty ?? true) {return;}
+              if (secret?.isEmpty ?? true) {return;}
               if (await repository.tryLogin(userId!, secret!)) {
                 User? tryingUser = await repository.getModelNow<User>(userId!);
                 if (tryingUser != null) {
@@ -52,8 +52,8 @@ class LoginUserExistingPage extends StatelessWidget {
             ),
             onSubmitted: (value) async {
               secret = value;
-              if (userId?.isEmpty ?? false) {return;}
-              if (secret?.isEmpty ?? false) {return;}
+              if (userId?.isEmpty ?? true) {return;}
+              if (secret?.isEmpty ?? true) {return;}
               if (await repository.tryLogin(userId!, secret!)) {
                 User? tryingUser = await repository.getModelNow<User>(userId!);
                 if (tryingUser != null) {
@@ -72,8 +72,8 @@ class LoginUserExistingPage extends StatelessWidget {
               const BackButton(),
               IconButton(
                 onPressed: () async {
-                  if (userId?.isEmpty ?? false) {return;}
-                  if (secret?.isEmpty ?? false) {return;}
+                  if (userId?.isEmpty ?? true) {return;}
+                  if (secret?.isEmpty ?? true) {return;}
                   if (await repository.tryLogin(userId!, secret!)) {
                     User? tryingUser = await repository.getModelNow<User>(userId!);
                     if (null != tryingUser) {

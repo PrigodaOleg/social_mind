@@ -10,6 +10,7 @@
 #    settings REST endpoint).
 # 4. Runs flutter test on chrome with RUN_EMULATOR_TESTS=true.
 set -euo pipefail
+export CHROME_EXECUTABLE=${CHROME_EXECUTABLE:-/usr/bin/chromium}
 cd "$(dirname "$0")/.."
 
 RULES_SRC=lib/remote_storage/firebase_realtime_database_rules.json
@@ -56,6 +57,10 @@ for i in $(seq 1 10); do
   sleep 2
 done
 
-flutter test --platform chrome test/integration/firebase_emulator_test.dart \
+# Тесты для запуска: аргумент скрипта (файл или папка) или все эмуляторные тесты.
+TEST_TARGET="${1:-test/integration test/e2e}"
+
+flutter test --platform chrome $TEST_TARGET \
+  ${2:+--plain-name "$2"} \
   --dart-define=RUN_EMULATOR_TESTS=true --timeout 120s
 
