@@ -117,7 +117,13 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
         [firebase, 'emulators:start', '--only', 'database',
          '--project', 'rules-compat-test'],
         cwd=WORK_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
     for _ in range(90):
+        # 1. Проверяем, не упал ли процесс Firebase в фоне
+        if proc.poll() is not None:
+            raise RuntimeError(f"Firebase CLI неожиданно завершил работу с кодом {proc.returncode}. Возможно, занят порт или кривой JSON.")
+
+        # 2. Пытаемся достучаться до эмулятора
         try:
             urllib.request.urlopen(
                 f'http://127.0.0.1:{port}/.json?ns=rules-compat-test',
@@ -128,6 +134,7 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
             return proc
         except Exception:
             time.sleep(1)
+
     proc.terminate()
     raise RuntimeError('RTDB emulator failed to start')
 
