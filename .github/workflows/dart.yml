@@ -50,6 +50,21 @@ jobs:
       - name: Check RTDB rules backward compatibility
         working-directory: ./domains/client
         run: |
+          proc = subprocess.Popen(
+              [firebase, 'emulators:start', '--only', 'database',
+               '--project', 'rules-compat-test'],
+              cwd=WORK_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              
+          for _ in range(90):
+              # Если процесс Firebase завершился с ошибкой (код не None и не 0)
+          if proc.poll() is not None:
+              raise RuntimeError(f"Firebase CLI неожиданно завершил работу с кодом {proc.returncode}. Возможно, отсутствует Java или занят порт.")
+  
+          try:
+              urllib.request.urlopen(
+                  f'http://127.0.0.1:{port}/.json?ns=rules-compat-test',
+                  timeout=2)
+              return proc
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             python3 tool/check_rules_backward_compatibility.py --base "origin/${{ github.base_ref }}"
           else
