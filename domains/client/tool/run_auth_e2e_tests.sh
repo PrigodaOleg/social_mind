@@ -190,10 +190,21 @@ boot_android_emulator() {
   done
 
   # Create the AVD on first run.
+  # ВАЖНО: avdmanager и emulator ищут AVD в разных местах, если не согласовать
+  # ANDROID_AVD_HOME (реальный случай, GHA-раннер, PR #53): avdmanager кладёт
+  # .ini в $HOME/.android/avd одного окружения, emulator не находит его —
+  # 'Unknown AVD name'. Явно задаём общий путь.
+  export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
+  mkdir -p "$ANDROID_AVD_HOME"
   if ! "$avdmanager" list avd 2>/dev/null | grep -q "Name: $AVD_NAME"; then
     echo "== Creating AVD $AVD_NAME ($ANDROID_SYSTEM_IMAGE, $ANDROID_DEVICE_PROFILE) =="
     echo no | "$avdmanager" create avd -n "$AVD_NAME" \
       -k "$ANDROID_SYSTEM_IMAGE" -d "$ANDROID_DEVICE_PROFILE" --force
+  fi
+  if [ ! -f "$ANDROID_AVD_HOME/$AVD_NAME.ini" ]; then
+    echo "ERROR: AVD $AVD_NAME was not created at $ANDROID_AVD_HOME" >&2
+    ls -la "$ANDROID_AVD_HOME" >&2 || true
+    exit 1
   fi
 
   # Headless by default when there is no display (CI); --headed/--headless
