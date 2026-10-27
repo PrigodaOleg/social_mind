@@ -46,10 +46,14 @@ IOS_DEVICE="${IOS_DEVICE:-iPhone 16}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --interactive) MODE="interactive" ;;
-    --debug) DEBUG=1 ;;
-    --platform) shift; PLATFORM="$1" ;;
-    --device) shift; IOS_DEVICE="$1" ;;
+    --interactive) MODE="interactive"; shift ;;
+    --debug) DEBUG=1; shift ;;
+    --platform)
+      [ $# -ge 2 ] || { echo "ERROR: --platform requires a value" >&2; exit 1; }
+      PLATFORM="$2"; shift 2 ;;
+    --device)
+      [ $# -ge 2 ] || { echo "ERROR: --device requires a value" >&2; exit 1; }
+      IOS_DEVICE="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,45p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -177,9 +181,10 @@ run_ios_tests() {
   boot_ios_device "$udid"
   [ "$DEBUG" -eq 1 ] && extra+=(--verbose)
   # The first build for the simulator may take 10-15 minutes (pod install).
+  # ${extra[@]+...} keeps this safe with `set -u` on bash 3.2 (macOS).
   flutter test integration_test/auth_e2e_test.dart -d "$udid" \
     --dart-define=RUN_EMULATOR_TESTS=true \
-    --timeout 180s "${extra[@]}"
+    --timeout 180s ${extra[@]+"${extra[@]}"}
   shutdown_ios_device "$udid"
 }
 
@@ -212,9 +217,10 @@ run_ios_interactive() {
 run_web_tests() {
   local extra=()
   [ "$DEBUG" -eq 1 ] && extra+=(--verbose)
+  # ${extra[@]+...} keeps this safe with `set -u` on bash 3.2 (macOS).
   flutter test --platform chrome test/e2e/auth_e2e_test.dart \
     --dart-define=RUN_EMULATOR_TESTS=true \
-    --timeout 180s "${extra[@]}"
+    --timeout 180s ${extra[@]+"${extra[@]}"}
 }
 
 run_web_interactive() {
