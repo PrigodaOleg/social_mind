@@ -121,14 +121,17 @@ done
 # Prints the UDID.
 resolve_ios_device() {
   local name="$1" udid=""
+  # Extract the UDID (a 36-char UUID) from the device line, e.g.:
+  #     iPhone 16 (XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX) (Shutdown)
+  local extract_udid='grep -Eo "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" | head -n 1 || true'
   udid=$(xcrun simctl list devices available | awk -v name="$name" '
     $0 ~ "-- iOS" {inios=1}
-    inios && index($0, name) && /Booted|Shutdown/ {print $NF; exit}')
+    inios && index($0, name) && /Booted|Shutdown/' | eval "$extract_udid")
   if [ -z "$udid" ]; then
     # Fall back to the first available iPhone in the iOS section.
     udid=$(xcrun simctl list devices available | awk '
       $0 ~ "-- iOS" {inios=1}
-      inios && /iPhone/ && /Booted|Shutdown/ {print $NF; exit}')
+      inios && /iPhone/ && /Booted|Shutdown/' | eval "$extract_udid")
   fi
   if [ -z "$udid" ]; then
     echo "ERROR: no iOS simulator found (requested: '$name')" >&2
