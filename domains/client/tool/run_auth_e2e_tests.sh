@@ -212,7 +212,17 @@ boot_android_emulator() {
   EMULATOR_PID=$!
 
   # Wait for the device to appear and finish booting.
-  "$adb" wait-for-device
+  # ВАЖНО: wait-for-device без таймаута висит вечно, если эмулятор не
+  # стартует (реальный случай: GHA-раннер, PR #53) — джоба убивается
+  # timeout-minutes через 45 минут без какого-либо диагноза. Ограничиваем
+  # сами и показываем лог эмулятора.
+  echo "== Waiting for device (up to ${BOOT_TIMEOUT}s) =="
+  "$emulator" -accel-check >&2 || true
+  if ! timeout "${BOOT_TIMEOUT}" "$adb" wait-for-device; then
+    echo "ERROR: android emulator did not come online within ${BOOT_TIMEOUT}s" >&2
+    tail -40 /tmp/closers_e2e_emulator.log >&2
+    exit 1
+  fi
   local i
   for i in $(seq 1 "$BOOT_TIMEOUT"); do
     if [ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
