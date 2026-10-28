@@ -1,7 +1,8 @@
 
 // End-to-end auth tests against the Firebase Local Emulator Suite
 // (Auth + Realtime Database) with the PRODUCTION security rules applied —
-// the ANDROID EMULATOR variant of test/e2e/auth_e2e_test.dart.
+// the NATIVE-platform variant (iOS simulator / android emulator) of
+// test/e2e/auth_e2e_test.dart.
 //
 // The tests exercise the same flows the UI login page drives
 // (lib/ui/pages/login.dart):
@@ -11,13 +12,15 @@
 //   - repeated login/logout cycles
 //   - negative scenarios (wrong secret, empty secret, unknown user)
 //
-// They run on a booted Android emulator:
-//   tool/run_auth_e2e_tests.sh --platform android
-//   (== firebase emulators + android emulator + flutter test -d emulator)
+// They run on a booted device:
+//   tool/run_auth_e2e_tests.sh --platform android   (android emulator)
+//   tool/run_auth_e2e_tests.sh --platform ios       (iOS simulator, macOS)
 //
 // The test body is platform-agnostic (it talks to the emulator over TCP);
-// the only Android-specific bits are the native Firebase plugin registration
-// (implicit on Android) and the host loopback alias 10.0.2.2.
+// the only platform-specific bits are the native Firebase plugin registration
+// (implicit on both platforms) and the host loopback alias 10.0.2.2 on the
+// android emulator ("localhost" from the iOS simulator is the host).
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -35,8 +38,9 @@ const authPort = 9099;
 const dbPort = 9000;
 
 // 10.0.2.2 is the Android-emulator alias for the host loopback, where the
-// Firebase emulators listen.
-const emulatorHost = '10.0.2.2';
+// Firebase emulators listen; from the iOS simulator "localhost" is the
+// host.
+final String emulatorHost = Platform.isAndroid ? '10.0.2.2' : 'localhost';
 
 // The default instance name used by User.settings
 // ('remote_storages.FirebaseRealtimeDatabase.instance') — Repository.tryLogin
@@ -133,9 +137,16 @@ class TestRepository extends Repository {
 Future<FirebaseApp> _initApp(String name) async {
   return Firebase.initializeApp(
     name: name,
-    options: const FirebaseOptions(
-      apiKey: 'test-api-key',
-      appId: '1:1:android:1',
+    // НЕ const: Platform.isIOS — runtime-значение (выбор appId под платформу).
+    options: FirebaseOptions(
+      // ВАЖНО: iOS FIRApp валидирует опции нативно (NSException -> crash
+      // приложения): apiKey обязан начинаться с 'AIza', appId — корректный
+      // формат '1:sender:ios:hash'. Андроид-вариант ('1:1:android:1' и
+      // 'test-api-key') мягче и работает как есть.
+      apiKey: 'AIzaSyD-9tJkeQsLFVi_9NvNleKzLb42i9SBnPo',
+      appId: Platform.isIOS
+          ? '1:1234567890123:ios:abcdef0123456789abcdef'
+          : '1:1:android:1',
       messagingSenderId: '1',
       projectId: project,
       databaseURL: 'http://$emulatorHost:$dbPort/?ns=$project',
@@ -147,12 +158,11 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
-  if (!const bool.fromEnvironment('RUN_EMULATOR_TESTS')) {
-    throw Skip('Requires Firebase emulator: '
-        'tool/run_auth_e2e_tests.sh --platform android '
-        '(flutter test integration_test/auth_e2e_test.dart -d <emulator> '
-        '--dart-define=RUN_EMULATOR_TESTS=true)');
-  }
+  // ВАЖНО: без условного guard'а на RUN_EMULATOR_TESTS. На iOS dart-define
+  // не доходит до хост-компиляции теста (только в билд приложения), и
+  // ранний return из main() оставляет хост-харнессу ноль тестов —
+  // 'No tests were found' (exit 79), хотя на устройстве все 8 проходят.
+  // Регистрируем тесты безусловно: тела выполняются на устройстве.
 
   late FirebaseApp app;
   late fb_auth.FirebaseAuth auth;
@@ -212,7 +222,7 @@ void main() {
   }
 
   group('auth e2e (new / existing / blank user)', () {
-    test('new user: create, login, logout, login again', () async {
+    testWidgets('new user: create, login, logout, login again', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'newbie_e2e');
       user.secret = 'top-secret-${DateTime.now().millisecondsSinceEpoch}';
@@ -229,7 +239,7 @@ void main() {
       expect(restored!.name, 'newbie_e2e');
     });
 
-    test('existing user: login with correct secret', () async {
+    testWidgets('existing user: login with correct secret', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'existing_e2e');
       user.secret = 'existing-secret';
@@ -245,7 +255,7 @@ void main() {
       expect(restored!.name, 'existing_e2e');
     });
 
-    test('blank user: creates account with empty name', () async {
+    testWidgets('blank user: creates account with empty name', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       // The "Blank user" flow on LoginPage.
       final blankUser = User(name: '');
@@ -260,7 +270,7 @@ void main() {
       );
     });
 
-    test('repeated login/logout cycles (5x)', () async {
+    testWidgets('repeated login/logout cycles (5x)', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'cycle_e2e');
       user.secret = 'cycle-secret';
@@ -280,7 +290,7 @@ void main() {
       }
     });
 
-    test('negative: wrong secret is rejected', () async {
+    testWidgets('negative: wrong secret is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'negative_e2e');
       user.secret = 'right-secret';
@@ -295,7 +305,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: empty secret is rejected', () async {
+    testWidgets('negative: empty secret is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'empty_secret_e2e');
       user.secret = 'non-empty';
@@ -310,7 +320,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: unknown user id is rejected', () async {
+    testWidgets('negative: unknown user id is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       await repository.init();
 
@@ -323,7 +333,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: correct secret for wrong user is rejected', () async {
+    testWidgets('negative: correct secret for wrong user is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'pair_e2e');
       user.secret = 'pair-secret';

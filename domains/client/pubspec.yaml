@@ -76,7 +76,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # E2E-тесты на устройствах/эмуляторах (flutter test integration_test -d <device>)
+  # E2E-тесты на нативных платформах (iOS simulator / android emulator):
+  #   flutter test integration_test -d <device>
   integration_test:
     sdk: flutter
 
