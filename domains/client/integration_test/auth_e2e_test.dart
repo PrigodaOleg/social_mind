@@ -152,12 +152,11 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
-  if (!const bool.fromEnvironment('RUN_EMULATOR_TESTS')) {
-    throw Skip('Requires Firebase emulator: '
-        'tool/run_auth_e2e_tests.sh --platform android '
-        '(flutter test integration_test/auth_e2e_test.dart -d <emulator> '
-        '--dart-define=RUN_EMULATOR_TESTS=true)');
-  }
+  // ВАЖНО: без условного guard'а на RUN_EMULATOR_TESTS. На iOS dart-define
+  // не доходит до хост-компиляции теста (только в билд приложения), и
+  // ранний return из main() оставляет хост-харнессу ноль тестов —
+  // 'No tests were found' (exit 79), хотя на устройстве все 8 проходят.
+  // Регистрируем тесты безусловно: тела выполняются на устройстве.
 
   late FirebaseApp app;
   late fb_auth.FirebaseAuth auth;
