@@ -137,7 +137,8 @@ class TestRepository extends Repository {
 Future<FirebaseApp> _initApp(String name) async {
   return Firebase.initializeApp(
     name: name,
-    options: const FirebaseOptions(
+    // НЕ const: Platform.isIOS — runtime-значение (выбор appId под платформу).
+    options: FirebaseOptions(
       apiKey: 'test-api-key',
       appId: Platform.isIOS ? '1:1:ios:1' : '1:1:android:1',
       messagingSenderId: '1',
