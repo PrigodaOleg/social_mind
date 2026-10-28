@@ -285,6 +285,9 @@ jobs:
   #   make test-auth-e2e-ios-interactive(интерактивный запуск приложения на симуляторе)
   e2e-ios-simulator:
     runs-on: macos-latest
+    # macOS-раннер: первый pod install может идти долго, но подвисший джобе
+    # путь без лимита (кейс PR #54) крутится часами — ограничиваем жёстко.
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4

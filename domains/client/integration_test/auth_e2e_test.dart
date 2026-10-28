@@ -23,6 +23,16 @@
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+import 'package:closers/local_storage/local_storage.dart';
+import 'package:closers/remote_storage/remote_storage.dart';
+import 'package:closers/repository/models/models.dart';
+import 'package:closers/repository/repository/repository.dart';
+
 const project = 'closers-test';
 const authPort = 9099;
 const dbPort = 9000;
