@@ -14,7 +14,7 @@ SSH_OPTS := -i $(IMAC_KEY) -o StrictHostKeyChecking=accept-new
 # Преобразуем KEY=VALUE из build.env в аргументы --dart-define
 DART_DEFINES := $(shell [ -f "$(BUILD_ENV_FILE)" ] && sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$$/--dart-define \1=\2/' $(BUILD_ENV_FILE))
 
-.PHONY: help deps secrets analyze format test test-auth-e2e test-auth-e2e-debug test-auth-e2e-interactive build-linux build-web build-apk ios-sync ios-build ios all clean
+.PHONY: help deps secrets analyze format test test-auth-e2e test-auth-e2e-debug test-auth-e2e-interactive test-auth-e2e-android test-auth-e2e-android-debug test-auth-e2e-android-interactive build-linux build-web build-apk ios-sync ios-build ios all clean
 
 help: ## Показать список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -52,6 +52,15 @@ test-auth-e2e-debug: ## E2E-тесты авторизации в режиме о
 
 test-auth-e2e-interactive: ## Интерактивный запуск web-версии против эмулятора (ручное тестирование)
 	tool/run_auth_e2e_tests.sh --interactive
+
+test-auth-e2e-android: ## E2E-тесты авторизации на android-эмуляторе (headless)
+	tool/run_auth_e2e_tests.sh --platform android
+
+test-auth-e2e-android-debug: ## E2E-тесты на android-эмуляторе в режиме отладки (verbose)
+	tool/run_auth_e2e_tests.sh --platform android --debug
+
+test-auth-e2e-android-interactive: ## Интерактивный запуск на android-эмуляторе (ручное тестирование)
+	tool/run_auth_e2e_tests.sh --platform android --interactive
 
 rules-compat-check: ## Проверка обратной совместимости Firebase RTDB правил (эмулятор; old = origin/main)
 	python3 tool/check_rules_backward_compatibility.py --base origin/main
