@@ -139,8 +139,14 @@ Future<FirebaseApp> _initApp(String name) async {
     name: name,
     // НЕ const: Platform.isIOS — runtime-значение (выбор appId под платформу).
     options: FirebaseOptions(
-      apiKey: 'test-api-key',
-      appId: Platform.isIOS ? '1:1:ios:1' : '1:1:android:1',
+      // ВАЖНО: iOS FIRApp валидирует опции нативно (NSException -> crash
+      // приложения): apiKey обязан начинаться с 'AIza', appId — корректный
+      // формат '1:sender:ios:hash'. Андроид-вариант ('1:1:android:1' и
+      // 'test-api-key') мягче и работает как есть.
+      apiKey: 'AIzaSyD-9tJkeQsLFVi_9NvNleKzLb42i9SBnPo',
+      appId: Platform.isIOS
+          ? '1:1234567890123:ios:abcdef0123456789abcdef'
+          : '1:1:android:1',
       messagingSenderId: '1',
       projectId: project,
       databaseURL: 'http://$emulatorHost:$dbPort/?ns=$project',

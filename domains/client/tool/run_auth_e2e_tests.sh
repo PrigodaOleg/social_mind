@@ -247,6 +247,14 @@ run_ios_tests() {
   udid=$(resolve_ios_device "$IOS_DEVICE")
   boot_ios_device "$udid"
   [ "$DEBUG" -eq 1 ] && extra+=(--verbose)
+  # Полный лог приложения: нативные крэши (NSException от FIRApp/FIRDatabase)
+  # не проходят через фильтр flutter-tools (sender ENDSWITH Flutter), поэтому
+  # пишем ВСЁ от процесса Runner и печатаем хвост при падении.
+  local app_log=.dart_tool/ios_app_log.txt
+  : > "$app_log"
+  xcrun simctl spawn "$udid" log stream --style compact \
+    --predicate 'processImagePath ENDSWITH "Runner"' >> "$app_log" 2>&1 &
+  local log_pid=$!
   # The first build for the simulator may take 10-15 minutes (pod install).
   # ${extra[@]+...} keeps this safe with `set -u` on bash 3.2 (macOS).
   #
@@ -254,13 +262,21 @@ run_ios_tests() {
   # завершается с "No tests were found" (exit 79), не дождавшись результатов
   # устройства, хотя все сценарии на симуляторе проходят. flutter drive +
   # integration_test_driver_extended — документированный CI-путь для iOS.
+  local rc=0
   flutter drive \
     --driver=test_driver/integration_test.dart \
     --target=integration_test/auth_e2e_test.dart \
     -d "$udid" \
     --debug \
-    --dart-define=RUN_EMULATOR_TESTS=true ${extra[@]+"${extra[@]}"}
+    --dart-define=RUN_EMULATOR_TESTS=true ${extra[@]+"${extra[@]}"} || rc=$?
+  sleep 2
+  kill "$log_pid" 2>/dev/null || true
+  if [ "$rc" -ne 0 ]; then
+    echo "== iOS app log (tail 120; причины нативного крэша — здесь) =="
+    tail -120 "$app_log" || true
+  fi
   shutdown_ios_device "$udid"
+  return "$rc"
 }
 
 run_ios_interactive() {
