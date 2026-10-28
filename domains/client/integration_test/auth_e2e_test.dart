@@ -217,7 +217,7 @@ void main() {
   }
 
   group('auth e2e (new / existing / blank user)', () {
-    test('new user: create, login, logout, login again', () async {
+    testWidgets('new user: create, login, logout, login again', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'newbie_e2e');
       user.secret = 'top-secret-${DateTime.now().millisecondsSinceEpoch}';
@@ -234,7 +234,7 @@ void main() {
       expect(restored!.name, 'newbie_e2e');
     });
 
-    test('existing user: login with correct secret', () async {
+    testWidgets('existing user: login with correct secret', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'existing_e2e');
       user.secret = 'existing-secret';
@@ -250,7 +250,7 @@ void main() {
       expect(restored!.name, 'existing_e2e');
     });
 
-    test('blank user: creates account with empty name', () async {
+    testWidgets('blank user: creates account with empty name', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       // The "Blank user" flow on LoginPage.
       final blankUser = User(name: '');
@@ -265,7 +265,7 @@ void main() {
       );
     });
 
-    test('repeated login/logout cycles (5x)', () async {
+    testWidgets('repeated login/logout cycles (5x)', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'cycle_e2e');
       user.secret = 'cycle-secret';
@@ -285,7 +285,7 @@ void main() {
       }
     });
 
-    test('negative: wrong secret is rejected', () async {
+    testWidgets('negative: wrong secret is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'negative_e2e');
       user.secret = 'right-secret';
@@ -300,7 +300,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: empty secret is rejected', () async {
+    testWidgets('negative: empty secret is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'empty_secret_e2e');
       user.secret = 'non-empty';
@@ -315,7 +315,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: unknown user id is rejected', () async {
+    testWidgets('negative: unknown user id is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       await repository.init();
 
@@ -328,7 +328,7 @@ void main() {
       expect(auth.currentUser, isNull);
     });
 
-    test('negative: correct secret for wrong user is rejected', () async {
+    testWidgets('negative: correct secret for wrong user is rejected', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       final user = User(name: 'pair_e2e');
       user.secret = 'pair-secret';
