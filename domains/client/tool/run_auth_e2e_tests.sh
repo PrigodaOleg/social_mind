@@ -60,16 +60,16 @@ IOS_DEVICE="${IOS_DEVICE:-iPhone 16}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --interactive) MODE="interactive" ;;
-    --debug) DEBUG=1 ;;
     --platform)
       [ $# -ge 2 ] || { echo "ERROR: --platform requires a value" >&2; exit 1; }
       PLATFORM="$2"; shift 2 ;;
     --device)
       [ $# -ge 2 ] || { echo "ERROR: --device requires a value" >&2; exit 1; }
       IOS_DEVICE="$2"; shift 2 ;;
-    --headless) HEADLESS="--headless" ;;
-    --headed) HEADLESS="--headed" ;;
+    --interactive) MODE="interactive"; shift ;;
+    --debug) DEBUG=1; shift ;;
+    --headless) HEADLESS="--headless"; shift ;;
+    --headed) HEADLESS="--headed"; shift ;;
     -h|--help)
       sed -n '2,45p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
