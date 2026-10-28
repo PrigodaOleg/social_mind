@@ -249,9 +249,17 @@ run_ios_tests() {
   [ "$DEBUG" -eq 1 ] && extra+=(--verbose)
   # The first build for the simulator may take 10-15 minutes (pod install).
   # ${extra[@]+...} keeps this safe with `set -u` on bash 3.2 (macOS).
-  flutter test integration_test/auth_e2e_test.dart -d "$udid" \
-    --dart-define=RUN_EMULATOR_TESTS=true \
-    --timeout 180s ${extra[@]+"${extra[@]}"}
+  #
+  # flutter drive, а не `flutter test -d`: на iOS host-харнесс `flutter test`
+  # завершается с "No tests were found" (exit 79), не дождавшись результатов
+  # устройства, хотя все сценарии на симуляторе проходят. flutter drive +
+  # integration_test_driver_extended — документированный CI-путь для iOS.
+  flutter drive \
+    --driver=test_driver/integration_test.dart \
+    --target=integration_test/auth_e2e_test.dart \
+    -d "$udid" \
+    --debug \
+    --dart-define=RUN_EMULATOR_TESTS=true ${extra[@]+"${extra[@]}"}
   shutdown_ios_device "$udid"
 }
 
