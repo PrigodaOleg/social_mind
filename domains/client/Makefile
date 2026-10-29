@@ -14,10 +14,17 @@ SSH_OPTS := -i $(IMAC_KEY) -o StrictHostKeyChecking=accept-new
 # Преобразуем KEY=VALUE из build.env в аргументы --dart-define
 DART_DEFINES := $(shell [ -f "$(BUILD_ENV_FILE)" ] && sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$$/--dart-define \1=\2/' $(BUILD_ENV_FILE))
 
-.PHONY:all analyze build-apk build-linux build-web clean deps format help ios ios-build ios-sync secrets test test-auth-e2e test-auth-e2e-android test-auth-e2e-android-debug test-auth-e2e-android-interactive test-auth-e2e-debug test-auth-e2e-interactive test-auth-e2e-ios test-auth-e2e-ios-debug test-auth-e2e-ios-interactive
+.PHONY:all analyze build-apk build-linux build-web clean deps format help ios ios-build ios-sync secrets setup-host test test-auth-e2e test-auth-e2e-android test-auth-e2e-android-debug test-auth-e2e-android-interactive test-auth-e2e-debug test-auth-e2e-interactive test-auth-e2e-ios test-auth-e2e-ios-debug test-auth-e2e-ios-interactive
 
 help: ## Показать список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+setup-host: ## Установить хостовый тулинг (Flutter, Android SDK, Firebase CLI и т.д.)
+ifeq ($(OS),Windows_NT)
+	tool/setup_host.bat
+else
+	tool/setup_host.sh
+endif
 
 deps: ## Установить зависимости (flutter pub get)
 	flutter pub get
