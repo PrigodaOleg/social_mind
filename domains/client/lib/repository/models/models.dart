@@ -10,6 +10,7 @@ import 'package:hashlib/hashlib.dart';
 part 'user.dart';
 part 'domain.dart';
 part 'task.dart';
+part 'contact_list.dart';
 part 'registry.dart';
 // part 'models.g.dart';
 
