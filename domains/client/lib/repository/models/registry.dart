@@ -24,18 +24,27 @@ part of 'models.dart';
 
 @HiveType(typeId: 7)
 class Transaction extends Equatable {
-  Transaction(String? id, this.prevHash, this.prevId, this.timeStamp, this.originatorId, this.changeDetails,
-      this.changeType, this.changes, this.path)
+  Transaction(
+      String? id,
+      this.prevHash,
+      this.prevId,
+      this.timeStamp,
+      this.originatorId,
+      this.changeDetails,
+      this.changeType,
+      this.changes,
+      this.path)
       : id = id ?? const Uuid().v4();
 
-  Transaction.zero(this.originatorId, this.changeDetails, this.changeType, this.changes, this.path)
+  Transaction.zero(this.originatorId, this.changeDetails, this.changeType,
+      this.changes, this.path)
       : id = const Uuid().v4(),
         prevHash = '',
         prevId = '',
         timeStamp = DateTime.now();
 
-  Transaction.fromPrev(
-      Transaction prev, this.originatorId, this.changeDetails, this.changeType, this.changes, this.path)
+  Transaction.fromPrev(Transaction prev, this.originatorId, this.changeDetails,
+      this.changeType, this.changes, this.path)
       : id = const Uuid().v4(),
         prevHash = prev.tHash(),
         prevId = prev.id,
@@ -61,7 +70,8 @@ class Transaction extends Equatable {
   List<String>
       changes; // Инеднификаторы изменившихся моделей, может тут нужна MAP с сериализованными изменениями в значениях полей
   @HiveField(8)
-  String path; // адрес в дереве моделей (домен-...), или цепочка вложенности/наследования
+  String
+      path; // адрес в дереве моделей (домен-...), или цепочка вложенности/наследования
 
   Map<String, Object> toJson() => {
         'id': id,
@@ -89,16 +99,28 @@ class Transaction extends Equatable {
         path = json['path'] as String;
 
   @override
-  List<Object?> get props => [prevHash, prevId, timeStamp, originatorId, changeDetails, changeType, changes, path];
+  List<Object?> get props => [
+        prevHash,
+        prevId,
+        timeStamp,
+        originatorId,
+        changeDetails,
+        changeType,
+        changes,
+        path
+      ];
 
   String tHash() {
     return sha256.string(jsonEncode(toJson())).hex();
   }
 
-  Transaction next(String originatorId, String changeDetails, String changeType, List<String> changes, String path) =>
-      Transaction.next(this, originatorId, changeDetails, changeType, changes, path);
+  Transaction next(String originatorId, String changeDetails, String changeType,
+          List<String> changes, String path) =>
+      Transaction.next(
+          this, originatorId, changeDetails, changeType, changes, path);
 
-  Transaction.next(Transaction? prev, this.originatorId, this.changeDetails, this.changeType, this.changes, this.path)
+  Transaction.next(Transaction? prev, this.originatorId, this.changeDetails,
+      this.changeType, this.changes, this.path)
       : id = const Uuid().v4(),
         prevHash = prev?.tHash() ?? '',
         prevId = prev?.id ?? '',
@@ -162,12 +184,16 @@ class RegistryMetadata extends Equatable {
 class Registry extends Equatable {
   Registry({String? id, String? parentId, Map<int, Transaction>? transactions})
       : assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
-        metadata = RegistryMetadata(id: id ?? const Uuid().v4(), parentId: parentId ?? ''),
+        metadata = RegistryMetadata(
+            id: id ?? const Uuid().v4(), parentId: parentId ?? ''),
         transactions = transactions ?? {};
 
-  Registry.fromMaps({required Map<String, dynamic> metadata, required Map<int, Map<String, dynamic>> transactions})
+  Registry.fromMaps(
+      {required Map<String, dynamic> metadata,
+      required Map<int, Map<String, dynamic>> transactions})
       : metadata = RegistryMetadata.fromJson(metadata),
-        transactions = transactions.map((key, value) => MapEntry(key, Transaction.fromJson(value)));
+        transactions = transactions
+            .map((key, value) => MapEntry(key, Transaction.fromJson(value)));
 
   /// Registry metadata.
   /// Cannot be null.
@@ -192,19 +218,25 @@ class Registry extends Equatable {
 
   Map<String, Object> toJson() => {
         'metadata': metadata.toJson(),
-        'transactions': transactions.map((key, value) => MapEntry(key.toString(), value.toJson())),
+        'transactions': transactions
+            .map((key, value) => MapEntry(key.toString(), value.toJson())),
       };
 
   Registry.fromJson(Map<String, dynamic> json)
       : metadata = RegistryMetadata.fromJson(json['metadata']),
-        transactions =
-            (json['transactions'] as Map).map((key, value) => MapEntry(int.parse(key as String), Transaction.fromJson(Map<String, dynamic>.from(value as Map))));
+        transactions = (json['transactions'] as Map).map((key, value) =>
+            MapEntry(int.parse(key as String),
+                Transaction.fromJson(Map<String, dynamic>.from(value as Map))));
 
-  Registry copyWith({String? id, String? parentId, Map<int, Transaction>? transactions}) {
+  Registry copyWith(
+      {String? id, String? parentId, Map<int, Transaction>? transactions}) {
     return Registry(
         id: id ?? this.id,
         parentId: parentId ?? this.parentId,
-        transactions: transactions ?? this.transactions.map((key, value) => MapEntry(key, value.copyWith())));
+        transactions: transactions ??
+            this
+                .transactions
+                .map((key, value) => MapEntry(key, value.copyWith())));
   }
 
   @override
@@ -223,10 +255,13 @@ class Registry extends Equatable {
     return transaction;
   }
 
-  void removeLastTransaction() => transactions.remove(transactions.keys.lastOrNull);
+  void removeLastTransaction() =>
+      transactions.remove(transactions.keys.lastOrNull);
 
   Registry onlyLastTransaction() {
-    if (transactions.isNotEmpty) return copyWith(transactions: Map.fromEntries([transactions.entries.last]));
+    if (transactions.isNotEmpty)
+      return copyWith(
+          transactions: Map.fromEntries([transactions.entries.last]));
     return this;
   }
 }
