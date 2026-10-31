@@ -9,8 +9,10 @@ import 'package:hashlib/hashlib.dart';
 
 part 'user.dart';
 part 'domain.dart';
-part 'task.dart';
+part 'task_list_model.dart';
 part 'registry.dart';
+part 'task.dart';
+
 // part 'models.g.dart';
 
 @HiveType(typeId: 3)
@@ -20,7 +22,7 @@ enum Location {
   @HiveField(1)
   remote,
   @HiveField(2)
-  both
+  both,
 }
 
 Location locationFromString(String? location) {
@@ -29,17 +31,25 @@ Location locationFromString(String? location) {
   return Location.local;
 }
 
+enum TaskListViewMode { creation, activeOnly, activeFirst, dueTime }
+
 enum SyncStatus { synced, syncing, no }
+
+TaskListViewMode taskListViewModeFromString(String? value) =>
+    TaskListViewMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => TaskListViewMode.creation,
+    );
 
 // ignore: must_be_immutable
 sealed class Model extends Equatable {
-  Model(
-      {String? id,
-      this.title = '',
-      this.description = '',
-      Map<String, String>? children,
-      Map<String, String>? parents})
-      : assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
+  Model({
+    String? id,
+    this.title = '',
+    this.description = '',
+    Map<String, String>? children,
+    Map<String, String>? parents,
+  })  : assert(id == null || id.isNotEmpty, 'id must be null or not empty'),
         id = id ?? const Uuid().v4(),
         location = Location.local,
         children = children ?? <String, String>{},
@@ -94,7 +104,7 @@ sealed class Model extends Equatable {
         "type": type,
         "location": location.toString(),
         "children": children,
-        "parents": parents
+        "parents": parents,
       };
 
   void link({Model? to, Model? from}) {
@@ -139,8 +149,14 @@ sealed class Model extends Equatable {
   }
 
   @override
-  List<Object> get props =>
-      [id, title, description, location, children, parents];
+  List<Object> get props => [
+        id,
+        title,
+        description,
+        location,
+        children,
+        parents,
+      ];
 }
 
 extension JsonHelper on Map<String, dynamic> {

@@ -1,6 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:closers/repository/models/models.dart';
-import 'package:closers/repository/navigation/navigation_stack.dart';
 import '../local_storage.dart';
 // import 'package:path_provider/path_provider.dart';
 
@@ -75,8 +76,13 @@ class HiveStorage extends LocalStorage {
   }
 
   @override
+  Uint8List? getImage(String id) {
+    final value = _commonBox.get(id);
+    return value is Uint8List ? value : null;
+  }
+
+  @override
   dynamic getItem({required String id}) {
-    // Get item by ID
     return _commonBox.get(id);
   }
 
@@ -104,8 +110,8 @@ class HiveStorage extends LocalStorage {
   Future<void> deleteItem(String id) async {
     await _commonBox.delete(id);
   }
-  
+
   // Future<Map<String, dynamic>> readRegistry(String id, {int take = 5}) async {
-    
+
   // }
 }

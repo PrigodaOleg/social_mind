@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:closers/repository/repository.dart';
 import '../ui.dart';
 
-
 class DomainContentPage extends StatelessWidget {
   const DomainContentPage(this.repository, {super.key, this.id});
 
@@ -10,14 +9,40 @@ class DomainContentPage extends StatelessWidget {
   final Repository repository;
   final String? id;
 
+  Future<void> _createTaskList(BuildContext context, Domain domain) async {
+    final controller = TextEditingController();
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('New task list'),
+        content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Name')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Create')),
+        ],
+      ),
+    );
+    if (created != true || controller.text.trim().isEmpty) return;
+    final list = TaskList(title: controller.text.trim());
+    await domain.linkTo(list);
+    if (context.mounted)
+      Navigator.of(context).pushNamed('${TaskListPage.routeName}/${list.id}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final n = Navigator.of(context);
     if (id == null) {
       return TextButton(
-        onPressed: () => n.pushNamed(DomainListPage.routeName),
-        child: const Text('Domains')
-      );
+          onPressed: () => n.pushNamed(DomainListPage.routeName),
+          child: const Text('Domains'));
     }
 
     Domain? domain = repository.getModel<Domain>(id!);
@@ -25,9 +50,8 @@ class DomainContentPage extends StatelessWidget {
     // а его нет в репозитории
     if (domain == null) {
       return TextButton(
-        onPressed: () => n.pushNamed(HomePage.routeName),
-        child: const Text('Home')
-      );
+          onPressed: () => n.pushNamed(HomePage.routeName),
+          child: const Text('Home'));
     }
 
     return Scaffold(
@@ -40,7 +64,8 @@ class DomainContentPage extends StatelessWidget {
           ListTile(
             title: const Text('Tasks lists'),
             onTap: () {
-              Navigator.of(context).pushNamed('${TaskListPage.routeName}/${domain.id}');
+              Navigator.of(context)
+                  .pushNamed('${TaskListPage.routeName}/${domain.id}');
             },
             leading: const Icon(Icons.task_alt),
           ),
@@ -52,11 +77,9 @@ class DomainContentPage extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                onPressed: () {
-                  // Тут почему-то не обновляется список на UI, надо переделать на BLOC
-                  domain.linkTo(Task(originatorId: repository.me.id));
-                },
-                icon: const Icon(Icons.add_task)
+                tooltip: 'Add task list',
+                onPressed: () => _createTaskList(context, domain),
+                icon: const Icon(Icons.playlist_add),
               )
             ],
           )

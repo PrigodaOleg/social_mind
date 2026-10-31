@@ -1,38 +1,37 @@
 part of 'models.dart';
 
-
 @HiveType(typeId: 2)
 // ignore: must_be_immutable
 class Domain extends Model {
-  Domain({
-    super.title,
-    super.id,
-    super.description,
-    this.isPersonal = false,
-    required this.originatorId,
-    registryId,
-    List<String>? participantsIds,
-    List<String>? observersIds,
-    Map<String, String>? models
-  }) :
-    participantsIds = participantsIds ?? <String>[],
-    observersIds = observersIds ?? <String>[],
-    registryId = registryId ?? '',
-    models = models ?? <String, String>{};
-  
-  Domain.fromJson(super.json) :
-    isPersonal = (json['isPersonal'] ?? json['isCompleted'] ?? false) as bool,
-    originatorId = (json['originatorId'] ?? '') as String,
-    registryId = (json['registryId'] ?? '') as String,
-    participantsIds = List<String>.from(json['participantsIds'] ?? []),
-    observersIds = List<String>.from(json['observersIds'] ?? []),
-    models = Map<String, String>.from(json['models'] ?? {}),
-    super.fromJson();
-    
+  Domain(
+      {super.title,
+      super.id,
+      super.description,
+      this.isPersonal = false,
+      required this.originatorId,
+      registryId,
+      List<String>? participantsIds,
+      List<String>? observersIds,
+      Map<String, String>? models})
+      : participantsIds = participantsIds ?? <String>[],
+        observersIds = observersIds ?? <String>[],
+        registryId = registryId ?? '',
+        models = models ?? <String, String>{};
+
+  Domain.fromJson(super.json)
+      : isPersonal =
+            (json['isPersonal'] ?? json['isCompleted'] ?? false) as bool,
+        originatorId = (json['originatorId'] ?? '') as String,
+        registryId = (json['registryId'] ?? '') as String,
+        participantsIds = List<String>.from(json['participantsIds'] ?? []),
+        observersIds = List<String>.from(json['observersIds'] ?? []),
+        models = Map<String, String>.from(json['models'] ?? {}),
+        super.fromJson();
+
   @override
   // ignore: overridden_fields
   final String type = "Domain";
-  
+
   @HiveField(6)
   final bool isPersonal;
 
@@ -51,17 +50,16 @@ class Domain extends Model {
   @HiveField(10)
   Map<String, String> models;
 
-  Domain copyWith({
-    String? id,
-    String? title,
-    String? description,
-    bool? isPersonal,
-    String? originatorId,
-    String? registryId,
-    List<String>? participantsIds,
-    List<String>? observersIds,
-    Map<String, String>? models
-  }) {
+  Domain copyWith(
+      {String? id,
+      String? title,
+      String? description,
+      bool? isPersonal,
+      String? originatorId,
+      String? registryId,
+      List<String>? participantsIds,
+      List<String>? observersIds,
+      Map<String, String>? models}) {
     return Domain(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -76,14 +74,15 @@ class Domain extends Model {
   }
 
   @override
-  Map<String, dynamic> toJson() => super.toJson()..addAll({
-    "isPersonal": isPersonal,
-    "originatorId": originatorId,
-    "registryId": registryId,
-    "participantsIds": participantsIds,
-    "observersIds": observersIds,
-    "models": models,
-  });
+  Map<String, dynamic> toJson() => super.toJson()
+    ..addAll({
+      "isPersonal": isPersonal,
+      "originatorId": originatorId,
+      "registryId": registryId,
+      "participantsIds": participantsIds,
+      "observersIds": observersIds,
+      "models": models,
+    });
 
   // @override
   // void link(Model to) {
@@ -100,5 +99,14 @@ class Domain extends Model {
   // }
 
   @override
-  List<Object> get props => super.props + [isPersonal, originatorId, registryId, participantsIds, observersIds, models];
+  List<Object> get props =>
+      super.props +
+      [
+        isPersonal,
+        originatorId,
+        registryId,
+        participantsIds,
+        observersIds,
+        models
+      ];
 }

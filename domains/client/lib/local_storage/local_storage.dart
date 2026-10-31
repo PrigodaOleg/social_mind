@@ -7,7 +7,6 @@ import 'dart:typed_data';
 
 import 'package:closers/repository/models/models.dart';
 
-
 abstract class LocalStorage {
   LocalStorage();
 
@@ -15,6 +14,7 @@ abstract class LocalStorage {
     'Domain': (json) => Domain.fromJson(json),
     'User': (json) => User.fromJson(json),
     'Task': (json) => Task.fromJson(json),
+    'TaskList': (json) => TaskList.fromJson(json),
   };
 
   Future<void> init() async {}

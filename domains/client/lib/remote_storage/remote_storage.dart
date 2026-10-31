@@ -4,7 +4,6 @@ import 'package:closers/repository/models/models.dart';
 
 export 'firebase_realtime_database.dart';
 
-
 class RemoteStorageWriteCollision implements Exception {
   final String message;
   final int statusCode;
@@ -15,20 +14,28 @@ class RemoteStorageWriteCollision implements Exception {
   String toString() => 'RemoteStorageWriteCollision ($statusCode): $message';
 }
 
-abstract class RemoteStorage {  // todo: abstract?
+abstract class RemoteStorage {
+  // todo: abstract?
   RemoteStorage();
 
   final models = <String, Function(Map<String, dynamic>)>{
     'Domain': (json) => Domain.fromJson(json),
     'User': (json) => User.fromJson(json),
     'Task': (json) => Task.fromJson(json),
+    'TaskList': (json) => TaskList.fromJson(json),
   };
 
-  Future<bool> init(String instance) async {return false;}
+  Future<bool> init(String instance) async {
+    return false;
+  }
 
-  Future<bool> createUserAndAuth(String login, String password) async {return false;}
+  Future<bool> createUserAndAuth(String login, String password) async {
+    return false;
+  }
 
-  Future<bool> auth(String login, String password) async {return false;}
+  Future<bool> auth(String login, String password) async {
+    return false;
+  }
 
   Future<dynamic> getItem({required String id}) async {}
 
@@ -37,7 +44,7 @@ abstract class RemoteStorage {  // todo: abstract?
     Map<String, Model> items = {};
     return items;
   }
-  
+
   Future<int> saveItems(Map<String, dynamic> items) async {
     return 0;
   }
@@ -51,7 +58,7 @@ abstract class RemoteStorage {  // todo: abstract?
   Future<Map<String, Registry>> readRegistries({
     List<String>? ids,
     List<(String id, int? count)>? idsCounts,
-    int count = 1
+    int count = 1,
   }) async {
     return {};
   }
