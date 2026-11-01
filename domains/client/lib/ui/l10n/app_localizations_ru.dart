@@ -15,10 +15,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get homePageName => 'Доска';
 
   @override
-  String get taskListPageName => 'Дела';
+  String get userProfilePageName => 'Профиль пользователя';
 
   @override
-  String get userProfilePageName => 'Профиль пользователя';
+  String get taskListPageName => 'Дела';
 
   @override
   String get domainListPageName => 'Близкие';
@@ -48,11 +48,54 @@ class AppLocalizationsRu extends AppLocalizations {
   String get loginBlankUserButtonText => 'Пустой пользователь';
 
   @override
-  String get unknownPageText => 'Запрошеная страница не существует';
+  String get unknownPageText => 'Запрошенная страница не существует';
 
   @override
   String get unknownPageTitle => 'Неизвестная страница';
 
   @override
   String get contactListPageName => 'Контакты';
+
+  @override
+  String get taskListViewAll => 'Все задачи';
+
+  @override
+  String get taskListViewActiveOnly => 'Активные задачи';
+
+  @override
+  String get taskListViewActiveFirst => 'Сначала активные';
+
+  @override
+  String get taskListViewDueTime => 'По сроку';
+
+  @override
+  String get changeTaskListViewMode => 'Изменить вид';
+
+  @override
+  String get editTaskListSettings => 'Настройки списка задач';
+
+  @override
+  String get newTaskList => 'Новый список задач';
+
+  @override
+  String get taskListName => 'Название';
+
+  @override
+  String get cancel => 'Отмена';
+
+  @override
+  String get create => 'Создать';
+
+  @override
+  String get save => 'Сохранить';
+
+  @override
+  String get addTaskList => 'Добавить список задач';
+
+  @override
+  String get tasksListsTitle => 'Списки задач';
+
+  @override
+  String get userProjectionDescription =>
+      'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.';
 }
