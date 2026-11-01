@@ -127,10 +127,27 @@ jobs:
           flutter build web --release --base-href /social_mind/ \
           --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
           --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
-          --dart-define CLOSERS_ANDROID_API_KEY=${{ secrets.CLOSERS_ANDROID_API_KEY }} \
-          --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }} \
+          --dart-define CLOSERS_WEB_API_KEY=${{ secrets.CLOSERS_WEB_API_KEY }} \
+          --dart-define CLOSERS_WEB_APP_ID=${{ secrets.CLOSERS_WEB_APP_ID }} \
+          --dart-define CLOSERS_WEB_MEASUREMENT_ID=${{ secrets.CLOSERS_WEB_MEASUREMENT_ID }} \
           --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
         working-directory: ./domains/client
+
+      # Проверяем, что web-конфиг Firebase реально попал в бандл:
+      # пустые CLOSERS_WEB_* секреты дают неработающее приложение
+      # с пустым экраном (ошибка инициализации Firebase проглатывается).
+      - name: Verify Firebase config in web bundle
+        run: |
+          if ! grep -q "AIzaSy" ./domains/client/build/web/main.dart.js; then
+            echo "::error::CLOSERS_WEB_API_KEY not found in web bundle - check CLOSERS_WEB_* secrets"
+            exit 1
+          fi
+
+      # GitHub Pages не делает SPA-fallback: обновление страницы на вложенном
+      # маршруте (/social_mind/login и т.п.) вернуло бы 404. Копия index.html
+      # в 404.html служит стандартным SPA-fallback'ом.
+      - name: SPA fallback (404.html)
+        run: cp ./domains/client/build/web/index.html ./domains/client/build/web/404.html
 
       - name: 'Upload APK'
         uses: 'actions/upload-artifact@v4'
