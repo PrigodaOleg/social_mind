@@ -10,7 +10,6 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     on<TaskDeleteRequested>(_onDelete);
     on<TaskCompletionRequested>(_onComplete);
     on<TaskSubmitionRequested>(_onSubmit);
-    on<TaskChangingRequested>(_onChange);
     on<TaskListViewModeChanged>(_onModeChanged);
     on<TaskListTitleChanged>(_onTitleChanged);
     _subscriberId = repository.addSyncListener(_onRemoteChange, (_, __) {});
@@ -22,38 +21,18 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
   String get selfUserId => repository.myId ?? '';
 
   void _onRemoteChange(String id, dynamic value) {
-    if (value is TaskList || value is Task)
+    if (value is TaskList || value is Task) {
       add(const TaskListStateInitRequested());
+    }
   }
-
-  bool _legacyParent = false;
-  Model? _legacyModel;
 
   Future<void> _onInit(
       TaskListStateInitRequested event, Emitter<TaskListState> emit) async {
-    final parent = repository.getModel<Model>(parentId, _subscriberId);
-    if (parent == null) return;
-    final list = parent is TaskList
-        ? parent
-        : TaskList(
-            id: parent.id,
-            title: parent.title,
-            description: parent.description,
-            parents: Map.from(parent.parents),
-            children: Map.from(parent.children),
-            tasks: {
-              for (final taskId in parent.ids<Task>()) taskId: 'Task',
-            },
-          );
-    _legacyParent = parent is! TaskList;
-    _legacyModel = parent;
+    final list = repository.getModel<TaskList>(parentId, _subscriberId);
+    if (list == null) return;
     final tasks = repository.getModels<Task>(list.taskIds, _subscriberId);
     final ordered = list.order(tasks.values);
     final taskMap = <String, Task>{for (final task in ordered) task.id: task};
-    if (_legacyParent) {
-      final placeholder = Task(originatorId: selfUserId);
-      taskMap[placeholder.id] = placeholder;
-    }
     emit(TaskListState(list: list, tasks: taskMap));
   }
 
@@ -65,9 +44,6 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     list.addTask(task);
     await repository.saveModels([list, task], _subscriberId);
     final updated = Map<String, Task>.from(state.tasks)..[task.id] = task;
-    if (_legacyParent && _legacyModel != null) {
-      _legacyModel!.linkTo(task, _subscriberId);
-    }
     emit(state.copyWith(list: list, tasks: updated));
   }
 
@@ -99,25 +75,9 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     final list = state.list;
     if (list == null || event.submittedText.trim().isEmpty) return;
     final task = event.task.copyWith(title: event.submittedText);
-    list.addTask(task);
-    if (_legacyParent && _legacyModel != null) {
-      _legacyModel!.linkTo(task, _subscriberId);
-    } else {
-      await repository.saveModel(list, _subscriberId);
-    }
     await repository.saveModel(task, _subscriberId);
     final updated = Map<String, Task>.from(state.tasks)..[task.id] = task;
-    if (_legacyParent) {
-      final placeholder = Task(originatorId: selfUserId);
-      updated[placeholder.id] = placeholder;
-    }
     emit(state.copyWith(list: list, tasks: updated));
-  }
-
-  void _onChange(TaskChangingRequested event, Emitter<TaskListState> emit) {
-    final updated = Map<String, Task>.from(state.tasks);
-    updated[event.task.id] = event.task.copyWith(title: event.changedText);
-    emit(state.copyWith(tasks: updated));
   }
 
   Future<void> _onModeChanged(
@@ -188,12 +148,6 @@ class TaskSubmitionRequested extends TaskEvent {
       {required this.task, required this.submittedText});
   final Task task;
   final String submittedText;
-}
-
-class TaskChangingRequested extends TaskEvent {
-  const TaskChangingRequested({required this.task, required this.changedText});
-  final Task task;
-  final String changedText;
 }
 
 class TaskListViewModeChanged extends TaskEvent {

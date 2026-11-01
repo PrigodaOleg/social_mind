@@ -158,10 +158,14 @@ void main() {
         'isCompleted': true,
         'originatorId': 'u1',
         'executorId': 'u2',
+        'createdAt': '2024-01-01T10:00:00.000',
+        'completedAt': '2024-01-02T10:00:00.000',
       });
       expect(task.isCompleted, true);
       expect(task.originatorId, 'u1');
       expect(task.executorId, 'u2');
+      expect(task.createdAt, DateTime.parse('2024-01-01T10:00:00.000'));
+      expect(task.completedAt, DateTime.parse('2024-01-02T10:00:00.000'));
     });
 
     test('fromJson handles missing fields', () {
@@ -169,6 +173,10 @@ void main() {
       expect(task.isCompleted, false);
       expect(task.originatorId, '');
       expect(task.executorId, '');
+      // unknown dates stay null instead of fake values
+      expect(task.createdAt, isNull);
+      expect(task.dueAt, isNull);
+      expect(task.completedAt, isNull);
     });
 
     test('toJson roundtrip', () {
@@ -773,6 +781,28 @@ void main() {
               .copyWith(viewMode: TaskListViewMode.dueTime)
               .order([done, active]).map((task) => task.id),
           ['active', 'done']);
+    });
+
+    test('tasks with unknown dates sort last', () {
+      final known = Task(
+          id: 'known',
+          title: 'k',
+          originatorId: 'u',
+          createdAt: DateTime(2024, 1, 1),
+          dueAt: DateTime(2024, 1, 2));
+      final unknown = Task(id: 'unknown', title: 'u', originatorId: 'u');
+      final list = TaskList(id: 'list-1', tasks: {
+        known.id: known.type,
+        unknown.id: unknown.type,
+      });
+
+      expect(list.order([unknown, known]).map((task) => task.id),
+          ['known', 'unknown']);
+      expect(
+          list
+              .copyWith(viewMode: TaskListViewMode.dueTime)
+              .order([unknown, known]).map((task) => task.id),
+          ['known', 'unknown']);
     });
 
     test('round trips settings and task membership', () {

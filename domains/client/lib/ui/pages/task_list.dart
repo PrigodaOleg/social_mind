@@ -3,19 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:closers/state/task_list/task_list.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:closers/ui/widgets/task_list_tile.dart';
+import '../l10n/app_localizations.dart';
 
 class TaskListPage extends StatelessWidget {
   static const routeName = '/tasklist';
+
   const TaskListPage(this.repository, {super.key, this.id});
   final Repository repository;
   final String? id;
 
   @override
-  Widget build(BuildContext context) => BlocProvider(
-        create: (_) => TaskListBloc(repository: repository, parentId: id ?? '')
-          ..add(const TaskListStateInitRequested()),
-        child: const TaskListView(),
-      );
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => TaskListBloc(repository: repository, parentId: id ?? '')
+        ..add(const TaskListStateInitRequested()),
+      child: const TaskListView(),
+    );
+  }
 }
 
 class TaskListView extends StatelessWidget {
@@ -23,35 +27,41 @@ class TaskListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final t = Theme.of(context);
     final bloc = context.read<TaskListBloc>();
     return BlocBuilder<TaskListBloc, TaskListState>(
       builder: (context, state) {
         final list = state.list;
+        final tasks = state.orderedTasks;
         return Scaffold(
           appBar: AppBar(
-            title: Text(
-                list?.title.isNotEmpty == true ? list!.title : 'Task list'),
+            backgroundColor: t.colorScheme.inversePrimary,
+            title: Text(list != null && list.title.isNotEmpty
+                ? list.title
+                : l.taskListPageName),
             actions: [
               PopupMenuButton<TaskListViewMode>(
-                tooltip: 'Change view',
+                tooltip: l.changeTaskListViewMode,
                 initialValue: list?.viewMode,
                 onSelected: (mode) => bloc.add(TaskListViewModeChanged(mode)),
-                itemBuilder: (_) => const [
+                itemBuilder: (_) => [
                   PopupMenuItem(
                       value: TaskListViewMode.creation,
-                      child: Text('All tasks')),
+                      child: Text(l.taskListViewAll)),
                   PopupMenuItem(
                       value: TaskListViewMode.activeOnly,
-                      child: Text('Active tasks')),
+                      child: Text(l.taskListViewActiveOnly)),
                   PopupMenuItem(
                       value: TaskListViewMode.activeFirst,
-                      child: Text('Active first')),
+                      child: Text(l.taskListViewActiveFirst)),
                   PopupMenuItem(
-                      value: TaskListViewMode.dueTime, child: Text('Due time')),
+                      value: TaskListViewMode.dueTime,
+                      child: Text(l.taskListViewDueTime)),
                 ],
               ),
               IconButton(
-                tooltip: 'Edit list settings',
+                tooltip: l.editTaskListSettings,
                 icon: const Icon(Icons.settings_outlined),
                 onPressed:
                     list == null ? null : () => _editSettings(context, list),
@@ -59,24 +69,23 @@ class TaskListView extends StatelessWidget {
             ],
           ),
           body: ListView.builder(
-            itemCount: state.orderedTasks.length,
+            itemCount: tasks.length,
             itemBuilder: (_, index) {
-              final task = state.orderedTasks[index];
+              final task = tasks[index];
               return Dismissible(
                 key: ValueKey(task.id),
                 onDismissed: (_) => bloc.add(TaskDeleteRequested(task)),
-                background:
-                    Container(color: Theme.of(context).colorScheme.error),
+                background: Container(color: t.colorScheme.error),
                 child: TaskListTile(
                   title: task.title,
                   value: task.isCompleted,
                   backgroundColor: index.isEven
-                      ? null
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  onValueChanged: (value) => bloc.add(TaskCompletionRequested(
-                      task: task, isComplited: value ?? false)),
-                  onTitleChanged: (value) => bloc.add(
-                      TaskChangingRequested(task: task, changedText: value)),
+                      ? t.colorScheme.surface
+                      : Color.lerp(
+                          t.colorScheme.surface, t.colorScheme.primary, 0.07),
+                  onValueChanged: (value) =>
+                      bloc.add(TaskCompletionRequested(
+                          task: task, isComplited: value)),
                   onTitleSubmitted: (value) => bloc.add(
                       TaskSubmitionRequested(task: task, submittedText: value)),
                 ),
@@ -84,7 +93,7 @@ class TaskListView extends StatelessWidget {
             },
           ),
           floatingActionButton: FloatingActionButton(
-            tooltip: 'Add task',
+            tooltip: l.addTaskHint,
             onPressed: () => bloc.add(const TaskAddRequested()),
             child: const Icon(Icons.add_task),
           ),
@@ -94,27 +103,27 @@ class TaskListView extends StatelessWidget {
   }
 
   Future<void> _editSettings(BuildContext context, TaskList list) async {
+    final l = AppLocalizations.of(context);
+    final bloc = context.read<TaskListBloc>();
     final controller = TextEditingController(text: list.title);
     await showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Task list settings'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.editTaskListSettings),
         content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Name')),
+            decoration: InputDecoration(labelText: l.taskListName)),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l.cancel)),
           FilledButton(
               onPressed: () {
-                context
-                    .read<TaskListBloc>()
-                    .add(TaskListTitleChanged(controller.text));
-                Navigator.pop(context);
+                bloc.add(TaskListTitleChanged(controller.text));
+                Navigator.pop(dialogContext);
               },
-              child: const Text('Save')),
+              child: Text(l.save)),
         ],
       ),
     );

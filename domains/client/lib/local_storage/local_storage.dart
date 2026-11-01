@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:closers/repository/models/models.dart';
 
+
 abstract class LocalStorage {
   LocalStorage();
 

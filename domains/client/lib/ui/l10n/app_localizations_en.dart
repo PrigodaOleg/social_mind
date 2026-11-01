@@ -15,10 +15,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageName => 'Home';
 
   @override
-  String get taskListPageName => 'Tasks';
+  String get userProfilePageName => 'Profile';
 
   @override
-  String get userProfilePageName => 'Profile';
+  String get taskListPageName => 'Tasks';
 
   @override
   String get domainListPageName => 'Closee groups';
@@ -55,4 +55,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactListPageName => 'Contacts';
+
+  @override
+  String get taskListViewAll => 'All tasks';
+
+  @override
+  String get taskListViewActiveOnly => 'Active tasks';
+
+  @override
+  String get taskListViewActiveFirst => 'Active first';
+
+  @override
+  String get taskListViewDueTime => 'Due time';
+
+  @override
+  String get changeTaskListViewMode => 'Change view';
+
+  @override
+  String get editTaskListSettings => 'Edit list settings';
+
+  @override
+  String get newTaskList => 'New task list';
+
+  @override
+  String get taskListName => 'Name';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get addTaskList => 'Add task list';
+
+  @override
+  String get tasksListsTitle => 'Task lists';
+
+  @override
+  String get userProjectionDescription =>
+      'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.';
 }

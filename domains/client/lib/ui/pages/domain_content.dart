@@ -10,34 +10,37 @@ class DomainContentPage extends StatelessWidget {
   final String? id;
 
   Future<void> _createTaskList(BuildContext context, Domain domain) async {
+    final l = AppLocalizations.of(context);
     final controller = TextEditingController();
     final created = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('New task list'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.newTaskList),
         content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Name')),
+            decoration: InputDecoration(labelText: l.taskListName)),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l.cancel)),
           FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Create')),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l.create)),
         ],
       ),
     );
     if (created != true || controller.text.trim().isEmpty) return;
     final list = TaskList(title: controller.text.trim());
     await domain.linkTo(list);
-    if (context.mounted)
+    if (context.mounted) {
       Navigator.of(context).pushNamed('${TaskListPage.routeName}/${list.id}');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final n = Navigator.of(context);
     if (id == null) {
       return TextButton(
@@ -62,22 +65,22 @@ class DomainContentPage extends StatelessWidget {
         children: [
           Text(domain.id),
           ListTile(
-            title: const Text('Tasks lists'),
-            onTap: () {
-              Navigator.of(context)
-                  .pushNamed('${TaskListPage.routeName}/${domain.id}');
-            },
-            leading: const Icon(Icons.task_alt),
+            title: Text(l.tasksListsTitle),
+            leading: const Icon(Icons.playlist_play),
           ),
-          for (final MapEntry<String, String> task in domain.children.entries)
-            ListTile(
-              title: Text(task.key),
-              leading: const Icon(Icons.task),
-            ),
+          for (final MapEntry<String, String> child in domain.children.entries)
+            if (child.value == 'TaskList')
+              ListTile(
+                title: Text(repository.getModel<TaskList>(child.key)?.title ??
+                    child.key),
+                leading: const Icon(Icons.task_alt),
+                onTap: () =>
+                    n.pushNamed('${TaskListPage.routeName}/${child.key}'),
+              ),
           Row(
             children: [
               IconButton(
-                tooltip: 'Add task list',
+                tooltip: l.addTaskList,
                 onPressed: () => _createTaskList(context, domain),
                 icon: const Icon(Icons.playlist_add),
               )

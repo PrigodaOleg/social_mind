@@ -62,7 +62,8 @@ import 'app_localizations_ru.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,7 +84,8 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
     delegate,
     GlobalMaterialLocalizations.delegate,
     GlobalCupertinoLocalizations.delegate,
@@ -107,17 +110,17 @@ abstract class AppLocalizations {
   /// **'Доска'**
   String get homePageName;
 
+  /// No description provided for @userProfilePageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Профиль пользователя'**
+  String get userProfilePageName;
+
   /// No description provided for @taskListPageName.
   ///
   /// In ru, this message translates to:
   /// **'Дела'**
   String get taskListPageName;
-
-  /// No description provided for @userProfilePageName.
-  ///
-  /// In ru, this message translates to:
-  /// **'Профиль'**
-  String get userProfilePageName;
 
   /// No description provided for @domainListPageName.
   ///
@@ -176,7 +179,7 @@ abstract class AppLocalizations {
   /// No description provided for @unknownPageText.
   ///
   /// In ru, this message translates to:
-  /// **'Запрошеная страница не существует'**
+  /// **'Запрошенная страница не существует'**
   String get unknownPageText;
 
   /// No description provided for @unknownPageTitle.
@@ -190,9 +193,94 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Контакты'**
   String get contactListPageName;
+
+  /// No description provided for @taskListViewAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все задачи'**
+  String get taskListViewAll;
+
+  /// No description provided for @taskListViewActiveOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'Активные задачи'**
+  String get taskListViewActiveOnly;
+
+  /// No description provided for @taskListViewActiveFirst.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сначала активные'**
+  String get taskListViewActiveFirst;
+
+  /// No description provided for @taskListViewDueTime.
+  ///
+  /// In ru, this message translates to:
+  /// **'По сроку'**
+  String get taskListViewDueTime;
+
+  /// No description provided for @changeTaskListViewMode.
+  ///
+  /// In ru, this message translates to:
+  /// **'Изменить вид'**
+  String get changeTaskListViewMode;
+
+  /// No description provided for @editTaskListSettings.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки списка задач'**
+  String get editTaskListSettings;
+
+  /// No description provided for @newTaskList.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новый список задач'**
+  String get newTaskList;
+
+  /// No description provided for @taskListName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Название'**
+  String get taskListName;
+
+  /// No description provided for @cancel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отмена'**
+  String get cancel;
+
+  /// No description provided for @create.
+  ///
+  /// In ru, this message translates to:
+  /// **'Создать'**
+  String get create;
+
+  /// No description provided for @save.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сохранить'**
+  String get save;
+
+  /// No description provided for @addTaskList.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить список задач'**
+  String get addTaskList;
+
+  /// No description provided for @tasksListsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Списки задач'**
+  String get tasksListsTitle;
+
+  /// No description provided for @userProjectionDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.'**
+  String get userProjectionDescription;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -201,25 +289,25 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'ru'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['en', 'ru'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en': return AppLocalizationsEn();
-    case 'ru': return AppLocalizationsRu();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'ru':
+      return AppLocalizationsRu();
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
-  );
+      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

@@ -14,5 +14,18 @@
     "loginBlankUserButtonText": "Blank user",
     "unknownPageText": "The requested page does not exist",
     "unknownPageTitle": "Unknown page",
-    "contactListPageName": "Contacts"
+    "contactListPageName": "Contacts",
+    "taskListViewAll": "All tasks",
+    "taskListViewActiveOnly": "Active tasks",
+    "taskListViewActiveFirst": "Active first",
+    "taskListViewDueTime": "Due time",
+    "changeTaskListViewMode": "Change view",
+    "editTaskListSettings": "Edit list settings",
+    "newTaskList": "New task list",
+    "taskListName": "Name",
+    "cancel": "Cancel",
+    "create": "Create",
+    "save": "Save",
+    "addTaskList": "Add task list",
+    "tasksListsTitle": "Task lists"
 }

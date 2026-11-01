@@ -1,6 +1,15 @@
 part of 'models.dart';
 
+enum TaskListViewMode { creation, activeOnly, activeFirst, dueTime }
+
+TaskListViewMode taskListViewModeFromString(String? value) =>
+    TaskListViewMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => TaskListViewMode.creation,
+    );
+
 @HiveType(typeId: 9)
+// ignore: must_be_immutable
 class TaskList extends Model {
   TaskList({
     super.id,
@@ -20,6 +29,7 @@ class TaskList extends Model {
   @override
   final String type = 'TaskList';
 
+  /// Идентификатор модели-задачи: тип модели-задачи (всегда 'Task').
   @HiveField(6)
   Map<String, String> tasks;
 
@@ -38,15 +48,23 @@ class TaskList extends Model {
     task.parents.remove(id);
   }
 
+  // Задачи с неизвестной датой считаются "старше" всех остальных
+  // и оказываются в конце списка.
+  int _compareDates(DateTime? a, DateTime? b) {
+    if (a == null && b == null) return 0;
+    if (a == null) return 1;
+    if (b == null) return -1;
+    return a.compareTo(b);
+  }
+
   List<Task> order(Iterable<Task> values) {
     final result = values.where((task) => tasks.containsKey(task.id)).toList();
-    final maxDate = DateTime.fromMillisecondsSinceEpoch(8640000000000000);
     switch (viewMode) {
       case TaskListViewMode.creation:
-        result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        result.sort((a, b) => _compareDates(a.createdAt, b.createdAt));
       case TaskListViewMode.activeOnly:
         result.removeWhere((task) => task.isCompleted);
-        result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        result.sort((a, b) => _compareDates(a.createdAt, b.createdAt));
       case TaskListViewMode.activeFirst:
         result.sort((a, b) {
           final group = (a.isCompleted ? 1 : 0).compareTo(
@@ -57,12 +75,10 @@ class TaskList extends Model {
               a.isCompleted ? (a.completedAt ?? a.createdAt) : a.createdAt;
           final bTime =
               b.isCompleted ? (b.completedAt ?? b.createdAt) : b.createdAt;
-          return aTime.compareTo(bTime);
+          return _compareDates(aTime, bTime);
         });
       case TaskListViewMode.dueTime:
-        result.sort(
-          (a, b) => (a.dueAt ?? maxDate).compareTo(b.dueAt ?? maxDate),
-        );
+        result.sort((a, b) => _compareDates(a.dueAt, b.dueAt));
     }
     return result;
   }

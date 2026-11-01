@@ -83,6 +83,7 @@ class HiveStorage extends LocalStorage {
 
   @override
   dynamic getItem({required String id}) {
+    // Get item by ID
     return _commonBox.get(id);
   }
 
