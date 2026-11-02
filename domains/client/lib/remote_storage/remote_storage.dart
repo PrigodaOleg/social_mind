@@ -23,6 +23,7 @@ abstract class RemoteStorage {  // todo: abstract?
     'User': (json) => User.fromJson(json),
     'Task': (json) => Task.fromJson(json),
     'ContactList': (json) => ContactList.fromJson(json),
+    'Contact': (json) => Contact.fromJson(json),
   };
 
   Future<bool> init(String instance) async {return false;}

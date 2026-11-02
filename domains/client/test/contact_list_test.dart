@@ -205,5 +205,210 @@ void main() {
         expect(restored.contactList, ['c-1']);
       });
     });
+
+    group('link/unlink', () {
+      test('link with Contact adds its id to contactList', () {
+        final list = ContactList(originatorId: 'user-1');
+        final contact = Contact(userId: 'user-2', name: 'Bob');
+
+        list.link(to: contact);
+
+        expect(list.contactList, [contact.id]);
+        expect(list.children, isEmpty);
+      });
+
+      test('link with non-Contact model does not change contactList', () {
+        final list = ContactList(originatorId: 'user-1');
+        final other = ContactList(id: 'other', originatorId: 'user-2');
+
+        list.link(to: other);
+
+        expect(list.contactList, isEmpty);
+        expect(list.children, {'other': 'ContactList'});
+      });
+
+      test('linkFrom with Contact adds its id to contactList', () {
+        final list = ContactList(originatorId: 'user-1');
+        final contact = Contact(userId: 'user-2', name: 'Bob');
+
+        list.link(from: contact);
+
+        expect(list.contactList, [contact.id]);
+        expect(list.children, isEmpty);
+      });
+
+      test('link with Contact does not add it to contactList children', () {
+        final list = ContactList(originatorId: 'user-1');
+        final contact = Contact(userId: 'user-2', name: 'Bob');
+
+        list.link(to: contact);
+        contact.link(from: list);
+
+        // Contacts are tracked only via contactList,
+        // so they never appear in children of the ContactList.
+        expect(list.children, isEmpty);
+        expect(list.contactList, contains(contact.id));
+      });
+
+      test('unlink with Contact removes its id from contactList', () {
+        final contact = Contact(userId: 'user-2', name: 'Bob');
+        final list = ContactList(
+          originatorId: 'user-1',
+          contactList: [contact.id],
+        );
+
+        list.unlink(to: contact);
+
+        expect(list.contactList, isEmpty);
+        expect(list.children, isEmpty);
+      });
+
+      test('unlink removes id from contactList but keeps other entries', () {
+        final contact = Contact(userId: 'user-2', name: 'Bob');
+        final list = ContactList(
+          originatorId: 'user-1',
+          contactList: ['c-0', contact.id],
+        );
+
+        list.unlink(to: contact);
+
+        expect(list.contactList, ['c-0']);
+      });
+
+      test('unlink with non-Contact model does not change contactList', () {
+        final other = ContactList(id: 'other', originatorId: 'user-2');
+        final list = ContactList(
+          originatorId: 'user-1',
+          contactList: ['c-1'],
+        );
+
+        list.unlink(to: other);
+
+        expect(list.contactList, ['c-1']);
+      });
+    });
+  });
+
+  group('Contact', () {
+    group('construction', () {
+      test('with userId only has correct defaults', () {
+        final contact = Contact(userId: 'user-2');
+
+        expect(contact.userId, 'user-2');
+        expect(contact.name, '');
+        expect(contact.id, isNotEmpty);
+        expect(contact.type, 'Contact');
+        expect(contact.sync, SyncStatus.no);
+        expect(contact.location, Location.local);
+      });
+
+      test('preserves explicitly passed values', () {
+        final contact = Contact(
+          id: 'contact-1',
+          title: 'Bob',
+          userId: 'user-2',
+          name: 'Bob',
+        );
+
+        expect(contact.id, 'contact-1');
+        expect(contact.title, 'Bob');
+        expect(contact.userId, 'user-2');
+        expect(contact.name, 'Bob');
+      });
+    });
+
+    group('serialization', () {
+      test('toJson/fromJson round-trip keeps all fields', () {
+        final contact = Contact(
+          id: 'contact-1',
+          title: 'Bob',
+          userId: 'user-2',
+          name: 'Bob',
+        );
+
+        final restored = Contact.fromJson(contact.toJson());
+
+        expect(restored.id, contact.id);
+        expect(restored.title, contact.title);
+        expect(restored.description, contact.description);
+        expect(restored.type, contact.type);
+        expect(restored.userId, contact.userId);
+        expect(restored.name, contact.name);
+        expect(restored.location, contact.location);
+      });
+
+      test('fromJson tolerates missing keys', () {
+        final restored = Contact.fromJson({'id': 'contact-1'});
+
+        expect(restored.id, 'contact-1');
+        expect(restored.userId, '');
+        expect(restored.name, '');
+      });
+    });
+
+    group('equality', () {
+      test('models with same fields are equal', () {
+        final a = Contact(id: 'contact-1', userId: 'user-2', name: 'Bob');
+        final b = Contact(id: 'contact-1', userId: 'user-2', name: 'Bob');
+
+        expect(a, equals(b));
+        expect(a.hashCode, b.hashCode);
+      });
+
+      test('different name makes models unequal', () {
+        final a = Contact(id: 'contact-1', userId: 'user-2', name: 'Bob');
+        final b = Contact(id: 'contact-1', userId: 'user-2', name: 'Alice');
+
+        expect(a, isNot(equals(b)));
+      });
+    });
+
+    group('copyWith', () {
+      test('overrides provided fields and keeps the rest', () {
+        final original = Contact(
+          id: 'contact-1',
+          userId: 'user-2',
+          name: 'Bob',
+        );
+
+        final updated = original.copyWith(name: 'Robert');
+
+        expect(updated.name, 'Robert');
+        expect(updated.id, 'contact-1');
+        expect(updated.userId, 'user-2');
+      });
+    });
+
+    group('deserializer registration', () {
+      test('LocalStorage models map restores Contact', () {
+        final factory = _DummyLocalStorage().models['Contact'];
+
+        expect(factory, isNotNull);
+        final restored = factory!({
+          'id': 'contact-1',
+          'userId': 'user-2',
+          'name': 'Bob',
+        });
+
+        expect(restored, isA<Contact>());
+        expect((restored as Contact).userId, 'user-2');
+        expect(restored.name, 'Bob');
+      });
+
+      test('RemoteStorage models map restores Contact', () {
+        final factory = _DummyRemoteStorage().models['Contact'];
+
+        expect(factory, isNotNull);
+        final restored = factory!({
+          'id': 'contact-1',
+          'userId': 'user-2',
+          'name': 'Bob',
+        });
+
+        expect(restored, isA<Contact>());
+        expect((restored as Contact).userId, 'user-2');
+        expect(restored.name, 'Bob');
+      });
+    });
   });
 }

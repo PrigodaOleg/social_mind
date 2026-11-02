@@ -52,4 +52,38 @@ class ContactList extends Model {
 
   @override
   List<Object> get props => super.props + [originatorId, contactList];
+
+  @override
+  void link({Model? to, Model? from}) {
+    switch (to) {
+      case Contact():
+        // Contacts are tracked only in [contactList], not in children.
+        contactList.add(to.id);
+      default:
+        super.link(to: to);
+    }
+    switch (from) {
+      case Contact():
+        // Contacts are tracked only in [contactList], not in parents.
+        contactList.add(from.id);
+      default:
+        super.link(from: from);
+    }
+  }
+
+  @override
+  void unlink({Model? to, Model? from}) {
+    switch (to) {
+      case Contact():
+        contactList.remove(to.id);
+      default:
+        super.unlink(to: to);
+    }
+    switch (from) {
+      case Contact():
+        contactList.remove(from.id);
+      default:
+        super.unlink(from: from);
+    }
+  }
 }

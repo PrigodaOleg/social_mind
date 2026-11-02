@@ -11,6 +11,7 @@ part 'user.dart';
 part 'domain.dart';
 part 'task.dart';
 part 'contact_list.dart';
+part 'contact.dart';
 part 'registry.dart';
 // part 'models.g.dart';
 
