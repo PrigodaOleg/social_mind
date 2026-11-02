@@ -41,7 +41,6 @@ dependencies:
   firebase_core: ^4.9.0
 
   # local_storage
-  hive_flutter: ^1.1.0
   isar_plus: ^1.2.6
   path_provider: ^2.1.6
 
@@ -89,7 +88,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # local_storage
-  # hive_generator: ^2.0.1
   # isar_generator: ^3.1.0
   isar_plus_flutter_libs: ^1.2.6 # Includes native binaries
 

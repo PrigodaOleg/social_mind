@@ -1,7 +1,4 @@
 part of 'models.dart';
-
-
-@HiveType(typeId: 0)
 // ignore: must_be_immutable
 class Task extends Model {
   Task({
@@ -32,13 +29,8 @@ class Task extends Model {
   /// Whether the `todo` is completed.
   ///
   /// Defaults to `false`.
-  @HiveField(6)
   final bool isCompleted;
-
-  @HiveField(7)
   final String originatorId;
-
-  @HiveField(8)
   final String executorId;
 
   /// Когда задача была создана, или `null`, если дата неизвестна.
