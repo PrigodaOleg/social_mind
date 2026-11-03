@@ -113,7 +113,14 @@ class IsarStorage extends LocalStorage {
     const IsarEngine engine = kIsWeb 
       ? IsarEngine.sqlite 
       : IsarEngine.isar;
-    if (kIsWeb) await Isar.initialize();
+    if (kIsWeb) {
+      // isar.js / isar.wasm лежат локально в web/ (не тянем с CDN unpkg):
+      // так загрузка детерминирована (без сети/CDN-сбоев) и работает
+      // оффлайн. isar_plus грузит glue-скрипт по URL, выведенному из пути
+      // к wasm, а wasm-fetch резолвится относительно <base href> — при
+      // деплое в подпапку (GitHub Pages /social_mind/) нужен полный путь.
+      await Isar.initialize('${const String.fromEnvironment('CLOSERS_BASE_HREF', defaultValue: '/')}isar.wasm');
+    }
     isar = Isar.open(
       schemas: [
         OperationalBoxSchema,
