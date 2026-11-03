@@ -187,8 +187,20 @@ jobs:
         working-directory: ./domains/client
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" \
-            "system-images;android-34;google_apis;x86_64" > /dev/null
+          # sdkmanager иногда падает при скачивании (обрыв сети/CDN —
+          # "Error reading Zip content from a SeekableByteChannel"),
+          # поэтому делаем до 3 попыток с небольшим ожиданием.
+          for i in 1 2 3; do
+            if "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" \
+              "system-images;android-34;google_apis;x86_64" > /dev/null; then
+              echo "SDK components installed (attempt $i)"
+              exit 0
+            fi
+            echo "::warning::sdkmanager failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "::error::sdkmanager failed after 3 attempts"
+          exit 1
 
       - name: Set up Node
         uses: actions/setup-node@v4
