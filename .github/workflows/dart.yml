@@ -261,8 +261,7 @@ jobs:
           --dart-define CLOSERS_WEB_API_KEY=${{ secrets.CLOSERS_WEB_API_KEY }} \
           --dart-define CLOSERS_WEB_APP_ID=${{ secrets.CLOSERS_WEB_APP_ID }} \
           --dart-define CLOSERS_WEB_MEASUREMENT_ID=${{ secrets.CLOSERS_WEB_MEASUREMENT_ID }} \
-          --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }} \
-          --dart-define CLOSERS_BASE_HREF=/social_mind/
+          --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
 
       - name: Serve web build
         working-directory: ./domains/client/build
