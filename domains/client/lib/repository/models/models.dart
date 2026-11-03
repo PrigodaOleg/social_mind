@@ -2,7 +2,6 @@ import 'dart:collection';
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:closers/repository/repository/repository.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hashlib/hashlib.dart';
@@ -14,14 +13,9 @@ part 'task.dart';
 part 'contact_list.dart';
 part 'registry.dart';
 // part 'models.g.dart';
-
-@HiveType(typeId: 3)
 enum Location {
-  @HiveField(0)
   local,
-  @HiveField(1)
   remote,
-  @HiveField(2)
   both
 }
 
@@ -62,31 +56,25 @@ sealed class Model extends Equatable {
   /// The unique identifier of the model.
   ///
   /// Cannot be empty.
-  @HiveField(0)
   final String id;
 
   /// The title of the model.
   ///
   /// Note that the title may be empty.
-  @HiveField(1)
   final String title;
 
   /// Some information about model to understand it context.
   ///
   /// Defaults to an empty string.
-  @HiveField(2)
   final String description;
 
   /// Where
-  @HiveField(3)
   final Location location;
 
   /// Model ID: Model Type
-  @HiveField(4)
   Map<String, String> children;
 
   /// Model ID: Model Type
-  @HiveField(5)
   Map<String, String> parents;
 
   Map<String, dynamic> toJson() => {

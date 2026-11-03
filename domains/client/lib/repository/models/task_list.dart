@@ -7,8 +7,6 @@ TaskListViewMode taskListViewModeFromString(String? value) =>
       (mode) => mode.name == value,
       orElse: () => TaskListViewMode.creation,
     );
-
-@HiveType(typeId: 9)
 // ignore: must_be_immutable
 class TaskList extends Model {
   TaskList({
@@ -30,10 +28,7 @@ class TaskList extends Model {
   final String type = 'TaskList';
 
   /// Идентификатор модели-задачи: тип модели-задачи (всегда 'Task').
-  @HiveField(6)
   Map<String, String> tasks;
-
-  @HiveField(7)
   TaskListViewMode viewMode;
 
   List<String> get taskIds => tasks.keys.toList(growable: false);

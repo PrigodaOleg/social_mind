@@ -94,7 +94,7 @@ class Repository {
     Map<String, RemoteStorage>? remoteStorages
   }) :
   _localStorage = localStorage ?? IsarStorage(),
-  // _localStorage = localStorage ?? HiveStorage()
+  
   _remoteStorages = remoteStorages ?? <String, RemoteStorage>{}
   ;
 
