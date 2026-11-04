@@ -187,8 +187,20 @@ jobs:
         working-directory: ./domains/client
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" \
-            "system-images;android-34;google_apis;x86_64" > /dev/null
+          # sdkmanager иногда падает при скачивании (обрыв сети/CDN —
+          # "Error reading Zip content from a SeekableByteChannel"),
+          # поэтому делаем до 3 попыток с небольшим ожиданием.
+          for i in 1 2 3; do
+            if "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" \
+              "system-images;android-34;google_apis;x86_64" > /dev/null; then
+              echo "SDK components installed (attempt $i)"
+              exit 0
+            fi
+            echo "::warning::sdkmanager failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "::error::sdkmanager failed after 3 attempts"
+          exit 1
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -228,6 +240,69 @@ jobs:
           path: |
             /tmp/closers_e2e_emulator.log
             ./domains/client/.dart_tool/firebase_emulator/firebase.log
+          if-no-files-found: ignore
+
+
+  # E2E-проверка работоспособности web-версии: собираем web-бандл, раздаём
+  # его локально и в headless Chrome убеждаемся, что приложение проходит
+  # splash-экран и показывает LoginPage (регрессия «зависания на splash»).
+  e2e-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: 'Build web app'
+        working-directory: ./domains/client
+        run: |
+          flutter build web --release --base-href /social_mind/ \
+          --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
+          --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
+          --dart-define CLOSERS_WEB_API_KEY=${{ secrets.CLOSERS_WEB_API_KEY }} \
+          --dart-define CLOSERS_WEB_APP_ID=${{ secrets.CLOSERS_WEB_APP_ID }} \
+          --dart-define CLOSERS_WEB_MEASUREMENT_ID=${{ secrets.CLOSERS_WEB_MEASUREMENT_ID }} \
+          --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
+
+      - name: Serve web build
+        working-directory: ./domains/client/build
+        run: |
+          # Бандл собран с --base-href /social_mind/ (как на GitHub Pages),
+          # поэтому раздаём каталог build через корень с symlink
+          # social_mind -> web, чтобы путь /social_mind/ резолвился.
+          mkdir -p e2e_root
+          ln -sfn ../web e2e_root/social_mind
+          nohup python3 -m http.server 8000 --bind 127.0.0.1 \
+            --directory e2e_root >/tmp/web_server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/social_mind/ >/dev/null && break
+            sleep 1
+          done
+          curl -sfI http://127.0.0.1:8000/social_mind/ || (cat /tmp/web_server.log && exit 1)
+
+      - name: Run web e2e (splash -> login screen)
+        working-directory: ./domains/client
+        run: |
+          npm install playwright-core --no-save
+          node tool/web_splash_e2e.mjs http://127.0.0.1:8000/social_mind/
+
+      - name: Upload web e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-web-logs
+          path: /tmp/web_server.log
           if-no-files-found: ignore
 
   # ВЫНОСИМ ДЕПЛОЙ В ОТДЕЛЬНУЮ ДЖОБУ С ПРОВЕРКОЙ ВЕТКИ

@@ -18,10 +18,12 @@ Future<void> main() async {
   }
   try {
     final options = DefaultFirebaseOptions.currentPlatform;
-    await Firebase.initializeApp(
-      name: options.projectId,
-      options: options,
-    );
+    // БЕЗ name: Firebase.initializeApp создаёт дефолтный инстанс "[DEFAULT]",
+    // который и ожидается всеми плагинами. name: options.projectId ломает
+    // инициализацию на web (FirebaseError: bad-app-name), когда projectId
+    // пуст (сборка без --dart-define), и создаёт не-дефолтный инстанс,
+    // который не видят пакеты, запрашивающие дефолтное приложение.
+    await Firebase.initializeApp(options: options);
     // FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
     // FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
   } catch (error) {

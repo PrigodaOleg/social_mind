@@ -40,6 +40,17 @@ class App extends StatelessWidget {
       ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      // Браузеры могут отдавать локали без языка (und/ничего) или локали,
+      // не входящие в supportedLocales с непарсимым для Intl кодом —
+      // intl.Intl.canonicalizedLocale бросает RangeError и приложение
+      // остаётся на splash-экране. Фолбэк на английский решает это.
+      localeResolutionCallback: (locale, supportedLocales) {
+        if (locale == null) return const Locale('en');
+        for (final supported in supportedLocales) {
+          if (supported.languageCode == locale.languageCode) return supported;
+        }
+        return const Locale('en');
+      },
       routerDelegate: AppRouterDelegate(initialRoute: (
         path: SplashScreen.routeName,
         constructor: SplashScreen.new,
