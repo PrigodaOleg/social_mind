@@ -1,0 +1,81 @@
+# Деплой GitHub Pages без повторной сборки при push в main.
+#
+# Схема:
+#   1. В PR (прекоммит) джоба build воркфлоу «Closers Flutter» собирает
+#      web-бандл и заливает артефакт `github-pages`.
+#   2. После успешного завершения рана этот workflow проверяет, что head-коммит
+#      того рана — это уже замерженный PR, скачивает артефакт именно из того
+#      рана (без пересборки) и деплоит его через actions/deploy-pages@v4.
+#
+# Прямые push в main больше НЕ запускают сборки/тесты повторно: остаётся только
+# deploy-rules (в dart.yml) и этот деплой собранного ранее.
+
+name: Closers Deploy Pages
+
+on:
+  workflow_run:
+    workflows: ["Closers Flutter"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # Деплоим только если ран был PR-раном и этот PR уже замержен в main.
+  check-merged:
+    runs-on: ubuntu-latest
+    outputs:
+      merged: ${{ steps.check.outputs.merged }}
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Check that the PR of the triggering run is merged
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          merged=false
+          prs=$(gh api "repos/${{ github.repository }}/commits/${HEAD_SHA}/pulls" --jq '.[].number' || true)
+          for pr in $prs; do
+            if [ "$(gh api "repos/${{ github.repository }}/pulls/${pr}" --jq '.merged')" = "true" ]; then
+              merged=true
+            fi
+          done
+          echo "merged=$merged" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: check-merged
+    if: needs.check-merged.outputs.merged == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Скачиваем артефакт из рана прекоммита (артефакт содержит
+      # artifact.tar, подготовленный upload-pages-artifact@v4).
+      - name: Download web artifact from precommit run
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ./site
+
+      # deploy-pages@v4 видит только артефакты текущего рана — перезаливаем.
+      - name: Re-upload artifact for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
