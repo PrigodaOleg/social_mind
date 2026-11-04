@@ -79,8 +79,13 @@ jobs:
           CLOSERS_PROJECT_ID: ${{ secrets.CLOSERS_PROJECT_ID }}
         run: python3 tool/deploy_firebase_rules.py
 
+  # Тяжёлые джобы (сборки + e2e) запускаются ТОЛЬКО на прекоммите (PR) и
+  # вручную. При push в main повторно гонять те же джобы бессмысленно —
+  # код уже проверен в PR-ране; деплой при этом переиспользует артефакты
+  # того рана (см. deploy-pages.yml: деплой по факту мержа PR).
   build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'push'
     permissions:
         contents: write
         pages: write
@@ -163,6 +168,8 @@ jobs:
   # E2E-тесты авторизации на android-эмуляторе (Firebase Local Emulator Suite).
   # Запускается при PR и push в main (paths: domains/client/**).
   e2e-android:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -247,6 +254,8 @@ jobs:
   # его локально и в headless Chrome убеждаемся, что приложение проходит
   # splash-экран и показывает LoginPage (регрессия «зависания на splash»).
   e2e-web:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -305,23 +314,13 @@ jobs:
           path: /tmp/web_server.log
           if-no-files-found: ignore
 
-  # ВЫНОСИМ ДЕПЛОЙ В ОТДЕЛЬНУЮ ДЖОБУ С ПРОВЕРКОЙ ВЕТКИ
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' # Деплоить только при пуше/слиянии в main
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  # Деплой Pages переехал в deploy-pages.yml: артефакт github-pages
+  # собирается в прекоммит-ране (джоба build), а деплоится из workflow_run
+  # после мержа PR — без повторной пересборки при push в main.
 
   build-ios:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: macos-latest
 
     steps:
@@ -376,6 +375,8 @@ jobs:
   #   make test-auth-e2e-ios-debug      (--debug: verbose)
   #   make test-auth-e2e-ios-interactive(интерактивный запуск приложения на симуляторе)
   e2e-ios-simulator:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: macos-latest
     # macOS-раннер: первый pod install может идти долго, но подвисший джобе
     # путь без лимита (кейс PR #54) крутится часами — ограничиваем жёстко.
@@ -418,6 +419,8 @@ jobs:
   # нативных Firebase-плагинов для Linux нет, поэтому там они идут через
   # web-реализацию.
   build-linux:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -459,6 +462,8 @@ jobs:
   # e2e-android и e2e-ios-simulator. Нативных Firebase-плагинов для Linux
   # нет, поэтому используется web-вариант набора (headless chrome).
   e2e-linux:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -511,6 +516,8 @@ jobs:
   # Сборка под Windows (desktop): тесты + сборка + выкладка артефактов.
   # isar-тесты на Windows используют закоммиченный test/isar_windows_x64.dll.
   build-windows:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: windows-latest
     timeout-minutes: 60
 
