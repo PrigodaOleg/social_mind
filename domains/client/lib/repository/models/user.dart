@@ -1,6 +1,4 @@
 part of 'models.dart';
-
-@HiveType(typeId: 1)
 // ignore: must_be_immutable
 class User extends Model {
   User({
@@ -34,11 +32,7 @@ class User extends Model {
   @override
   // ignore: overridden_fields
   final String type = "User";
-
-  @HiveField(6)
   final String name;
-
-  @HiveField(7)
   List<String> domainsIds;
 
   String registryId;

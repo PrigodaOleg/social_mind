@@ -1,20 +1,12 @@
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:equatable/equatable.dart';
 
 // part 'navigation_stack.g.dart';
-
-
-@HiveType(typeId: 4)
 class NavStackEntry extends Equatable {
   NavStackEntry(
     this.path,
     this.args
   );
-
-  @HiveField(0)
   String path;
-
-  @HiveField(1)
   Map<String, dynamic> args;
 
   Map<String, dynamic> toJson() => {

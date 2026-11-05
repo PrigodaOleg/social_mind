@@ -200,61 +200,87 @@ void main() {
   group('TaskListBloc', () {
     late Repository repo;
     late User me;
-    late Domain domain;
+    late TaskList list;
 
     setUp(() async {
       me = User(id: 'me', name: 'me');
       repo = await makeRepo(me: me);
-      domain = Domain(originatorId: me.id, title: 'root');
-      await repo.saveModel(domain);
+      list = TaskList(id: 'list-1', title: 'root');
+      await repo.saveModel(list);
     });
 
-    test('init loads parent tasks and adds a placeholder', () async {
+    test('init loads the list and its tasks', () async {
       final t1 = Task(id: 't1', title: 'one', originatorId: me.id);
       await repo.saveModel(t1);
-      await domain.linkTo(t1);
+      list.addTask(t1);
+      await repo.saveModel(list);
 
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
 
-      final tasks = bloc.state.tasks;
-      expect(tasks.keys, contains('t1'));
-      // placeholder task is not completed and has empty title
-      final placeholders = tasks.values
-          .where((t) => t.id != 't1' && t.title == '')
-          .toList();
-      expect(placeholders.length, 1);
+      expect(bloc.state.list!.id, list.id);
+      expect(bloc.state.tasks.keys, contains('t1'));
       await bloc.close();
     });
 
-    test('init without existing tasks still emits placeholder', () async {
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
+    test('init without tasks emits an empty task map', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+      expect(bloc.state.tasks, isEmpty);
+      await bloc.close();
+    });
+
+    test('init for unknown list leaves the state empty', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: 'missing');
+      bloc.add(const TaskListStateInitRequested());
+      await Future.delayed(Duration.zero);
+      expect(bloc.state.list, isNull);
+      expect(bloc.state.tasks, isEmpty);
+      await bloc.close();
+    });
+
+    test('TaskAddRequested adds and persists a new empty task', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+
+      bloc.add(const TaskAddRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
       expect(bloc.state.tasks.length, 1);
+      final added = bloc.state.tasks.values.single;
+      // task is persisted and linked to the list
+      expect(repo.getModel<Task>(added.id), isNotNull);
+      expect(added.parents[list.id], 'TaskList');
       await bloc.close();
     });
 
-    test('TaskAddRequested adds a new empty task', () async {
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
-      await expectLater(bloc.stream, emits(isA<TaskListState>()));
-      final countBefore = bloc.state.tasks.length;
+    test('TaskDeleteRequested removes the task from list and state', () async {
+      final t1 = Task(id: 't1', title: 'one', originatorId: me.id);
+      await repo.saveModel(t1);
+      list.addTask(t1);
+      await repo.saveModel(list);
 
-      bloc.add(TaskAddRequested());
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
-      expect(bloc.state.tasks.length, countBefore + 1);
+
+      bloc.add(TaskDeleteRequested(t1));
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+      expect(bloc.state.tasks.containsKey('t1'), isFalse);
+      expect(repo.outgoingDeletes.map((m) => m.id), contains('t1'));
       await bloc.close();
     });
 
     test('TaskCompletionRequested saves completed task', () async {
       final t1 = Task(id: 't1', title: 'one', originatorId: me.id);
       await repo.saveModel(t1);
-      await domain.linkTo(t1);
+      list.addTask(t1);
+      await repo.saveModel(list);
 
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
 
       bloc.add(TaskCompletionRequested(task: t1, isComplited: true));
@@ -269,10 +295,11 @@ void main() {
     test('TaskCompletionRequested ignores empty-title task', () async {
       final empty = Task(id: 'empty', title: '', originatorId: me.id);
       await repo.saveModel(empty);
-      await domain.linkTo(empty);
+      list.addTask(empty);
+      await repo.saveModel(list);
 
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
 
       bloc.add(TaskCompletionRequested(task: empty, isComplited: true));
@@ -282,42 +309,57 @@ void main() {
       await bloc.close();
     });
 
-    test('TaskSubmitionRequested sets title, links and adds placeholder',
-        () async {
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
-      await expectLater(bloc.stream, emits(isA<TaskListState>()));
-      final placeholder = bloc.state.tasks.values.first;
+    test('TaskSubmitionRequested persists the new title', () async {
+      final t1 = Task(id: 't1', title: '', originatorId: me.id);
+      await repo.saveModel(t1);
+      list.addTask(t1);
+      await repo.saveModel(list);
 
-      bloc.add(TaskSubmitionRequested(
-          task: placeholder, submittedText: 'new title'));
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
 
-      final submitted =
-          bloc.state.tasks.values.where((t) => t.title == 'new title');
-      expect(submitted.length, 1);
-      expect(submitted.first.parents[domain.id], 'Domain');
-      // new placeholder appended
-      final emptyTasks = bloc.state.tasks.values.where((t) => t.title == '');
-      expect(emptyTasks.length, 1);
+      bloc.add(TaskSubmitionRequested(task: t1, submittedText: 'new title'));
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+      expect(bloc.state.tasks['t1']!.title, 'new title');
+      // persisted to local storage
+      expect(repo.getModel<Task>('t1')!.title, 'new title');
       await bloc.close();
     });
 
-    test('TaskChangingRequested updates title in state only', () async {
-      final t1 = Task(id: 't1', title: 'one', originatorId: me.id);
-      await repo.saveModel(t1);
-
-      final bloc = TaskListBloc(repository: repo, parentId: domain.id);
-      bloc.add(TaskListStateInitRequested());
+    test('TaskListViewModeChanged persists the list view mode', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
 
-      bloc.add(
-          TaskChangingRequested(task: t1, changedText: 'renamed in place'));
+      bloc.add(TaskListViewModeChanged(TaskListViewMode.activeOnly));
       await expectLater(bloc.stream, emits(isA<TaskListState>()));
-      expect(bloc.state.tasks['t1']!.title, 'renamed in place');
-      // not persisted
-      expect(repo.getModel<Task>('t1')!.title, 'one');
+      expect(bloc.state.list!.viewMode, TaskListViewMode.activeOnly);
+      expect(
+          repo.getModel<TaskList>(list.id)!.viewMode,
+          TaskListViewMode.activeOnly);
       await bloc.close();
+    });
+
+    test('TaskListTitleChanged persists the list title', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+
+      bloc.add(const TaskListTitleChanged('renamed list'));
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+      expect(bloc.state.list!.title, 'renamed list');
+      expect(repo.getModel<TaskList>(list.id)!.title, 'renamed list');
+      await bloc.close();
+    });
+
+    test('close removes sync listener without errors', () async {
+      final bloc = TaskListBloc(repository: repo, parentId: list.id);
+      bloc.add(const TaskListStateInitRequested());
+      await expectLater(bloc.stream, emits(isA<TaskListState>()));
+      final listenersBefore = repo.syncListeners.length;
+      await bloc.close();
+      expect(repo.syncListeners.length, listenersBefore - 1);
     });
   });
 

@@ -21,8 +21,6 @@ part of 'models.dart';
 // В базу данных записывается консистентный набор изменений + транзакция. Изменений должно быть ровно столько, сколько записей в транзакции.
 // Если есть лишние, то транзакция будет отклонена, если каких-то изменений не достает, то транзакция будет отклонена.
 // Предоставить годную транзакцию - дело клиента пользователя.
-
-@HiveType(typeId: 7)
 class Transaction extends Equatable {
   Transaction(String? id, this.prevHash, this.prevId, this.timeStamp, this.originatorId, this.changeDetails,
       this.changeType, this.changes, this.path)
@@ -40,27 +38,17 @@ class Transaction extends Equatable {
         prevHash = prev.tHash(),
         prevId = prev.id,
         timeStamp = DateTime.now();
-
-  @HiveField(0)
   String id; // Идентификатор этого изменения
-  @HiveField(1)
   String prevId; // Идентификатор предыдущего изменения
-  @HiveField(2)
   String
       prevHash; // Хэш предыдущего изменения, возможно будем использовать его в арбитраже транзакций в распределенном хранилище
-  @HiveField(3)
   DateTime timeStamp;
-  @HiveField(4)
   String originatorId;
-  @HiveField(5)
   String
       changeDetails; // Адрес изменения на уровне экосистемы (человек-сессия-программа-устройство), пока не понятно зачем
-  @HiveField(6)
   String changeType; // Тип изменения - создание, изменение, удаление
-  @HiveField(7)
   List<String>
       changes; // Инеднификаторы изменившихся моделей, может тут нужна MAP с сериализованными изменениями в значениях полей
-  @HiveField(8)
   String path; // адрес в дереве моделей (домен-...), или цепочка вложенности/наследования
 
   Map<String, Object> toJson() => {
@@ -127,21 +115,17 @@ class Transaction extends Equatable {
         path ?? this.path);
   }
 }
-
-@HiveType(typeId: 8)
 class RegistryMetadata extends Equatable {
   const RegistryMetadata({required this.id, required this.parentId});
 
   /// The unique identifier of the model.
   ///
   /// Cannot be empty.
-  @HiveField(0)
   final String id;
 
   /// The identifier of container model (domain or user).
   ///
   /// Cannot be empty.
-  @HiveField(1)
   final String parentId;
 
   Map<String, Object> toJson() => {
@@ -156,8 +140,6 @@ class RegistryMetadata extends Equatable {
   @override
   List<Object?> get props => [id, parentId];
 }
-
-@HiveType(typeId: 6)
 // ignore: must_be_immutable
 class Registry extends Equatable {
   Registry({String? id, String? parentId, Map<int, Transaction>? transactions})
@@ -172,7 +154,6 @@ class Registry extends Equatable {
   /// Registry metadata.
   /// Cannot be null.
   /// Храним тут любые аттрибуты, связанные с реестром, например, его тип, имя, описание и т.п.
-  @HiveField(0)
   RegistryMetadata metadata;
 
   /// Transactions list.
@@ -184,10 +165,9 @@ class Registry extends Equatable {
   /// При чтении можно запросить несколько последних элементов а не весь список.
   /// В качестве ключей будем использовать целые числа. Максимальное возможное целое число - 2^53.
   /// Это, вроде как, много, поэтому проблему переполнения можем проигнорировать, по крайней мере, на время.
-  /// В hive нельзя читать ни списки ни словари частично из коробки. Но можно дописать свои методы
+  /// В локальной базе нельзя читать ни списки ни словари частично из коробки. Но можно дописать свои методы
   /// для чтения/записи нескольких элементов с конца. Таким образом можно содержать/накапливать в базе полный
   /// словарь никогда полностью не читаю его в память. Этот подход дает также возможность выгружать часть словаря в архив.
-  @HiveField(1)
   Map<int, Transaction> transactions;
 
   Map<String, Object> toJson() => {

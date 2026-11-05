@@ -13,7 +13,7 @@ import '../local_storage.dart';
 part 'isar_storage.g.dart';
 
 
-// Вроде как для Isar нужно насоздавать нексолько коллекций. Коллекции - аналог боксов в Hive.
+// Вроде как для Isar нужно насоздавать нексолько коллекций. Коллекции - аналог боксов.
 // Нам потребуются коллекции для хранения:
 // - моделей (с индексацией по родителям, по времени, а также, возможно, по доменам/пользователям)
 // - транзакций (с индексацией по доменам/пользователям, по сути по родителям), а где хранить метаданные реестров (в отдельной коллекции)?
@@ -113,7 +113,12 @@ class IsarStorage extends LocalStorage {
     const IsarEngine engine = kIsWeb 
       ? IsarEngine.sqlite 
       : IsarEngine.isar;
-    if (kIsWeb) await Isar.initialize();
+    if (kIsWeb) {
+      // isar.js / isar.wasm в репозиторий НЕ коммитим (блобы в git — плохая
+      // практика): Isar.initialize() без аргументов грузит их в рантайме
+      // с CDN (unpkg.com/isar_plus@<version>/isar.wasm).
+      await Isar.initialize();
+    }
     isar = Isar.open(
       schemas: [
         OperationalBoxSchema,

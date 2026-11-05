@@ -8,10 +8,10 @@ name: Closers Flutter
 on:
   push:
     branches: [ "main" ]
-    paths: [ "domains/client/**" ]
+    paths: [ "domains/client/**", ".github/workflows/**" ]
   pull_request:
     branches: [ "main" ]
-    paths: [ "domains/client/**" ]
+    paths: [ "domains/client/**", ".github/workflows/**" ]
   workflow_dispatch:
 
 jobs:
@@ -79,8 +79,13 @@ jobs:
           CLOSERS_PROJECT_ID: ${{ secrets.CLOSERS_PROJECT_ID }}
         run: python3 tool/deploy_firebase_rules.py
 
+  # Тяжёлые джобы (сборки + e2e) запускаются ТОЛЬКО на прекоммите (PR) и
+  # вручную. При push в main повторно гонять те же джобы бессмысленно —
+  # код уже проверен в PR-ране; деплой при этом переиспользует артефакты
+  # того рана (см. deploy-pages.yml: деплой по факту мержа PR).
   build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'push'
     permissions:
         contents: write
         pages: write
@@ -89,11 +94,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: 'Set up JDK 17'
-        uses: 'actions/setup-java@v2'
+      - name: 'Set up JDK 21'
+        uses: 'actions/setup-java@v4'
         with:
           distribution: "temurin"
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -127,10 +132,27 @@ jobs:
           flutter build web --release --base-href /social_mind/ \
           --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
           --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
-          --dart-define CLOSERS_ANDROID_API_KEY=${{ secrets.CLOSERS_ANDROID_API_KEY }} \
-          --dart-define CLOSERS_ANDROID_APP_ID=${{ secrets.CLOSERS_ANDROID_APP_ID }} \
+          --dart-define CLOSERS_WEB_API_KEY=${{ secrets.CLOSERS_WEB_API_KEY }} \
+          --dart-define CLOSERS_WEB_APP_ID=${{ secrets.CLOSERS_WEB_APP_ID }} \
+          --dart-define CLOSERS_WEB_MEASUREMENT_ID=${{ secrets.CLOSERS_WEB_MEASUREMENT_ID }} \
           --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
         working-directory: ./domains/client
+
+      # Проверяем, что web-конфиг Firebase реально попал в бандл:
+      # пустые CLOSERS_WEB_* секреты дают неработающее приложение
+      # с пустым экраном (ошибка инициализации Firebase проглатывается).
+      - name: Verify Firebase config in web bundle
+        run: |
+          if ! grep -q "AIzaSy" ./domains/client/build/web/main.dart.js; then
+            echo "::error::CLOSERS_WEB_API_KEY not found in web bundle - check CLOSERS_WEB_* secrets"
+            exit 1
+          fi
+
+      # GitHub Pages не делает SPA-fallback: обновление страницы на вложенном
+      # маршруте (/social_mind/login и т.п.) вернуло бы 404. Копия index.html
+      # в 404.html служит стандартным SPA-fallback'ом.
+      - name: SPA fallback (404.html)
+        run: cp ./domains/client/build/web/index.html ./domains/client/build/web/404.html
 
       - name: 'Upload APK'
         uses: 'actions/upload-artifact@v4'
@@ -143,23 +165,162 @@ jobs:
         with:
           path: ./domains/client/build/web/
 
-  # ВЫНОСИМ ДЕПЛОЙ В ОТДЕЛЬНУЮ ДЖОБУ С ПРОВЕРКОЙ ВЕТКИ
-  deploy:
+  # E2E-тесты авторизации на android-эмуляторе (Firebase Local Emulator Suite).
+  # Запускается при PR и push в main (paths: domains/client/**).
+  e2e-android:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' # Деплоить только при пуше/слиянии в main
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 45
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+
+      - name: 'Set up JDK 21'
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Android SDK components
+        working-directory: ./domains/client
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          # sdkmanager иногда падает при скачивании (обрыв сети/CDN —
+          # "Error reading Zip content from a SeekableByteChannel"),
+          # поэтому делаем до 3 попыток с небольшим ожиданием.
+          for i in 1 2 3; do
+            if "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" \
+              "system-images;android-34;google_apis;x86_64" > /dev/null; then
+              echo "SDK components installed (attempt $i)"
+              exit 0
+            fi
+            echo "::warning::sdkmanager failed (attempt $i), retrying..."
+            sleep 10
+          done
+          echo "::error::sdkmanager failed after 3 attempts"
+          exit 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools
+
+      - name: Cache Firebase Emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('~/.cache/firebase/emulators/*.jar') }}
+          restore-keys: |
+            ${{ runner.os }}-firebase-emulators-
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: Generate google-services.json
+        working-directory: ./domains/client
+        run: echo '{"project_info":{"project_number":"${{ secrets.CLOSERS_PROJECT_NUMBER }}","project_id":"${{ secrets.CLOSERS_PROJECT_ID }}","storage_bucket":"${{ secrets.CLOSERS_PROJECT_ID }}.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"${{ secrets.CLOSERS_ANDROID_APP_ID }}","android_client_info":{"package_name":"com.example.closers"}},"oauth_client":[],"api_key":[{"current_key":"${{ secrets.CLOSERS_ANDROID_API_KEY }}"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' >> android/app/google-services.json
+
+      - name: Run android emulator e2e tests
+        working-directory: ./domains/client
+        run: |
+          chmod +x tool/run_auth_e2e_tests.sh
+          tool/run_auth_e2e_tests.sh --platform android
+
+      - name: Upload e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-android-logs
+          path: |
+            /tmp/closers_e2e_emulator.log
+            ./domains/client/.dart_tool/firebase_emulator/firebase.log
+          if-no-files-found: ignore
+
+
+  # E2E-проверка работоспособности web-версии: собираем web-бандл, раздаём
+  # его локально и в headless Chrome убеждаемся, что приложение проходит
+  # splash-экран и показывает LoginPage (регрессия «зависания на splash»).
+  e2e-web:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: 'Build web app'
+        working-directory: ./domains/client
+        run: |
+          flutter build web --release --base-href /social_mind/ \
+          --dart-define CLOSERS_PROJECT_ID=${{ secrets.CLOSERS_PROJECT_ID }} \
+          --dart-define CLOSERS_PROJECT_NUMBER=${{ secrets.CLOSERS_PROJECT_NUMBER }} \
+          --dart-define CLOSERS_WEB_API_KEY=${{ secrets.CLOSERS_WEB_API_KEY }} \
+          --dart-define CLOSERS_WEB_APP_ID=${{ secrets.CLOSERS_WEB_APP_ID }} \
+          --dart-define CLOSERS_WEB_MEASUREMENT_ID=${{ secrets.CLOSERS_WEB_MEASUREMENT_ID }} \
+          --dart-define CLOSERS_DATABASE_URL=${{ secrets.CLOSERS_DATABASE_URL }}
+
+      - name: Serve web build
+        working-directory: ./domains/client/build
+        run: |
+          # Бандл собран с --base-href /social_mind/ (как на GitHub Pages),
+          # поэтому раздаём каталог build через корень с symlink
+          # social_mind -> web, чтобы путь /social_mind/ резолвился.
+          mkdir -p e2e_root
+          ln -sfn ../web e2e_root/social_mind
+          nohup python3 -m http.server 8000 --bind 127.0.0.1 \
+            --directory e2e_root >/tmp/web_server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/social_mind/ >/dev/null && break
+            sleep 1
+          done
+          curl -sfI http://127.0.0.1:8000/social_mind/ || (cat /tmp/web_server.log && exit 1)
+
+      - name: Run web e2e (splash -> login screen)
+        working-directory: ./domains/client
+        run: |
+          npm install playwright-core --no-save
+          node tool/web_splash_e2e.mjs http://127.0.0.1:8000/social_mind/
+
+      - name: Upload web e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-web-logs
+          path: /tmp/web_server.log
+          if-no-files-found: ignore
+
+  # Деплой Pages переехал в deploy-pages.yml: артефакт github-pages
+  # собирается в прекоммит-ране (джоба build), а деплоится из workflow_run
+  # после мержа PR — без повторной пересборки при push в main.
 
   build-ios:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
     runs-on: macos-latest
 
     steps:
@@ -206,3 +367,180 @@ jobs:
         with:
           name: 'Closers-iOS'
           path: './domains/client/build/ios/iphoneos/Runner.app'
+
+  # E2E-тесты авторизации на iOS-симуляторе: Firebase-эмуляторы (auth + database)
+  # поднимаются на раннере, симулятор загружается скриптом, тесты гоняются через
+  # integration_test (integration_test/auth_e2e_test.dart). Локально то же самое:
+  #   make test-auth-e2e-ios            (== tool/run_auth_e2e_tests.sh --platform ios)
+  #   make test-auth-e2e-ios-debug      (--debug: verbose)
+  #   make test-auth-e2e-ios-interactive(интерактивный запуск приложения на симуляторе)
+  e2e-ios-simulator:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: macos-latest
+    # macOS-раннер: первый pod install может идти долго, но подвисший джобе
+    # путь без лимита (кейс PR #54) крутится часами — ограничиваем жёстко.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: Set up JDK 21
+        # firebase-tools запускает эмуляторы через Java и требует JDK 21+.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+
+      - name: Run auth e2e tests on iOS simulator
+        working-directory: ./domains/client
+        env:
+          # Первый запуск собирает приложение под симулятор (pod install) —
+          # даём шагу до 40 минут.
+          FLUTTER_TEST_TIMEOUT: 40m
+        run: |
+          chmod +x tool/run_auth_e2e_tests.sh
+          tool/run_auth_e2e_tests.sh --platform ios --debug
+
+  # Сборка под Linux (desktop): юнит- и Isar-тесты выполняются нативно на
+  # Linux (test/libisar_linux_x64.so закоммичен, локальный запуск без
+  # браузера), затем сборка и выкладка артефактов. Firebase-интеграционные и
+  # e2e-тесты вынесены в отдельную джобу e2e-linux (как e2e-android/e2e-ios):
+  # нативных Firebase-плагинов для Linux нет, поэтому там они идут через
+  # web-реализацию.
+  build-linux:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libblkid-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      # Нативный запуск на Linux-раннере (VM), включая Isar-тесты
+      # (test/libisar_linux_x64.so). Интеграционные тесты с эмулятором
+      # пропускаются (Skip без RUN_EMULATOR_TESTS), они живут в e2e-linux.
+      - name: Run tests
+        working-directory: ./domains/client
+        run: flutter test
+
+      - name: 'Build Linux app'
+        working-directory: ./domains/client
+        run: flutter build linux --release
+
+      - name: 'Upload Linux app'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'Closers-Linux'
+          path: './domains/client/build/linux/x64/release/bundle/'
+
+  # E2E-тесты на linux-раннере: Firebase-эмуляторы (auth + database)
+  # поднимаются на раннере, e2e-набор гоняется отдельной джобой — как
+  # e2e-android и e2e-ios-simulator. Нативных Firebase-плагинов для Linux
+  # нет, поэтому используется web-вариант набора (headless chrome).
+  e2e-linux:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 'Set up JDK 21'
+        # firebase-tools запускает эмуляторы через Java и требует JDK 21+.
+        uses: 'actions/setup-java@v4'
+        with:
+          distribution: "temurin"
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+
+      - name: Cache Firebase Emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('~/.cache/firebase/emulators/*.jar') }}
+          restore-keys: |
+            ${{ runner.os }}-firebase-emulators-
+
+      - name: Run e2e tests
+        working-directory: ./domains/client
+        env:
+          FLUTTER_WEB_CHROME: /usr/bin/google-chrome-stable
+        run: |
+          chmod +x tool/run_auth_e2e_tests.sh
+          tool/run_auth_e2e_tests.sh
+
+      - name: Upload e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-linux-logs
+          path: |
+            /tmp/closers_e2e_emulator.log
+            ./domains/client/.dart_tool/firebase_emulator/firebase.log
+          if-no-files-found: ignore
+
+  # Сборка под Windows (desktop): тесты + сборка + выкладка артефактов.
+  # isar-тесты на Windows используют закоммиченный test/isar_windows_x64.dll.
+  build-windows:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: Run tests
+        working-directory: ./domains/client
+        run: flutter test
+
+      - name: 'Build Windows app'
+        working-directory: ./domains/client
+        run: flutter build windows --release
+
+      - name: 'Upload Windows app'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'Closers-Windows'
+          path: './domains/client/build/windows/x64/runner/Release/'
