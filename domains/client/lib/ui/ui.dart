@@ -9,3 +9,5 @@ export 'pages/domain_list.dart';
 export 'pages/domain_content.dart';
 export 'pages/unknown_page.dart';
 export 'pages/user_profile.dart';
+export 'pages/invitation.dart';
+export 'pages/notifications.dart';
