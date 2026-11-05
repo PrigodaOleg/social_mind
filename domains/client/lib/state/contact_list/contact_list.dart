@@ -1,198 +1,232 @@
 import 'package:bloc/bloc.dart';
-import 'package:closers/repository/repository.dart';
 import 'package:equatable/equatable.dart';
+import 'package:closers/repository/repository.dart';
 
-
-class ContactListBloc extends Bloc<ContactEvent, ContactListState> {
-  ContactListBloc({
-    required Repository repository
-    }) : _repo = repository,
-     super(const ContactListState()) {
-    on<ContactListStateInitRequested>(_onStateInit);
-    on<ContactInvitationRequested>(_onInvitation);
-    on<ContactHandshakeRequested>(_onHandshake);
-    on<ContactCreateUserProjectionRequested>(_onCreateUserProjection);
-    on<ContactUserSyncRequested>(_onUserSync);
-    on<ContactDomainSyncRequested>(_onDomainSync);
+/// Bloc for the user's own contact list: shows contacts stored in the
+/// current user's [ContactList] and allows adding, editing and deleting them.
+///
+/// Contacts are saved to local and remote storage through the existing
+/// link/unlink mechanism (`Model.linkTo` / `Model.unlinkFrom`) and
+/// `Repository.saveModel`.
+class ContactListBloc extends Bloc<ContactListEvent, ContactListState> {
+  ContactListBloc({required Repository repository})
+      : _repo = repository,
+        super(const ContactListState()) {
+    on<ContactListInitRequested>(_onInit);
+    on<ContactListContactCreated>(_onContactCreated);
+    on<ContactListContactEdited>(_onContactEdited);
+    on<ContactListContactDeleted>(_onContactDeleted);
+    on<ContactListContactsSynced>(_onContactsSynced);
   }
 
   final Repository _repo;
   late final int listenerId;
-  
+
   @override
   Future<void> close() {
-    // При закрытии страницы нам больше не нужно следить за изменениями в репозитории
+    // After the page is closed we no longer need to listen for model changes.
     _repo.removeSyncListener(listenerId);
     return super.close();
   }
 
-  Future<void> _onStateInit(
-    ContactListStateInitRequested event,
+  /// Finds the contact list of the current user, creating one if it does not
+  /// exist yet, and loads all contacts it links to.
+  Future<void> _onInit(
+    ContactListInitRequested event,
     Emitter<ContactListState> emit,
   ) async {
-    // При открытии страницы с контактами регистрируем обратный вызов на изменение моделей.
-    // Причем, нас интересует только изменение пользователей или доменов.
+    // Register a callback on model changes so the page can react to sync.
     listenerId = _repo.addSyncListener(
       (id, item) {
-        if (!isClosed) {
-          switch (item) {
-            case User _:
-              add(ContactUserSyncRequested(contacts: {id: item}));
-              break;
-            case Domain _:
-              add(ContactDomainSyncRequested(domains: {id: item}));
-              break;
-            default:
-          }
+        if (!isClosed && item is Contact) {
+          add(ContactListContactsSynced(contacts: {id: item}));
         }
       },
-      (localChanges, remoteChanges) {
-        if (!isClosed) {
-          print('ContactListBloc: localChanges=$localChanges, remoteChanges=$remoteChanges');
-        }
-      }
+      (localChanges, remoteChanges) {},
     );
-    User me = _repo.me;
-    _repo.subscribeToSync(me.id, listenerId);
-    Map<String, Domain> contactDomains = _repo.getModels<Domain>(me.domainsIds, listenerId);
-    List<String> userIds = [];
-    for (final domain in contactDomains.values) {
-      userIds.addAll(domain.participantsIds);
+
+    final User me = _repo.me;
+
+    // Find the contact list of the current user among his children.
+    ContactList? contactList;
+    final contactListIds = me.ids<ContactList>();
+    if (contactListIds.isNotEmpty) {
+      contactList = _repo.getModels<ContactList>(contactListIds, listenerId)
+          .values
+          .firstOrNull;
     }
-    Map<String, User> contacts = _repo.getModels<User>(userIds, listenerId);
+    if (contactList == null) {
+      // No contact list yet - create one and link it to the user.
+      contactList = ContactList(originatorId: me.id);
+      await me.linkTo(contactList, listenerId);
+    }
+
+    // Load all contacts referenced by the contact list.
+    final contacts =
+        _repo.getModels<Contact>(contactList.contactList, listenerId);
+
+    emit(state.copyWith(
+      contactList: () => contactList,
+      contacts: () => contacts,
+      status: () => ContactListStatus.ready,
+    ));
+  }
+
+  /// Creates a new contact and links it to the user's contact list
+  /// (the linkTo mechanism saves both models to local and remote DBs).
+  Future<void> _onContactCreated(
+    ContactListContactCreated event,
+    Emitter<ContactListState> emit,
+  ) async {
+    final contactList = state.contactList;
+    if (contactList == null) return;
+
+    final contact = Contact(
+      userId: event.userId,
+      name: event.name,
+    );
+    await contactList.linkTo(contact, listenerId);
+
+    emit(state.copyWith(
+      contactList: () => contactList,
+      contacts: () => {...state.contacts, contact.id: contact},
+    ));
+  }
+
+  /// Edits the name of an existing contact and saves it.
+  Future<void> _onContactEdited(
+    ContactListContactEdited event,
+    Emitter<ContactListState> emit,
+  ) async {
+    final contact = state.contacts[event.contactId];
+    if (contact == null) return;
+
+    final updated = contact.copyWith(name: event.name);
+    await _repo.saveModel(updated, listenerId);
+
+    emit(state.copyWith(
+      contacts: () => {...state.contacts}..[updated.id] = updated,
+    ));
+  }
+
+  /// Deletes a contact by unlinking it from the contact list.
+  /// The unlinkFrom mechanism removes the link and deletes the contact
+  /// from local and remote storages.
+  Future<void> _onContactDeleted(
+    ContactListContactDeleted event,
+    Emitter<ContactListState> emit,
+  ) async {
+    final contactList = state.contactList;
+    final contact = state.contacts[event.contactId];
+    if (contactList == null || contact == null) return;
+
+    await contactList.unlinkFrom(contact, listenerId);
+
+    final contacts = {...state.contacts}..remove(contact.id);
+    emit(state.copyWith(
+      contactList: () => contactList,
+      contacts: () => contacts,
+    ));
+  }
+
+  /// Applies incoming sync changes to the state.
+  void _onContactsSynced(
+    ContactListContactsSynced event,
+    Emitter<ContactListState> emit,
+  ) {
+    var contacts = {...state.contacts};
+    contacts.addAll(event.contacts);
+    for (final id in event.removedIds) {
+      contacts.remove(id);
+    }
     emit(state.copyWith(contacts: () => contacts));
-  }
-
-  Future<void> _onInvitation(
-    ContactInvitationRequested event,
-    Emitter<ContactListState> emit,
-  ) async {
-    // Пригласить нового пользователя (которого нет в базе,
-    // то есть ему нужно послать ссылку на скачивание приложения)
-  }
-
-  Future<void> _onHandshake(
-    ContactHandshakeRequested event,
-    Emitter<ContactListState> emit,
-  ) async {
-    // Начать контактировать с пользователем, который уже есть в базе,
-    // и мы знаем его ID. Для этого достаточно создать с ним новый домен
-    // или добавить его в один из существующих.
-  }
-
-  Future<void> _onCreateUserProjection(
-    ContactCreateUserProjectionRequested event,
-    Emitter<ContactListState> emit,
-  ) async {
-    // Третий вариант - не приглашать пользователя, а создать некую его проекцию,
-    // которая будет выполнять роль пользователя, и которую можно в последствии
-    // превратить в настоящего пользователя, или перенести контекст проекции на
-    // существующего пользователя. Это кажется мощным инструментом.
-  }
-
-  Future<void> _onUserSync(
-    ContactUserSyncRequested event,
-    Emitter<ContactListState> emit,
-  ) async {
-    // При изменении пользователя может измениться число доменов, в которые он входит,
-    // соответственно и число пользователей в этом списке.
-  }
-
-  Future<void> _onDomainSync(
-    ContactDomainSyncRequested event,
-    Emitter<ContactListState> emit,
-  ) async {
-    // При обновлении состояния домена нужно пересчитать пользователей,
-    // поскольку, если какой-то пользователь будет исключен из домена,
-    // то он пропадет и из этого списка.
   }
 }
 
-class ContactListState {
-  // Наше состояние хранит таблицу с пользователями
+enum ContactListStatus { initial, loading, ready }
+
+class ContactListState extends Equatable {
   const ContactListState({
-    this.contacts = const {}
+    this.status = ContactListStatus.initial,
+    this.contactList,
+    this.contacts = const {},
   });
-  final Map<String, User> contacts;
+
+  final ContactListStatus status;
+  final ContactList? contactList;
+  final Map<String, Contact> contacts;
 
   ContactListState copyWith({
-    Map<String, User> Function()? contacts,
+    ContactListStatus Function()? status,
+    ContactList? Function()? contactList,
+    Map<String, Contact> Function()? contacts,
   }) {
     return ContactListState(
+      status: status != null ? status() : this.status,
+      contactList: contactList != null ? contactList() : this.contactList,
       contacts: contacts != null ? contacts() : this.contacts,
     );
   }
-}
-
-sealed class ContactEvent extends Equatable{
-  const ContactEvent();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [status, contactList, contacts];
 }
 
-final class ContactListStateInitRequested extends ContactEvent {
-  // Событие создания состояния. Оно ничего не принимает.
-  const ContactListStateInitRequested();
+sealed class ContactListEvent extends Equatable {
+  const ContactListEvent();
+
+  @override
+  List<Object?> get props => [];
 }
 
-final class ContactInvitationRequested extends ContactEvent {
-  // Событие на кнопку "пригласить пользователя".
-  // Чтобы пригласить пользователя, нужно иметь канал связи с ним.
-  // В современном мире это мессенджеры, более архаично по почте или смс.
-  // Соответственно, мы должны принимать какой-то текст приглашения,
-  // а также способ отправки этого сообщения.
-  // К сообщению также нужно приложить ссылку на скачивание нашего приложения
-  // под платформу пользователя или ссылку на web версию.
-  // Кстати, мы можем послать ссылку на вход под проекцией,
-  // которая при этом станет настоящим пользователем.
-  const ContactInvitationRequested(
-    this.name,
-    this.invitationMessage,
-    this.communicationChannel
-  );
-  final String name;
-  final String invitationMessage;
-  final String communicationChannel;
+final class ContactListInitRequested extends ContactListEvent {
+  const ContactListInitRequested();
 }
 
-final class ContactHandshakeRequested extends ContactEvent {
-  // Событие на кнопку "контактировать".
-  // Мы заранее знаем ID пользователя и приглашаем его в один из доменов.
-  // Попутно мы можем создать с ним приватный домен, если нужно.
-  const ContactHandshakeRequested(
-    this.id
-  );
-  final String id;
-}
-
-final class ContactCreateUserProjectionRequested extends ContactEvent {
-  // Когда мы хотим создать проекцию пользователя,
-  // то нам нужно знать хотя бы его имя. Можно, также указать канал связи с ним.
-  // Также возможен вариант, что создается проекция существующего пользователя.
-  // В этом случае нужно также указать ID.
-  const ContactCreateUserProjectionRequested(
-    this.name,
-    [this.communicationChannel,
-    this.id]
-  );
-  final String name;
-  final String? communicationChannel;
-  final String? id;
-}
-
-final class ContactUserSyncRequested extends ContactEvent {
-  // Событие от репозитория на изменение пользователя, на которого ранее была настроена подписка.
-  const ContactUserSyncRequested({
-    required this.contacts
+final class ContactListContactCreated extends ContactListEvent {
+  const ContactListContactCreated({
+    required this.name,
+    required this.userId,
   });
-  final Map<String, User> contacts;
+
+  final String name;
+  final String userId;
+
+  @override
+  List<Object?> get props => [name, userId];
 }
 
-final class ContactDomainSyncRequested extends ContactEvent {
-  // Событие от репозитория на изменение домена, на который ранее была настроена подписка.
-  const ContactDomainSyncRequested({
-    required this.domains
+final class ContactListContactEdited extends ContactListEvent {
+  const ContactListContactEdited({
+    required this.contactId,
+    required this.name,
   });
-  final Map<String, Domain> domains;
+
+  final String contactId;
+  final String name;
+
+  @override
+  List<Object?> get props => [contactId, name];
+}
+
+final class ContactListContactDeleted extends ContactListEvent {
+  const ContactListContactDeleted({required this.contactId});
+
+  final String contactId;
+
+  @override
+  List<Object?> get props => [contactId];
+}
+
+final class ContactListContactsSynced extends ContactListEvent {
+  const ContactListContactsSynced({
+    required this.contacts,
+    this.removedIds = const {},
+  });
+
+  final Map<String, Contact> contacts;
+  final Set<String> removedIds;
+
+  @override
+  List<Object?> get props => [contacts, removedIds];
 }

@@ -14,5 +14,16 @@
     "loginBlankUserButtonText": "Blank user",
     "unknownPageText": "The requested page does not exist",
     "unknownPageTitle": "Unknown page",
-    "contactListPageName": "Contacts"
+    "contactListPageName": "Contacts",
+    "contactListEmpty": "No contacts yet",
+    "contactListAdd": "Add contact",
+    "contactListEdit": "Edit contact",
+    "contactListDelete": "Delete",
+    "contactListDeleteConfirm": "Delete contact \"{name}\"?",
+    "@contactListDeleteConfirm": {"placeholders": {"name": {"type": "String"}}},
+    "contactListNameLabel": "Name",
+    "contactListNameRequired": "Name is required",
+    "contactListUserIdLabel": "User ID",
+    "contactListUserIdRequired": "User ID is required",
+    "contactPickerTitle": "Choose contacts"
 }

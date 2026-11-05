@@ -48,11 +48,43 @@ class AppLocalizationsRu extends AppLocalizations {
   String get loginBlankUserButtonText => 'Пустой пользователь';
 
   @override
-  String get unknownPageText => 'Запрошеная страница не существует';
+  String get unknownPageText => 'Запрошенная страница не существует';
 
   @override
   String get unknownPageTitle => 'Неизвестная страница';
 
   @override
   String get contactListPageName => 'Контакты';
+
+  @override
+  String get contactListEmpty => 'Контактов пока нет';
+
+  @override
+  String get contactListAdd => 'Добавить контакт';
+
+  @override
+  String get contactListEdit => 'Редактировать контакт';
+
+  @override
+  String get contactListDelete => 'Удалить';
+
+  @override
+  String contactListDeleteConfirm(String name) {
+    return 'Удалить контакт \"$name\"?';
+  }
+
+  @override
+  String get contactListNameLabel => 'Имя';
+
+  @override
+  String get contactListNameRequired => 'Укажите имя';
+
+  @override
+  String get contactListUserIdLabel => 'ID пользователя';
+
+  @override
+  String get contactListUserIdRequired => 'Укажите ID пользователя';
+
+  @override
+  String get contactPickerTitle => 'Выберите контакты';
 }

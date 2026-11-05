@@ -97,99 +97,159 @@ abstract class AppLocalizations {
 
   /// No description provided for @applicationTitle.
   ///
-  /// In ru, this message translates to:
-  /// **'Близкие'**
+  /// In en, this message translates to:
+  /// **'Closers'**
   String get applicationTitle;
 
   /// No description provided for @homePageName.
   ///
-  /// In ru, this message translates to:
-  /// **'Доска'**
+  /// In en, this message translates to:
+  /// **'Home'**
   String get homePageName;
 
   /// No description provided for @taskListPageName.
   ///
-  /// In ru, this message translates to:
-  /// **'Дела'**
+  /// In en, this message translates to:
+  /// **'Tasks'**
   String get taskListPageName;
 
   /// No description provided for @userProfilePageName.
   ///
-  /// In ru, this message translates to:
-  /// **'Профиль'**
+  /// In en, this message translates to:
+  /// **'Profile'**
   String get userProfilePageName;
 
   /// No description provided for @domainListPageName.
   ///
-  /// In ru, this message translates to:
-  /// **'Близкие'**
+  /// In en, this message translates to:
+  /// **'Closee groups'**
   String get domainListPageName;
 
   /// No description provided for @addTaskHint.
   ///
-  /// In ru, this message translates to:
-  /// **'Добавить задачу'**
+  /// In en, this message translates to:
+  /// **'Add new task'**
   String get addTaskHint;
 
   /// No description provided for @loginHelloLabel.
   ///
-  /// In ru, this message translates to:
-  /// **'Привет, дорогой друг!'**
+  /// In en, this message translates to:
+  /// **'Hi there'**
   String get loginHelloLabel;
 
   /// No description provided for @loginActionLabel.
   ///
-  /// In ru, this message translates to:
-  /// **'Войти как:'**
+  /// In en, this message translates to:
+  /// **'Login as:'**
   String get loginActionLabel;
 
   /// No description provided for @loginPutIdHintText.
   ///
-  /// In ru, this message translates to:
-  /// **'Введите ID для входа'**
+  /// In en, this message translates to:
+  /// **'Put user ID to authenticate'**
   String get loginPutIdHintText;
 
   /// No description provided for @loginExistingUserButtonText.
   ///
-  /// In ru, this message translates to:
-  /// **'Существующий пользователь'**
+  /// In en, this message translates to:
+  /// **'Existing user'**
   String get loginExistingUserButtonText;
 
   /// No description provided for @loginExistingUserActionLabel.
   ///
-  /// In ru, this message translates to:
-  /// **'Введите ваш ID'**
+  /// In en, this message translates to:
+  /// **'Please input your ID'**
   String get loginExistingUserActionLabel;
 
   /// No description provided for @loginNewUserButtonText.
   ///
-  /// In ru, this message translates to:
-  /// **'Новый пользователь'**
+  /// In en, this message translates to:
+  /// **'New user'**
   String get loginNewUserButtonText;
 
   /// No description provided for @loginBlankUserButtonText.
   ///
-  /// In ru, this message translates to:
-  /// **'Пустой пользователь'**
+  /// In en, this message translates to:
+  /// **'Blank user'**
   String get loginBlankUserButtonText;
 
   /// No description provided for @unknownPageText.
   ///
-  /// In ru, this message translates to:
-  /// **'Запрошеная страница не существует'**
+  /// In en, this message translates to:
+  /// **'The requested page does not exist'**
   String get unknownPageText;
 
   /// No description provided for @unknownPageTitle.
   ///
-  /// In ru, this message translates to:
-  /// **'Неизвестная страница'**
+  /// In en, this message translates to:
+  /// **'Unknown page'**
   String get unknownPageTitle;
 
   /// No description provided for @contactListPageName.
   ///
-  /// In ru, this message translates to:
-  /// **'Контакты'**
+  /// In en, this message translates to:
+  /// **'Contacts'**
   String get contactListPageName;
+
+  /// No description provided for @contactListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No contacts yet'**
+  String get contactListEmpty;
+
+  /// No description provided for @contactListAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add contact'**
+  String get contactListAdd;
+
+  /// No description provided for @contactListEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit contact'**
+  String get contactListEdit;
+
+  /// No description provided for @contactListDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get contactListDelete;
+
+  /// No description provided for @contactListDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete contact \"{name}\"?'**
+  String contactListDeleteConfirm(String name);
+
+  /// No description provided for @contactListNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get contactListNameLabel;
+
+  /// No description provided for @contactListNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required'**
+  String get contactListNameRequired;
+
+  /// No description provided for @contactListUserIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID'**
+  String get contactListUserIdLabel;
+
+  /// No description provided for @contactListUserIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID is required'**
+  String get contactListUserIdRequired;
+
+  /// No description provided for @contactPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose contacts'**
+  String get contactPickerTitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

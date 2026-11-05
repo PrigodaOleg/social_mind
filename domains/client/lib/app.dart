@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'ui/pages/contact_list.dart';
 import 'ui/ui.dart';
 import 'ui/navigation.dart';
 import 'repository/repository.dart';

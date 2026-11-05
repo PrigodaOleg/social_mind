@@ -55,4 +55,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactListPageName => 'Contacts';
+
+  @override
+  String get contactListEmpty => 'No contacts yet';
+
+  @override
+  String get contactListAdd => 'Add contact';
+
+  @override
+  String get contactListEdit => 'Edit contact';
+
+  @override
+  String get contactListDelete => 'Delete';
+
+  @override
+  String contactListDeleteConfirm(String name) {
+    return 'Delete contact \"$name\"?';
+  }
+
+  @override
+  String get contactListNameLabel => 'Name';
+
+  @override
+  String get contactListNameRequired => 'Name is required';
+
+  @override
+  String get contactListUserIdLabel => 'User ID';
+
+  @override
+  String get contactListUserIdRequired => 'User ID is required';
+
+  @override
+  String get contactPickerTitle => 'Choose contacts';
 }

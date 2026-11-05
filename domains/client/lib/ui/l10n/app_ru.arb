@@ -15,6 +15,16 @@
     "unknownPageText": "Запрошенная страница не существует",
     "unknownPageTitle": "Неизвестная страница",
     "contactListPageName": "Контакты",
+    "contactListEmpty": "Контактов пока нет",
+    "contactListAdd": "Добавить контакт",
+    "contactListEdit": "Редактировать контакт",
+    "contactListDelete": "Удалить",
+    "contactListDeleteConfirm": "Удалить контакт \"{name}\"?",
+    "contactListNameLabel": "Имя",
+    "contactListNameRequired": "Укажите имя",
+    "contactListUserIdLabel": "ID пользователя",
+    "contactListUserIdRequired": "Укажите ID пользователя",
+    "contactPickerTitle": "Выберите контакты",
 
 
     "BRIEFS": "",
