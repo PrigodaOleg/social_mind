@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'ui/ui.dart';
 import 'ui/navigation.dart';
 import 'repository/repository.dart';
+import 'notifications/push_notification_service.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -9,6 +10,13 @@ class App extends StatelessWidget {
   Future<List<NavStackEntry>?> locateUser(Repository repository) async {
     // This is the origin point of working with repository
     await repository.init();
+    // FCM: регистрация токена после того, как репозиторий знает пользователя
+    try {
+      await PushNotificationService.instance.initOnLogin(repository);
+    } catch (error) {
+      // Пуши не критичны для работы приложения
+      print('Push notifications init failed: $error');
+    }
 
     // Trying to get user and set it as actual local user
     // User account can be stored locally or remotely
@@ -69,7 +77,9 @@ class App extends StatelessWidget {
         DomainContentPage.routeName: DomainContentPage.new,
         TaskListPage.routeName: TaskListPage.new,
         ContactListPage.routeName: ContactListPage.new,
-        UserProfilePage.routeName: UserProfilePage.new
+        UserProfilePage.routeName: UserProfilePage.new,
+        InvitationPage.routeName: InvitationPage.new,
+        NotificationsPage.routeName: NotificationsPage.new
       }),
       routeInformationParser: AppRouteInformationParser(),
     );
