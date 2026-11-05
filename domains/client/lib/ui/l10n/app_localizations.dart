@@ -107,39 +107,32 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Home'**
+  /// In ru, this message translates to:
+  /// **'Доска'**
   String get homePageName;
 
   /// No description provided for @taskListPageName.
   ///
   /// In en, this message translates to:
   /// **'Tasks'**
+  /// In ru, this message translates to:
+  /// **'Дела'**
   String get taskListPageName;
 
   /// No description provided for @userProfilePageName.
   ///
   /// In en, this message translates to:
   /// **'Profile'**
+  /// In ru, this message translates to:
+  /// **'Профиль пользователя'**
   String get userProfilePageName;
 
   /// No description provided for @domainListPageName.
   ///
   /// In en, this message translates to:
   /// **'Closee groups'**
-  /// In ru, this message translates to:
-  /// **'Доска'**
-  String get homePageName;
 
-  /// No description provided for @userProfilePageName.
-  ///
-  /// In ru, this message translates to:
-  /// **'Профиль пользователя'**
-  String get userProfilePageName;
 
-  /// No description provided for @taskListPageName.
-  ///
-  /// In ru, this message translates to:
-  /// **'Дела'**
-  String get taskListPageName;
 
   /// No description provided for @domainListPageName.
   ///
@@ -231,6 +224,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Contacts'**
+  /// In ru, this message translates to:
+  /// **'Контакты'**
   String get contactListPageName;
 
   /// No description provided for @contactListEmpty.
@@ -292,13 +287,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose contacts'**
   String get contactPickerTitle;
-}
-
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
-  /// In ru, this message translates to:
-  /// **'Контакты'**
-  String get contactListPageName;
-
   /// No description provided for @taskListViewAll.
   ///
   /// In ru, this message translates to:
@@ -376,7 +364,6 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   /// In ru, this message translates to:
   /// **'Списки задач'**
   String get tasksListsTitle;
-
   /// No description provided for @userProjectionDescription.
   ///
   /// In ru, this message translates to:
