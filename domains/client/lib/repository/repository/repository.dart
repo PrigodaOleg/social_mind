@@ -102,6 +102,12 @@ class Repository {
 
   late Timer _sync;
 
+  // Отложить синхронизацию (безопасно до вызова init - например, в тестах)
+  void postponeSync() {
+    if (late) return;
+    _sync.postpone();
+  }
+
   // User associated with this application instance
   // late String myId;
 
@@ -141,6 +147,8 @@ class Repository {
 
   final knownRemoteStorages = <String, Function()>{
     'FirebaseRealtimeDatabase': () => FirebaseStorage(),
+    'CloudFirestore': () => CloudFirestoreStorage(),
+    'Supabase': () => SupabaseStorage(),
   };
 
   Future<void> init() async {
@@ -156,6 +164,159 @@ class Repository {
     late = false;
   }
 
+  // # Реалтайм: подписка на изменения реестров в удаленных хранилищах.
+  // Подписываемся только на реестры (доменов пользователя и личный реестр),
+  // по входящим транзакциям определяем изменившиеся модели и дочитываем их по ID.
+  final registryWatchSubscriptions = <RemoteStorage, StreamSubscription>{};
+  Set<String> watchedRegistryIds = {};
+
+  /// Подписаться на изменения реестров [registryIds] в соответствующих хранилищах.
+  /// Входящие события обрабатываются через [onRemoteRegistryChange].
+  Future<void> watchRegistries(Set<String> registryIds) async {
+    final newIds = registryIds.difference(watchedRegistryIds);
+    if (newIds.isEmpty) return;
+    watchedRegistryIds.addAll(newIds);
+    for (var storageEntry in _remoteStorages.entries) {
+      // Реестры маршрутизируем по storageKey родителя; для простоты подписываемся
+      // на все новые ID в каждом подключенном хранилище, лишние события отфильтруются
+      // при чтении (реестр не найдется в этом хранилище).
+      if (registryWatchSubscriptions.containsKey(storageEntry.value)) {
+        await registryWatchSubscriptions[storageEntry.value]?.cancel();
+      }
+      registryWatchSubscriptions[storageEntry.value] = storageEntry.value
+          .watchRegistries(watchedRegistryIds.toList())
+          .listen((event) => onRemoteRegistryChange(event.registryId));
+    }
+  }
+
+  Future<void> stopWatchingRegistries() async {
+    for (var sub in registryWatchSubscriptions.values) {
+      await sub.cancel();
+    }
+    registryWatchSubscriptions.clear();
+    watchedRegistryIds.clear();
+  }
+
+  /// Обработка события изменения реестра: перечитываем новые транзакции,
+  /// определяем изменившиеся модели, дочитываем их и кладем в локальное хранилище,
+  /// после чего уведомляем слушателей.
+  Future<void> onRemoteRegistryChange(String registryId) async {
+    if (_remoteStorages.isEmpty) return;
+    try {
+      final localRegistry = _localStorage.getRegistry(id: registryId, count: 1);
+      final lastLocalIndex = localRegistry?.lastTransactionIndex ?? -1;
+      // Читаем транзакции, опережающие локальную голову
+      final remoteRegistries = await _readRegistriesRoutedCounts([(registryId, 50)]);
+      final remoteRegistry = remoteRegistries[registryId];
+      if (remoteRegistry == null) return;
+      final freshTransactions = remoteRegistry.transactions.entries
+          .where((e) => e.key > lastLocalIndex)
+          .map((e) => e.value)
+          .toList();
+      if (freshTransactions.isEmpty) return;
+      // Сохраняем реестр локально
+      await _localStorage.storeItems({registryId: remoteRegistry});
+      // Определяем изменившиеся модели и дочитываем их
+      final changedModelIds = freshTransactions.expand((t) => t.changes).toSet().toList();
+      if (changedModelIds.isNotEmpty) {
+        final remoteModels = await _getFromAllRemoteStorages(changedModelIds);
+        // Ребейзим с локальными копиями, если они изменены локально
+        await _localStorage.storeItems(remoteModels.cast<String, Model>());
+        for (final id in changedModelIds) {
+          incomingSyncIds[id]?.forEach((subscriberId) {
+            final model = remoteModels[id];
+            if (model != null && model is Model) {
+              model.sync = SyncStatus.synced;
+              syncListeners[subscriberId]?.call(id, model);
+            }
+          });
+        }
+        // Уведомляем о событиях для пуших (назначение задач, изменения статусов...)
+        for (final transaction in freshTransactions) {
+          _notifyEventListeners(transaction, remoteModels.cast<String, Model>());
+        }
+      }
+      syncedThisTime.addAll(changedModelIds);
+    } catch (e) {
+      print('Error on remote registry change ($registryId): $e');
+    }
+  }
+
+  // # События для уведомлений (фаза пуши).
+  final eventListeners = <int, void Function(String type, Model subject, String actorId)>{};
+  int eventListenersCounter = 0;
+
+  int addEventListener(void Function(String type, Model subject, String actorId) listener) {
+    eventListeners[eventListenersCounter] = listener;
+    return eventListenersCounter++;
+  }
+
+  void removeEventListener(int id) {
+    eventListeners.remove(id);
+  }
+
+  /// Определяем тип события из транзакции и уведомляем слушателей.
+  /// Пока поддерживаем: назначение исполнителя задачи и завершение задачи.
+  @visibleForTesting
+  void onRemoteTransactionForTest(Transaction transaction, Map<String, Model> models) => _notifyEventListeners(transaction, models);
+
+  void _notifyEventListeners(Transaction transaction, Map<String, Model> models) {
+    if (transaction.originatorId == myId) return; // свои события не уведомляем
+    for (final modelId in transaction.changes) {
+      final model = models[modelId];
+      if (model is Task) {
+        if (model.executorId == myId && model.executorId.isNotEmpty) {
+          eventListeners.values.toList().forEach((l) => l('task_assigned', model, transaction.originatorId));
+        } else if (model.isCompleted) {
+          eventListeners.values.toList().forEach((l) => l('task_completed', model, transaction.originatorId));
+        }
+      }
+    }
+  }
+
+  /// Обновление реестров всех доменов пользователя + личного реестра (мультиустройство).
+  /// Вызывается после логина и при появлении новых доменов.
+  // Карта registryId -> storageKey родителя (домена/пользователя). Заполняется
+  // при подписке и используется для маршрутизации чтения реестров.
+  final Map<String, String> registryStorageKeys = {};
+
+  Future<void> updateRegistryWatches() async {
+    if (myId == null || _remoteStorages.isEmpty) return;
+    final registryIds = <String>{};
+    try {
+      final meUser = me;
+      if (meUser.registryId.isNotEmpty) {
+        registryIds.add(meUser.registryId);
+        registryStorageKeys[meUser.registryId] = meUser.storageKey;
+      }
+      for (final domainId in meUser.domainsIds) {
+        final domain = _localStorage.getItem(id: domainId);
+        if (domain is Domain && domain.registryId.isNotEmpty) {
+          registryIds.add(domain.registryId);
+          registryStorageKeys[domain.registryId] = domain.storageKey;
+        }
+      }
+    } catch (_) {
+      // me еще не инициализирован
+      return;
+    }
+    await watchRegistries(registryIds);
+  }
+
+  // Подключенные удаленные хранилища (только для чтения извне; запись через
+  // addConnectedStorage - при подключении хранилища на лету).
+  Map<String, RemoteStorage> get connectedStorages => _remoteStorages;
+
+  // Доступ к локальному хранилищу для настройки-сервисов (правила уведомлений
+  // и другие локальные настройки). Общий контракт Repository остается прежним.
+  LocalStorage get localStorage => _localStorage;
+
+  // Регистрация уже подключенного хранилища (например, при принятии приглашения
+  // в домен, когда хранилище подключается на лету).
+  void addConnectedStorage(String storageKey, RemoteStorage storage) {
+    _remoteStorages[storageKey] = storage;
+  }
+
   Future<void> initRemoteStorages() async {
     for (var storage in me.settings.getDeep('remote_storages', defaultValue: {}).entries) {
       _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
@@ -164,7 +325,8 @@ class Repository {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
       String? instance = me.settings.getDeep(instanceFieldName);
       if (instance != null) {
-        await storage.value.init(instance);  // todo: wrap in try-catch and show error message to user
+        final anonKey = me.settings.getDeep('remote_storages.${storage.key}.anon_key');
+        await storage.value.init(instance, anonKey: anonKey);  // todo: wrap in try-catch and show error message to user
       } else {
         print('No parameter $instanceFieldName is specified for ${storage.key}');
       }
@@ -267,7 +429,26 @@ class Repository {
     print('Access denied for items: $items');
   }
 
-  void _delayedSync() async {
+  // Мьютекс синхронизации: исключает параллельный запуск _delayedSync из
+  // debounce-таймера и из immediate-вызовов saveModel/saveModels.
+  bool _syncInProgress = false;
+  Future<void> _syncMutex() async {
+    while (_syncInProgress) {
+      await Future.delayed(const Duration(milliseconds: 20));
+    }
+    _syncInProgress = true;
+  }
+
+  Future<void> _delayedSync() async {
+    await _syncMutex();
+    try {
+      await _doDelayedSync();
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<void> _doDelayedSync() async {
     // Свежий взгляд 08.12.2024.
     // Этот метод совершает синхронизацию локальных и удаленных объектов. Конкретно должны обрабатываться следующие сценарии:
     // 1. Локально создан новый объект и его нужно просто загрузить в удаленное хранилище.
@@ -338,7 +519,7 @@ class Repository {
 
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
     var idsToSync = incomingSyncIds.keys.toSet().difference(syncedThisTime).toList();
-    var syncedModels = await _remoteStorages.values.first.getItems(idsToSync);
+    var syncedModels = await _getFromAllRemoteStorages(idsToSync);
     // Вот тут, внимание(!), сохраняем приехвашие изменения в локальное хранилище, хотя надо делать слияние
     await _localStorage.storeItems(syncedModels);
     // Вызываем для каждого синхронизированного элемента событие для слушателя
@@ -352,7 +533,8 @@ class Repository {
 
   void _findAndCallListeners(String id) async {
     incomingSyncIds[id]?.forEach((subscriberId) async {
-      Model? model = await _remoteStorages.values.first.getItem(id: id); // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
+      final remoteItems = await _getFromAllRemoteStorages([id]);
+      Model? model = remoteItems[id]; // тут плохо сделано, на каждый элемент вызывается чтение с сервера. Запросы на чтение нужно накапливать за определенный промежуток времени, а потом батчевать.
       model?.sync = SyncStatus.synced;
       syncedThisTime.add(id); // todo: тут ошибка - если в удаленном репозитории такой модели нет, то ее надо либо туда загрузить, либо удалить тут, тихо промолчать нельзя
       // print(model);
@@ -391,17 +573,22 @@ class Repository {
 
   void _syncModel(Model model) {
     subscribeToSync(model.id, defaultSyncSubscriber);
-    _sync.postpone();
+    postponeSync();
   }
 
   Future<void> saveModel(
     Model model,
-    [int? subscriberId] // Item ID - sync callback pair
+    [int? subscriberId, // Item ID - sync callback pair
+    bool immediate = false] // немедленная отправка (без дебаунса) - для важных изменений
   ) async  {
     await _localStorage.storeItem(model);
     subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
-    _sync.postpone();
+    if (immediate) {
+      await _delayedSync();
+    } else {
+      postponeSync();
+    }
   }
 
   T? getModel<T>(
@@ -410,7 +597,7 @@ class Repository {
   ) {
     T? model = _localStorage.getItem(id: modelId);
     subscribeToSync(modelId, subscriberId);
-    _sync.postpone();
+    postponeSync();
     return model;
   }
 
@@ -427,19 +614,24 @@ class Repository {
     Map<String, T> models = _localStorage.getItems(ids);
     subscribeToSyncAll(ids, subscriberId);
     _markSyncedAll(models);
-    _sync.postpone();
+    postponeSync();
     return models;
   }
 
   Future<void> saveModels(
     List<Model> models,
-    [int? subscriberId] // Item ID - sync callback pair
+    [int? subscriberId, // Item ID - sync callback pair
+    bool immediate = false]
   ) async {
     var modelsMap = { for (var model in models) model.id : model };
     await _localStorage.storeItems(modelsMap);
     subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
     outgoingChanges.addAll(models);
-    _sync.postpone();
+    if (immediate) {
+      await _delayedSync();
+    } else {
+      postponeSync();
+    }
   }
 
   void deleteModel(
@@ -447,7 +639,7 @@ class Repository {
     [int? subscriberId] // Item ID - sync callback pair
   ) {
     outgoingDeletes.addLast(model);
-    _sync.postpone();
+    postponeSync();
   }
 
  Future<void> saveImage(String name, Uint8List imageBytes) async {
@@ -525,33 +717,92 @@ Uint8List? getImage(String name) {
     }
   }
 
-  // todo: Тут, конечно, получается полный сюрреализм, поскольку мы читаем одни и те же модели из разных источников, получаются дубли.
-  // Нужно читать либо откуда-то из одного места, либо при чтении из разных как-то сравнивать получающиеся данные и при их расхождении
-  // производить анализ на предмет того, чьи данные актуальнее, и распространять свежую версию во все хранилища.
-  // Тут по хорошему нужно нарисовать схему взаимодействия между всеми хранилищами и сделать правильную логику синхронизации.
+  // Читаем модели из тех удаленных хранилищ, к которым они относятся
+  // (маршрутизация по storageKey родителя модели).
   Future<Map<String, dynamic>> _getFromAllRemoteStorages(List ids) async {
     Map<String, dynamic> items = {};
-    for (var rStorage in _remoteStorages.entries) {
-      items.addAll(await rStorage.value.getItems(ids));
+    // Группируем ID по хранилищам и читаем батчами
+    final idsByStorage = <RemoteStorage, List<String>>{};
+    for (final id in ids) {
+      final localItem = _localStorage.getItem(id: id as String);
+      // Модель с известным storageKey читаем из его хранилища, иначе (обратная
+      // совместимость) - из первого подключенного.
+      final storage = (localItem != null ? _storageForModel(localItem) : null) ?? _remoteStorages.values.firstOrNull;
+      if (storage == null) continue;
+      idsByStorage.putIfAbsent(storage, () => []).add(id);
+    }
+    for (var entry in idsByStorage.entries) {
+      items.addAll(await entry.key.getItems(entry.value));
     }
     return items;
   }
 
+  // Сохраняем модели в их удаленные хранилища. Каждая пачка кластеризуется
+  // по родителю, и каждая пачка пишется ровно в одно хранилище - то, которое
+  // указано в поле storageKey родителя.
   Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries) async {
     int count = 0;
-    // todo: Сейчас сохраняет тупым перебором все remote storage'ы. Нужно сделать более умный способ
-    for (var rStorage in _remoteStorages.entries) {
-      count += await rStorage.value.saveItems({...items,  ...registries});
+    Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
+    for (var parentEntry in parentItems.entries) {
+      final parent = parentEntry.key;
+      var storage = _storageForModel(parent);
+      // Обратная совместимость: модели без storageKey (старые данные и тесты)
+      // пишутся в первое подключенное хранилище.
+      storage ??= _remoteStorages.values.firstOrNull;
+      if (storage == null) {
+        print('No remote storage configured for ${parent.runtimeType} ${parent.id}'); // todo: показывать ошибку пользователю
+        continue;
+      }
+      count += await storage.saveItems({...parentEntry.value, ...registries});
     }
-    return count; // todo: Тут вообще возвращается не пойми что
-  }
-
-  Future<int> _deleteFromAllRemoteStorages(Map<String, dynamic> items) async {
-    int count = 0;
-    for (var rStorage in _remoteStorages.entries) {
-      count += await rStorage.value.deleteItems(items);
+    // Реестры, чей родитель не среди items (например, личный реестр пользователя),
+    // пишем в хранилище пользователя.
+    final orphanRegistries = <String, Registry>{};
+    for (var registryEntry in registries.entries) {
+      if (items.containsKey(registryEntry.value.parentId)) continue;
+      final parentModel = _localStorage.getItem(id: registryEntry.value.parentId ?? '');
+      if (parentModel != null && items.containsKey(parentModel.id)) continue;
+      orphanRegistries[registryEntry.key] = registryEntry.value;
+    }
+    if (orphanRegistries.isNotEmpty) {
+      final storage = (_storageByKey(me.storageKey) ?? _remoteStorages.values.firstOrNull);
+      if (storage != null) {
+        count += await storage.saveItems(orphanRegistries);
+      }
     }
     return count;
+  }
+
+  // Удаляем модели из их удаленных хранилищ.
+  Future<int> _deleteFromAllRemoteStorages(Map<String, dynamic> items) async {
+    int count = 0;
+    Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items.cast<String, Model>());
+    for (var parentEntry in parentItems.entries) {
+      final storage = _storageForModel(parentEntry.key) ?? _remoteStorages.values.firstOrNull;
+      if (storage == null) continue;
+      count += await storage.deleteItems(parentEntry.value);
+    }
+    return count;
+  }
+
+  // Получаем удаленное хранилище по ключу из настроек (remote_storages.<storageKey>).
+  // Если ключ пуст или хранилище не подключено/не инициализировано, возвращаем null -
+  // модель остается только локально.
+  RemoteStorage? _storageByKey(String? storageKey) {
+    if (storageKey == null || storageKey.isEmpty) return null;
+    final storage = _remoteStorages[storageKey];
+    return storage;
+  }
+
+  // Определяем удаленное хранилище для модели по ее родителю (домену или пользователю).
+  // Модель существует ровно в одном удаленном хранилище - том, которое указано в
+  // поле storageKey родителя.
+  RemoteStorage? _storageForModel(Model model) {
+    if (model is Domain) return _storageByKey(model.storageKey);
+    if (model is User) return _storageByKey(model.storageKey);
+    final parent = _getParent(model);
+    if (parent == null) return null;
+    return _storageForModel(parent);
   }
 
   // Извлекаем домен для модели.
@@ -601,7 +852,7 @@ Uint8List? getImage(String name) {
     // или пока не обнаружим отсутствие прав на запись (пока индексы транзакций меняются при перечитывании).
     do {
       if (isRemoteRegistriesActual == false) {
-        latestRemoteRegistries = await _remoteStorages.values.first.readRegistries(ids: localRegistries.keys.toList());
+        latestRemoteRegistries = await _readRegistriesRouted(localRegistries.keys.toList());
         if (_isIndexesEqual(remoteRegistries, latestRemoteRegistries)) {
           // Индексы не изменились, значит нет прав на запись
           _rollbackLastTransaction(oldItems, localRegistries);
@@ -815,7 +1066,7 @@ Uint8List? getImage(String name) {
         remoteMap[field] = localMap[field];
       }
     }
-    return _remoteStorages.values.first.models[remoteModel.type]!(remoteMap);
+    return FirebaseStorage().models[remoteModel.type]!(remoteMap);
   }
 
   Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
@@ -931,6 +1182,43 @@ Uint8List? getImage(String name) {
     }
   }
 
+  // Резолвим хранилище для реестра: сперва по карте registryStorageKeys
+  // (заполняется при подписке), затем по storageKey локальной модели-родителя
+  // (registry.parentId), затем фолбэк на первое подключенное хранилище.
+  RemoteStorage? _storageForRegistry(String registryId) {
+    final storageKey = registryStorageKeys[registryId];
+    if (storageKey != null) {
+      final byKey = _storageByKey(storageKey);
+      if (byKey != null) return byKey;
+    }
+    final localRegistry = _localStorage.getRegistry(id: registryId, count: 1);
+    final parentId = localRegistry?.parentId;
+    if (parentId != null && parentId.isNotEmpty) {
+      final parentModel = _localStorage.getItem(id: parentId);
+      if (parentModel != null) {
+        final byParent = _storageForModel(parentModel);
+        if (byParent != null) return byParent;
+      }
+    }
+    return _remoteStorages.values.firstOrNull;
+  }
+
+  // Читаем реестры из их удаленных хранилищ. Каждый реестр лежит рядом со своим
+  // родителем (доменом или пользователем), поэтому маршрутизируем по storageKey родителя.
+  Future<Map<String, Registry>> _readRegistriesRouted(List<String> ids) async {
+    Map<String, Registry> registries = {};
+    final idsByStorage = <RemoteStorage, List<String>>{};
+    for (final id in ids) {
+      final storage = _storageForRegistry(id);
+      if (storage == null) continue;
+      idsByStorage.putIfAbsent(storage, () => []).add(id);
+    }
+    for (var entry in idsByStorage.entries) {
+      registries.addAll(await entry.key.readRegistries(ids: entry.value));
+    }
+    return registries;
+  }
+
   // Вычисляем и читаем опережающие цепочки транзакций по всем реестрам
   // Базовые индексы берем из [localRegistries], известные индексы вычисляем из объединения
   // [remoteRegistries] и [knownFragment]. Причем, так как мы не знаем, появились ли новые транзакции в УХ,
@@ -957,16 +1245,32 @@ Uint8List? getImage(String name) {
       final count = latestRemoteIndex - lastLocalIndex + 2;
       registriesIdsToRead.add((localRegistry.id!, count));
     }
-    return await _remoteStorages.values.first.readRegistries(idsCounts: registriesIdsToRead);
+    return await _readRegistriesRoutedCounts(registriesIdsToRead);
   }
 
-  // Читаем из удаленного репозитория все изменения, перечисленные в [registries]
+  // Читаем реестры с указанным количеством транзакций, маршрутизируя по storageKey родителя.
+  Future<Map<String, Registry>> _readRegistriesRoutedCounts(List<(String, int)> registriesIdsToRead) async {
+    Map<String, Registry> registries = {};
+    final idsByStorage = <RemoteStorage, List<(String, int)>>{};
+    for (final (id, count) in registriesIdsToRead) {
+      final storage = _storageForRegistry(id);
+      if (storage == null) continue;
+      idsByStorage.putIfAbsent(storage, () => []).add((id, count));
+    }
+    for (var entry in idsByStorage.entries) {
+      registries.addAll(await entry.key.readRegistries(idsCounts: entry.value));
+    }
+    return registries;
+  }
+
+  // Читаем из удаленных хранилищ все изменения, перечисленные в [registries]
   Future<Map<String, Model>> _getRemoteChanges(Map<String, Registry> registries) async {
     Set<String> allModels = {};
     for (final registry in registries.values) {
       registry.transactions.values.forEach((transaction) => allModels.addAll(transaction.changes));
     }
-    return await _remoteStorages.values.first.getItems(allModels.toList());
+    final items = await _getFromAllRemoteStorages(allModels.toList());
+    return items.cast<String, Model>();
   }
 
   // Создаем новые транзакции для каждого реестра в [registries].

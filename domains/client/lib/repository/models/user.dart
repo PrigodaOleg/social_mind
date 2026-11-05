@@ -10,6 +10,7 @@ class User extends Model {
     firstName,
     lastName,
     description,
+    this.storageKey = '',
   })  : domainsIds = domainsIds ?? <String>[],
         registryId = registryId ?? '',
         avatarUrl = avatarUrl ?? '',
@@ -27,6 +28,7 @@ class User extends Model {
         firstName = (json['firstName'] ?? '') as String,
         lastName = (json['lastName'] ?? '') as String,
         description = (json['description'] ?? '') as String,
+        storageKey = (json['storageKey'] ?? '') as String,
         super.fromJson();
 
   @override
@@ -36,6 +38,10 @@ class User extends Model {
   List<String> domainsIds;
 
   String registryId;
+
+  /// Хранилище по умолчанию для новых доменов этого пользователя
+  /// (remote_storages.<storageKey> в настройках).
+  String storageKey;
 
   String avatarUrl;
   String firstName;
@@ -69,6 +75,7 @@ class User extends Model {
       'firstName': firstName,
       'lastName': lastName,
       'description': description,
+      'storageKey': storageKey,
     });
 
   @override
@@ -102,6 +109,7 @@ class User extends Model {
     String? firstName,
     String? lastName,
     String? description,
+    String? storageKey,
   }) {
     return User(
       id: id ?? this.id,
@@ -112,6 +120,7 @@ class User extends Model {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       description: description ?? this.description,
+      storageKey: storageKey ?? this.storageKey,
     );
   }
 
@@ -159,5 +168,5 @@ class User extends Model {
   }
 
   @override
-  List<Object> get props => super.props + [name, domainsIds, registryId];
+  List<Object> get props => super.props + [name, domainsIds, registryId, storageKey];
 }
