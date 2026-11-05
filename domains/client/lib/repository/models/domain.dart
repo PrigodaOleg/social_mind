@@ -10,7 +10,8 @@ class Domain extends Model {
     registryId,
     List<String>? participantsIds,
     List<String>? observersIds,
-    Map<String, String>? models
+    Map<String, String>? models,
+    this.storageKey = ''
   }) :
     participantsIds = participantsIds ?? <String>[],
     observersIds = observersIds ?? <String>[],
@@ -21,9 +22,11 @@ class Domain extends Model {
     isPersonal = (json['isPersonal'] ?? json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? '') as String,
     registryId = (json['registryId'] ?? '') as String,
-    participantsIds = List<String>.from(json['participantsIds'] ?? []),
-    observersIds = List<String>.from(json['observersIds'] ?? []),
+    // RTDB хранит списки как словари (ключ -> ''), поэтому принимаем обе формы.
+    participantsIds = _listFromRemote(json['participantsIds']),
+    observersIds = _listFromRemote(json['observersIds']),
     models = Map<String, String>.from(json['models'] ?? {}),
+    storageKey = (json['storageKey'] ?? '') as String,
     super.fromJson();
     
   @override
@@ -39,6 +42,11 @@ class Domain extends Model {
   // Model ID: Model Type
   Map<String, String> models;
 
+  /// Ключ удаленного хранилища (remote_storages.<storageKey> в настройках
+  /// пользователя), в котором синхронизируется домен. Модель существует ровно
+  /// в одном удаленном хранилище. Пустая строка - только локально.
+  String storageKey;
+
   Domain copyWith({
     String? id,
     String? title,
@@ -48,7 +56,8 @@ class Domain extends Model {
     String? registryId,
     List<String>? participantsIds,
     List<String>? observersIds,
-    Map<String, String>? models
+    Map<String, String>? models,
+    String? storageKey,
   }) {
     return Domain(
       id: id ?? this.id,
@@ -60,6 +69,7 @@ class Domain extends Model {
       participantsIds: participantsIds ?? this.participantsIds,
       observersIds: observersIds ?? this.observersIds,
       models: models ?? this.models,
+      storageKey: storageKey ?? this.storageKey,
     );
   }
 
@@ -71,6 +81,7 @@ class Domain extends Model {
     "participantsIds": participantsIds,
     "observersIds": observersIds,
     "models": models,
+    "storageKey": storageKey,
   });
 
   // @override
@@ -88,5 +99,15 @@ class Domain extends Model {
   // }
 
   @override
-  List<Object> get props => super.props + [isPersonal, originatorId, registryId, participantsIds, observersIds, models];
+  List<Object> get props => super.props + [isPersonal, originatorId, registryId, participantsIds, observersIds, models, storageKey];
+}
+/// RTDB не умеет хранить пустые списки и представляет списки словарями
+/// (ключ -> ''). Превращаем обе формы обратно в список.
+List<String> _listFromRemote(dynamic value) {
+  if (value is List) return List<String>.from(value);
+  if (value is Map) return value.entries
+      .where((e) => e.value == true || e.value == '' || e.value == null)
+      .map((e) => e.key.toString())
+      .toList();
+  return [];
 }
