@@ -20,13 +20,12 @@
     "contactListEdit": "Edit contact",
     "contactListDelete": "Delete",
     "contactListDeleteConfirm": "Delete contact \"{name}\"?",
-    "@contactListDeleteConfirm": {"placeholders": {"name": {"type": "String"}}},
+"@contactListDeleteConfirm": {"placeholders": {"name": {"type": "Object"}}},
     "contactListNameLabel": "Name",
     "contactListNameRequired": "Name is required",
     "contactListUserIdLabel": "User ID",
     "contactListUserIdRequired": "User ID is required",
     "contactPickerTitle": "Choose contacts",
-    "contactListPageName": "Contacts",
     "taskListViewAll": "All tasks",
     "taskListViewActiveOnly": "Active tasks",
     "taskListViewActiveFirst": "Active first",
@@ -39,5 +38,6 @@
     "create": "Create",
     "save": "Save",
     "addTaskList": "Add task list",
-    "tasksListsTitle": "Task lists"
+    "tasksListsTitle": "Task lists",
+    "userProjectionDescription": "A user projection is not a real user, but an entity that plays the user's role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projection's context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly."
 }

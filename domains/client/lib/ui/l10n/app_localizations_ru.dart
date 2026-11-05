@@ -15,10 +15,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get homePageName => 'Доска';
 
   @override
-  String get taskListPageName => 'Дела';
+  String get userProfilePageName => 'Профиль пользователя';
 
   @override
-  String get userProfilePageName => 'Профиль пользователя';
+  String get taskListPageName => 'Дела';
 
   @override
   String get domainListPageName => 'Близкие';
@@ -69,7 +69,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contactListDelete => 'Удалить';
 
   @override
-  String contactListDeleteConfirm(String name) {
+  String contactListDeleteConfirm(Object name) {
     return 'Удалить контакт \"$name\"?';
   }
 
@@ -87,6 +87,8 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contactPickerTitle => 'Выберите контакты';
+
+  @override
   String get taskListViewAll => 'Все задачи';
 
   @override

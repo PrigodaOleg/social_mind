@@ -62,7 +62,8 @@ import 'app_localizations_ru.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,7 +84,8 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
     delegate,
     GlobalMaterialLocalizations.delegate,
     GlobalCupertinoLocalizations.delegate,
@@ -97,42 +100,27 @@ abstract class AppLocalizations {
 
   /// No description provided for @applicationTitle.
   ///
-  /// In en, this message translates to:
-  /// **'Closers'**
   /// In ru, this message translates to:
   /// **'Близкие'**
   String get applicationTitle;
 
   /// No description provided for @homePageName.
   ///
-  /// In en, this message translates to:
-  /// **'Home'**
   /// In ru, this message translates to:
   /// **'Доска'**
   String get homePageName;
 
-  /// No description provided for @taskListPageName.
-  ///
-  /// In en, this message translates to:
-  /// **'Tasks'**
-  /// In ru, this message translates to:
-  /// **'Дела'**
-  String get taskListPageName;
-
   /// No description provided for @userProfilePageName.
   ///
-  /// In en, this message translates to:
-  /// **'Profile'**
   /// In ru, this message translates to:
   /// **'Профиль пользователя'**
   String get userProfilePageName;
 
-  /// No description provided for @domainListPageName.
+  /// No description provided for @taskListPageName.
   ///
-  /// In en, this message translates to:
-  /// **'Closee groups'**
-
-
+  /// In ru, this message translates to:
+  /// **'Дела'**
+  String get taskListPageName;
 
   /// No description provided for @domainListPageName.
   ///
@@ -142,151 +130,130 @@ abstract class AppLocalizations {
 
   /// No description provided for @addTaskHint.
   ///
-  /// In en, this message translates to:
-  /// **'Add new task'**
   /// In ru, this message translates to:
   /// **'Добавить задачу'**
   String get addTaskHint;
 
   /// No description provided for @loginHelloLabel.
   ///
-  /// In en, this message translates to:
-  /// **'Hi there'**
   /// In ru, this message translates to:
   /// **'Привет, дорогой друг!'**
   String get loginHelloLabel;
 
   /// No description provided for @loginActionLabel.
   ///
-  /// In en, this message translates to:
-  /// **'Login as:'**
   /// In ru, this message translates to:
   /// **'Войти как:'**
   String get loginActionLabel;
 
   /// No description provided for @loginPutIdHintText.
   ///
-  /// In en, this message translates to:
-  /// **'Put user ID to authenticate'**
   /// In ru, this message translates to:
   /// **'Введите ID для входа'**
   String get loginPutIdHintText;
 
   /// No description provided for @loginExistingUserButtonText.
   ///
-  /// In en, this message translates to:
-  /// **'Existing user'**
   /// In ru, this message translates to:
   /// **'Существующий пользователь'**
   String get loginExistingUserButtonText;
 
   /// No description provided for @loginExistingUserActionLabel.
   ///
-  /// In en, this message translates to:
-  /// **'Please input your ID'**
   /// In ru, this message translates to:
   /// **'Введите ваш ID'**
   String get loginExistingUserActionLabel;
 
   /// No description provided for @loginNewUserButtonText.
   ///
-  /// In en, this message translates to:
-  /// **'New user'**
   /// In ru, this message translates to:
   /// **'Новый пользователь'**
   String get loginNewUserButtonText;
 
   /// No description provided for @loginBlankUserButtonText.
   ///
-  /// In en, this message translates to:
-  /// **'Blank user'**
   /// In ru, this message translates to:
   /// **'Пустой пользователь'**
   String get loginBlankUserButtonText;
 
   /// No description provided for @unknownPageText.
   ///
-  /// In en, this message translates to:
-  /// **'The requested page does not exist'**
   /// In ru, this message translates to:
   /// **'Запрошенная страница не существует'**
   String get unknownPageText;
 
   /// No description provided for @unknownPageTitle.
   ///
-  /// In en, this message translates to:
-  /// **'Unknown page'**
   /// In ru, this message translates to:
   /// **'Неизвестная страница'**
   String get unknownPageTitle;
 
   /// No description provided for @contactListPageName.
   ///
-  /// In en, this message translates to:
-  /// **'Contacts'**
   /// In ru, this message translates to:
   /// **'Контакты'**
   String get contactListPageName;
 
   /// No description provided for @contactListEmpty.
   ///
-  /// In en, this message translates to:
-  /// **'No contacts yet'**
+  /// In ru, this message translates to:
+  /// **'Контактов пока нет'**
   String get contactListEmpty;
 
   /// No description provided for @contactListAdd.
   ///
-  /// In en, this message translates to:
-  /// **'Add contact'**
+  /// In ru, this message translates to:
+  /// **'Добавить контакт'**
   String get contactListAdd;
 
   /// No description provided for @contactListEdit.
   ///
-  /// In en, this message translates to:
-  /// **'Edit contact'**
+  /// In ru, this message translates to:
+  /// **'Редактировать контакт'**
   String get contactListEdit;
 
   /// No description provided for @contactListDelete.
   ///
-  /// In en, this message translates to:
-  /// **'Delete'**
+  /// In ru, this message translates to:
+  /// **'Удалить'**
   String get contactListDelete;
 
   /// No description provided for @contactListDeleteConfirm.
   ///
-  /// In en, this message translates to:
-  /// **'Delete contact \"{name}\"?'**
-  String contactListDeleteConfirm(String name);
+  /// In ru, this message translates to:
+  /// **'Удалить контакт \"{name}\"?'**
+  String contactListDeleteConfirm(Object name);
 
   /// No description provided for @contactListNameLabel.
   ///
-  /// In en, this message translates to:
-  /// **'Name'**
+  /// In ru, this message translates to:
+  /// **'Имя'**
   String get contactListNameLabel;
 
   /// No description provided for @contactListNameRequired.
   ///
-  /// In en, this message translates to:
-  /// **'Name is required'**
+  /// In ru, this message translates to:
+  /// **'Укажите имя'**
   String get contactListNameRequired;
 
   /// No description provided for @contactListUserIdLabel.
   ///
-  /// In en, this message translates to:
-  /// **'User ID'**
+  /// In ru, this message translates to:
+  /// **'ID пользователя'**
   String get contactListUserIdLabel;
 
   /// No description provided for @contactListUserIdRequired.
   ///
-  /// In en, this message translates to:
-  /// **'User ID is required'**
+  /// In ru, this message translates to:
+  /// **'Укажите ID пользователя'**
   String get contactListUserIdRequired;
 
   /// No description provided for @contactPickerTitle.
   ///
-  /// In en, this message translates to:
-  /// **'Choose contacts'**
+  /// In ru, this message translates to:
+  /// **'Выберите контакты'**
   String get contactPickerTitle;
+
   /// No description provided for @taskListViewAll.
   ///
   /// In ru, this message translates to:
@@ -364,6 +331,7 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Списки задач'**
   String get tasksListsTitle;
+
   /// No description provided for @userProjectionDescription.
   ///
   /// In ru, this message translates to:
@@ -381,25 +349,25 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'ru'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['en', 'ru'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en': return AppLocalizationsEn();
-    case 'ru': return AppLocalizationsRu();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'ru':
+      return AppLocalizationsRu();
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
-  );
+      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

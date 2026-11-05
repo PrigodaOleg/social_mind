@@ -15,10 +15,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageName => 'Home';
 
   @override
-  String get taskListPageName => 'Tasks';
+  String get userProfilePageName => 'Profile';
 
   @override
-  String get userProfilePageName => 'Profile';
+  String get taskListPageName => 'Tasks';
 
   @override
   String get domainListPageName => 'Closee groups';
@@ -69,7 +69,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contactListDelete => 'Delete';
 
   @override
-  String contactListDeleteConfirm(String name) {
+  String contactListDeleteConfirm(Object name) {
     return 'Delete contact \"$name\"?';
   }
 
@@ -87,6 +87,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactPickerTitle => 'Choose contacts';
+
+  @override
   String get taskListViewAll => 'All tasks';
 
   @override
@@ -127,5 +129,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get userProjectionDescription =>
-      'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.';
+      'A user projection is not a real user, but an entity that plays the users role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projections context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly.';
 }
