@@ -107,6 +107,27 @@ flutter gen-l10n
 - Деплой правил в прод выполняется автоматически при push в `main`
   (job `deploy-rules`), после успешной проверки совместимости.
 
+## E2E тесты авторизации
+Сценарии лежат в `test/e2e/auth_e2e_scenarios.dart`, раннеры —
+`test/e2e/auth_e2e_test.dart` (web/chrome) и
+`integration_test/auth_e2e_test.dart` (нативные платформы: iOS/Android).
+
+Тестам нужен Firebase Emulator (auth:9099, database:9000, проект `closers-test`).
+Запуск (эмулятор поднимается и гасится скриптом автоматически):
+
+```sh
+make test-auth-e2e            # web (chrome)
+make test-auth-e2e-ios        # iOS-симулятор (по умолчанию "iPhone 16",
+                              # переопределяется IOS_DEVICE=<имя или UDID>)
+make test-auth-e2e-ios-debug  # то же + подробный лог flutter
+make test-auth-e2e-ios-interactive  # интерактивный режим (flutter run)
+```
+
+Без `RUN_EMULATOR_TESTS=true` нативный раннер молча пропускает тесты,
+поэтому обычный `flutter test` / CI не требуют запущенного эмулятора.
+В GHA на PR с изменениями в `domains/client/**` дополнительно запускается
+job `e2e-ios-simulator` (macos-latest: эмуляторы + iPhone-симулятор).
+
 ## Секреты
 Для деплоя правил нужен секрет `CLOSERS_FIREBASE_SERVICE_ACCOUNT_JSON` —
 содержимое JSON-ключа сервисного аккаунта Firebase с ролью

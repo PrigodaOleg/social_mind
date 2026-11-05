@@ -99,6 +99,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Closers'**
+  /// In ru, this message translates to:
+  /// **'Близкие'**
   String get applicationTitle;
 
   /// No description provided for @homePageName.
@@ -123,66 +125,106 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Closee groups'**
+  /// In ru, this message translates to:
+  /// **'Доска'**
+  String get homePageName;
+
+  /// No description provided for @userProfilePageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Профиль пользователя'**
+  String get userProfilePageName;
+
+  /// No description provided for @taskListPageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Дела'**
+  String get taskListPageName;
+
+  /// No description provided for @domainListPageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Близкие'**
   String get domainListPageName;
 
   /// No description provided for @addTaskHint.
   ///
   /// In en, this message translates to:
   /// **'Add new task'**
+  /// In ru, this message translates to:
+  /// **'Добавить задачу'**
   String get addTaskHint;
 
   /// No description provided for @loginHelloLabel.
   ///
   /// In en, this message translates to:
   /// **'Hi there'**
+  /// In ru, this message translates to:
+  /// **'Привет, дорогой друг!'**
   String get loginHelloLabel;
 
   /// No description provided for @loginActionLabel.
   ///
   /// In en, this message translates to:
   /// **'Login as:'**
+  /// In ru, this message translates to:
+  /// **'Войти как:'**
   String get loginActionLabel;
 
   /// No description provided for @loginPutIdHintText.
   ///
   /// In en, this message translates to:
   /// **'Put user ID to authenticate'**
+  /// In ru, this message translates to:
+  /// **'Введите ID для входа'**
   String get loginPutIdHintText;
 
   /// No description provided for @loginExistingUserButtonText.
   ///
   /// In en, this message translates to:
   /// **'Existing user'**
+  /// In ru, this message translates to:
+  /// **'Существующий пользователь'**
   String get loginExistingUserButtonText;
 
   /// No description provided for @loginExistingUserActionLabel.
   ///
   /// In en, this message translates to:
   /// **'Please input your ID'**
+  /// In ru, this message translates to:
+  /// **'Введите ваш ID'**
   String get loginExistingUserActionLabel;
 
   /// No description provided for @loginNewUserButtonText.
   ///
   /// In en, this message translates to:
   /// **'New user'**
+  /// In ru, this message translates to:
+  /// **'Новый пользователь'**
   String get loginNewUserButtonText;
 
   /// No description provided for @loginBlankUserButtonText.
   ///
   /// In en, this message translates to:
   /// **'Blank user'**
+  /// In ru, this message translates to:
+  /// **'Пустой пользователь'**
   String get loginBlankUserButtonText;
 
   /// No description provided for @unknownPageText.
   ///
   /// In en, this message translates to:
   /// **'The requested page does not exist'**
+  /// In ru, this message translates to:
+  /// **'Запрошенная страница не существует'**
   String get unknownPageText;
 
   /// No description provided for @unknownPageTitle.
   ///
   /// In en, this message translates to:
   /// **'Unknown page'**
+  /// In ru, this message translates to:
+  /// **'Неизвестная страница'**
   String get unknownPageTitle;
 
   /// No description provided for @contactListPageName.
@@ -253,6 +295,97 @@ abstract class AppLocalizations {
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+  /// In ru, this message translates to:
+  /// **'Контакты'**
+  String get contactListPageName;
+
+  /// No description provided for @taskListViewAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Все задачи'**
+  String get taskListViewAll;
+
+  /// No description provided for @taskListViewActiveOnly.
+  ///
+  /// In ru, this message translates to:
+  /// **'Активные задачи'**
+  String get taskListViewActiveOnly;
+
+  /// No description provided for @taskListViewActiveFirst.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сначала активные'**
+  String get taskListViewActiveFirst;
+
+  /// No description provided for @taskListViewDueTime.
+  ///
+  /// In ru, this message translates to:
+  /// **'По сроку'**
+  String get taskListViewDueTime;
+
+  /// No description provided for @changeTaskListViewMode.
+  ///
+  /// In ru, this message translates to:
+  /// **'Изменить вид'**
+  String get changeTaskListViewMode;
+
+  /// No description provided for @editTaskListSettings.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки списка задач'**
+  String get editTaskListSettings;
+
+  /// No description provided for @newTaskList.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новый список задач'**
+  String get newTaskList;
+
+  /// No description provided for @taskListName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Название'**
+  String get taskListName;
+
+  /// No description provided for @cancel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отмена'**
+  String get cancel;
+
+  /// No description provided for @create.
+  ///
+  /// In ru, this message translates to:
+  /// **'Создать'**
+  String get create;
+
+  /// No description provided for @save.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сохранить'**
+  String get save;
+
+  /// No description provided for @addTaskList.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить список задач'**
+  String get addTaskList;
+
+  /// No description provided for @tasksListsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Списки задач'**
+  String get tasksListsTitle;
+
+  /// No description provided for @userProjectionDescription.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.'**
+  String get userProjectionDescription;
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override

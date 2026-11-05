@@ -1,4 +1,3 @@
-
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -41,7 +40,8 @@ void main() {
     });
 
     test('constructor asserts on empty id', () {
-      expect(() => Task(id: '', originatorId: 'u1'), throwsA(isA<AssertionError>()));
+      expect(() => Task(id: '', originatorId: 'u1'),
+          throwsA(isA<AssertionError>()));
     });
 
     test('link and unlink update children and parents', () {
@@ -94,7 +94,8 @@ void main() {
     });
 
     test('toJson includes base fields', () {
-      final task = Task(id: 't1', title: 'T', description: 'D', originatorId: 'u1');
+      final task =
+          Task(id: 't1', title: 'T', description: 'D', originatorId: 'u1');
       final json = task.toJson();
       expect(json['id'], 't1');
       expect(json['title'], 'T');
@@ -157,10 +158,14 @@ void main() {
         'isCompleted': true,
         'originatorId': 'u1',
         'executorId': 'u2',
+        'createdAt': '2024-01-01T10:00:00.000',
+        'completedAt': '2024-01-02T10:00:00.000',
       });
       expect(task.isCompleted, true);
       expect(task.originatorId, 'u1');
       expect(task.executorId, 'u2');
+      expect(task.createdAt, DateTime.parse('2024-01-01T10:00:00.000'));
+      expect(task.completedAt, DateTime.parse('2024-01-02T10:00:00.000'));
     });
 
     test('fromJson handles missing fields', () {
@@ -168,10 +173,20 @@ void main() {
       expect(task.isCompleted, false);
       expect(task.originatorId, '');
       expect(task.executorId, '');
+      // unknown dates stay null instead of fake values
+      expect(task.createdAt, isNull);
+      expect(task.dueAt, isNull);
+      expect(task.completedAt, isNull);
     });
 
     test('toJson roundtrip', () {
-      final task = Task(id: 't1', title: 'T', description: 'D', isCompleted: true, originatorId: 'u1', executorId: 'u2');
+      final task = Task(
+          id: 't1',
+          title: 'T',
+          description: 'D',
+          isCompleted: true,
+          originatorId: 'u1',
+          executorId: 'u2');
       final restored = Task.fromJson(task.toJson());
       expect(restored, task);
       expect(restored.isCompleted, true);
@@ -179,7 +194,8 @@ void main() {
     });
 
     test('copyWith updates fields and keeps others', () {
-      final task = Task(id: 't1', title: 'T', originatorId: 'u1', executorId: 'u2');
+      final task =
+          Task(id: 't1', title: 'T', originatorId: 'u1', executorId: 'u2');
       final updated = task.copyWith(isCompleted: true, title: 'New');
       expect(updated.id, 't1');
       expect(updated.title, 'New');
@@ -290,7 +306,8 @@ void main() {
 
     test('copyWith updates fields', () {
       final user = User(id: 'u1', name: 'alice');
-      final updated = user.copyWith(name: 'bob', firstName: 'B', domainsIds: ['d9']);
+      final updated =
+          user.copyWith(name: 'bob', firstName: 'B', domainsIds: ['d9']);
       expect(updated.id, 'u1');
       expect(updated.name, 'bob');
       expect(updated.firstName, 'B');
@@ -307,11 +324,20 @@ void main() {
       for (final p in props.skip(1)) {
         expect(p['isEditable'], true);
       }
-      expect(props.map((p) => p['propId']), containsAll(['name', 'avatarUrl', 'firstName', 'lastName', 'description']));
+      expect(
+          props.map((p) => p['propId']),
+          containsAll(
+              ['name', 'avatarUrl', 'firstName', 'lastName', 'description']));
     });
 
     test('copyWithList updates provided props', () {
-      final user = User(id: 'u1', name: 'alice', firstName: 'A', lastName: 'B', description: 'd', avatarUrl: 'url');
+      final user = User(
+          id: 'u1',
+          name: 'alice',
+          firstName: 'A',
+          lastName: 'B',
+          description: 'd',
+          avatarUrl: 'url');
       final updated = user.copyWithList([
         {'propId': 'name', 'value': 'bob'},
         {'propId': 'firstName', 'value': 'F'},
@@ -403,7 +429,8 @@ void main() {
     });
 
     test('toJson roundtrip', () {
-      final domain = Domain(id: 'd1', title: 'D', originatorId: 'u1', isPersonal: true);
+      final domain =
+          Domain(id: 'd1', title: 'D', originatorId: 'u1', isPersonal: true);
       final restored = Domain.fromJson(domain.toJson());
       expect(restored.id, 'd1');
       expect(restored.title, 'D');
@@ -412,7 +439,8 @@ void main() {
 
     test('copyWith updates fields', () {
       final domain = Domain(id: 'd1', title: 'D', originatorId: 'u1');
-      final updated = domain.copyWith(title: 'New', isPersonal: true, participantsIds: ['u9']);
+      final updated = domain
+          .copyWith(title: 'New', isPersonal: true, participantsIds: ['u9']);
       expect(updated.id, 'd1');
       expect(updated.title, 'New');
       expect(updated.isPersonal, true);
@@ -437,7 +465,8 @@ void main() {
     });
 
     test('main constructor with explicit id', () {
-      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       expect(t.id, 'id1');
       expect(t.prevHash, 'ph');
       expect(t.prevId, 'pid');
@@ -471,7 +500,8 @@ void main() {
     });
 
     test('toJson includes all fields', () {
-      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       final json = t.toJson();
       expect(json['id'], 'id1');
       expect(json['prevHash'], 'ph');
@@ -485,7 +515,8 @@ void main() {
     });
 
     test('fromJson restores transaction', () {
-      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       final restored = Transaction.fromJson(t.toJson());
       expect(restored.id, 'id1');
       expect(restored.prevHash, 'ph');
@@ -495,9 +526,12 @@ void main() {
     });
 
     test('tHash is stable and differs for different content', () {
-      final t1 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
-      final t2 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
-      final t3 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m2'], 'path');
+      final t1 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
+      final t2 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
+      final t3 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m2'], 'path');
       expect(t1.tHash(), t2.tHash());
       expect(t1.tHash(), isNot(t3.tHash()));
       expect(t1.tHash().length, 64);
@@ -517,7 +551,8 @@ void main() {
     });
 
     test('copyWith updates fields', () {
-      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       final updated = t.copyWith(changeType: 'deletion', changes: ['m2']);
       expect(updated.id, 'id1');
       expect(updated.changeType, 'deletion');
@@ -526,11 +561,14 @@ void main() {
     });
 
     test('equatable: same fields equal', () {
-      final t1 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
-      final t2 = Transaction('id2', 'ph', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t1 = Transaction('id1', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
+      final t2 = Transaction('id2', 'ph', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       // id is not part of props
       expect(t1, equals(t2));
-      final t3 = Transaction('id1', 'other', 'pid', ts, 'orig', 'details', 'creation', ['m1'], 'path');
+      final t3 = Transaction('id1', 'other', 'pid', ts, 'orig', 'details',
+          'creation', ['m1'], 'path');
       expect(t1, isNot(equals(t3)));
     });
   });
@@ -580,16 +618,19 @@ void main() {
     });
 
     test('fromMaps restores registry', () {
-      final t = Transaction('id1', 'ph', 'pid', DateTime.now(), 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', DateTime.now(), 'orig',
+          'details', 'creation', ['m1'], 'path');
       final r = Registry(id: 'r1', parentId: 'p1', transactions: {0: t});
-      final restored = Registry.fromMaps(metadata: r.metadata.toJson(), transactions: {0: t.toJson()});
+      final restored = Registry.fromMaps(
+          metadata: r.metadata.toJson(), transactions: {0: t.toJson()});
       expect(restored.id, 'r1');
       expect(restored.transactions.length, 1);
       expect(restored.transactions[0]!.id, 'id1');
     });
 
     test('toJson/fromJson roundtrip', () {
-      final t = Transaction('id1', 'ph', 'pid', DateTime.now(), 'orig', 'details', 'creation', ['m1'], 'path');
+      final t = Transaction('id1', 'ph', 'pid', DateTime.now(), 'orig',
+          'details', 'creation', ['m1'], 'path');
       final r = Registry(id: 'r1', parentId: 'p1', transactions: {0: t});
       final restored = Registry.fromJson(r.toJson());
       expect(restored.id, 'r1');
@@ -672,7 +713,8 @@ void main() {
     });
 
     test('copyWith copies transactions when not replaced', () {
-      final t = Transaction('id1', '', '', DateTime.now(), 'o', 'd', 'creation', ['m1'], 'p');
+      final t = Transaction(
+          'id1', '', '', DateTime.now(), 'o', 'd', 'creation', ['m1'], 'p');
       final r = Registry(id: 'r1', parentId: 'p1', transactions: {0: t});
       final copy = r.copyWith();
       copy.transactions[0]!.changeType = 'modified';
@@ -688,6 +730,92 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
       expect(a, isNot(equals(c)));
+    });
+  });
+
+  group('TaskList', () {
+    test('links tasks as parents and removes the link', () {
+      final list = TaskList(id: 'list-1', title: 'Work');
+      final task = Task(id: 'task-1', originatorId: 'u1');
+
+      list.addTask(task);
+      expect(list.tasks, {'task-1': 'Task'});
+      expect(task.parents[list.id], 'TaskList');
+
+      list.removeTask(task);
+      expect(list.tasks, isEmpty);
+      expect(task.parents, isEmpty);
+    });
+
+    test('orders tasks using each persisted view mode', () {
+      final created = DateTime(2024, 1, 1);
+      final done = Task(
+        id: 'done',
+        title: 'done',
+        originatorId: 'u',
+        createdAt: created.add(const Duration(minutes: 2)),
+        completedAt: created.add(const Duration(minutes: 5)),
+        isCompleted: true,
+      );
+      final active = Task(
+        id: 'active',
+        title: 'active',
+        originatorId: 'u',
+        createdAt: created.add(const Duration(minutes: 1)),
+        dueAt: created.add(const Duration(minutes: 10)),
+      );
+      final list = TaskList(id: 'list-1', tasks: {
+        done.id: done.type,
+        active.id: active.type,
+      });
+
+      expect(list.order([done, active]).map((task) => task.id),
+          ['active', 'done']);
+      expect(
+          list
+              .copyWith(viewMode: TaskListViewMode.activeOnly)
+              .order([done, active]).map((task) => task.id),
+          ['active']);
+      expect(
+          list
+              .copyWith(viewMode: TaskListViewMode.dueTime)
+              .order([done, active]).map((task) => task.id),
+          ['active', 'done']);
+    });
+
+    test('tasks with unknown dates sort last', () {
+      final known = Task(
+          id: 'known',
+          title: 'k',
+          originatorId: 'u',
+          createdAt: DateTime(2024, 1, 1),
+          dueAt: DateTime(2024, 1, 2));
+      final unknown = Task(id: 'unknown', title: 'u', originatorId: 'u');
+      final list = TaskList(id: 'list-1', tasks: {
+        known.id: known.type,
+        unknown.id: unknown.type,
+      });
+
+      expect(list.order([unknown, known]).map((task) => task.id),
+          ['known', 'unknown']);
+      expect(
+          list
+              .copyWith(viewMode: TaskListViewMode.dueTime)
+              .order([unknown, known]).map((task) => task.id),
+          ['known', 'unknown']);
+    });
+
+    test('round trips settings and task membership', () {
+      final list = TaskList(
+        id: 'list-1',
+        title: 'Work',
+        viewMode: TaskListViewMode.activeFirst,
+        tasks: {'task-1': 'Task'},
+      );
+      final restored = TaskList.fromJson(list.toJson());
+      expect(restored, list);
+      expect(restored.viewMode, TaskListViewMode.activeFirst);
+      expect(restored.tasks, {'task-1': 'Task'});
     });
   });
 

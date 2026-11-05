@@ -1,7 +1,4 @@
 part of 'models.dart';
-
-
-@HiveType(typeId: 2)
 // ignore: must_be_immutable
 class Domain extends Model {
   Domain({
@@ -32,23 +29,14 @@ class Domain extends Model {
   @override
   // ignore: overridden_fields
   final String type = "Domain";
-  
-  @HiveField(6)
   final bool isPersonal;
-
-  @HiveField(7)
   final String originatorId;
-
-  @HiveField(8)
   List<String> participantsIds = <String>[];
-
-  @HiveField(9)
   List<String> observersIds;
 
   String registryId;
 
   // Model ID: Model Type
-  @HiveField(10)
   Map<String, String> models;
 
   Domain copyWith({
