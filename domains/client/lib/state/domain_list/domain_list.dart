@@ -61,8 +61,10 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     User me = _repo.me;
     print(me);
 
-    var newDomain = Domain(originatorId: me.id, title: event.title);
+    var newDomain = Domain(originatorId: me.id, title: event.title, storageKey: me.storageKey);
     await me.linkTo(newDomain, listenerId);
+    // Подписываемся на реестр нового домена для реалтайм-обновлений
+    _repo.updateRegistryWatches();
         
     // Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
     // emit(state.copyWith(domains: () => domains));
