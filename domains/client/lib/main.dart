@@ -6,6 +6,8 @@ import 'firebase_options.dart';
 
 import 'package:flutter_web_plugins/url_strategy.dart';
 
+import 'notifications/push_notification_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -24,6 +26,10 @@ Future<void> main() async {
     // пуст (сборка без --dart-define), и создаёт не-дефолтный инстанс,
     // который не видят пакеты, запрашивающие дефолтное приложение.
     await Firebase.initializeApp(options: options);
+    // Локальная инициализация уведомлений (права, плагин). Регистрация FCM
+    // токена выполняется после логина (когда репозиторий знает myId) -
+    // см. PushNotificationService.initOnLogin.
+    await PushNotificationService.instance.initLocalNotifications();
     // FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
     // FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
   } catch (error) {
