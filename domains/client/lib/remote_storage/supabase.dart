@@ -142,20 +142,27 @@ class SupabaseStorage extends RemoteStorage {
   /// клиент сделает rebase.
   Future<void> _saveRegistryTransactionally(Registry registry) async {
     final lastTransactionIndex = registry.transactions.keys.last;
+    // 0. Гарантируем существование строки головы (FK registry_transactions
+    //    требует ее раньше транзакций). Upsert без last_idx не трогает
+    //    удаленную голову при конфликте.
+    await client.from('registries').upsert({
+      'id': registry.id,
+      'parent_id': registry.parentId,
+    });
     // 1. Транзакция - идемпотентный upsert
     await client.from('registry_transactions').upsert({
       'registry_id': registry.id,
       'idx': lastTransactionIndex,
       'data': registry.transactions[lastTransactionIndex]!.toJson(),
     });
-    // 2. Условный апдейт головы: затирается только если наш индекс новее удаленного.
+    // 2. Условный апдейт головы (UPDATE, а не upsert): PostgREST игнорирует
+    //    фильтры в query string у POST/upsert, поэтому коллизия детектируется
+    //    только через UPDATE c условием .lt - при устаревшей голове он
+    //    возвращает 0 строк.
     final updated = await client
         .from('registries')
-        .upsert({
-          'id': registry.id,
-          'parent_id': registry.parentId,
-          'last_idx': lastTransactionIndex,
-        })
+        .update({'last_idx': lastTransactionIndex})
+        .eq('id', registry.id!)
         .lt('last_idx', lastTransactionIndex)
         .select();
     if ((updated as List).isEmpty) {
