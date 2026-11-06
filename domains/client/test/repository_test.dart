@@ -142,7 +142,7 @@ class TrackingRemoteStorage extends RemoteStorage {
   bool throwOnCreate = false;
 
   @override
-  Future<bool> init(String instance) async {
+  Future<bool> init(String instance, {String? anonKey}) async {
     initInstance = instance;
     return initResult;
   }

@@ -81,3 +81,26 @@
 ## Разовая настройка Firebase/FlutterFire (локально)
 
 - Скрипт `firebase_setup.ps1` выполняет по порядку: `npm install -g firebase-tools`, `npm i -g firebase`, `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, `$env:NODE_TLS_REJECT_UNAUTHORIZED=0`, добавление `Pub\Cache\bin` в `$env:Path`, `dart pub global activate firebase`, `firebase login --reauth`, `dart pub global activate flutterfire_cli`, `flutterfire configure --project=$project_id`, `flutter pub add firebase_core` — `firebase_setup.ps1:1-10`.
+
+## Эмуляторы
+
+### Firebase Local Emulator Suite (Auth + Realtime Database)
+
+- Запуск эмуляторов: `firebase emulators:start --only auth,database --project closers-test` (порты по умолчанию: Auth — 9099, RTDB — 9000).
+- Интеграционные тесты против эмуляторов лежат в `test/integration/` (`firebase_emulator_test.dart`, `collaboration_emulator_test.dart`); запускаются только на web-платформе и пропускаются без `--dart-define=RUN_EMULATOR_TESTS=true`.
+- Полный запуск (сsanitize правил RTDB, старт эмуляторов, заливка правил, тесты): `make test-emulator` или `tool/run_firebase_emulator_tests.sh`.
+- Тесты подключаются к эмулятору через `useAuthEmulator('localhost', 9099)` и `useDatabaseEmulator('localhost', 9000)`.
+
+### Supabase (локальный стек)
+
+- Запуск: `supabase start` — приложение подключается к `http://127.0.0.1:54321` с локальным anon-ключом (см. `supabase/README.md`).
+- Накат миграций (`supabase/migrations/`): `make supabase-migrate` (= `supabase db reset`).
+
+### Firestore
+
+- Правила для Cloud Firestore находятся в `firestore.rules` (пока пермиссивные для аутентифицированных, с TODO на per-user). Деплой: `firebase deploy --only firestore:rules`.
+
+### Запуск интеграционных тестов
+
+- `make test-emulator` — стартует эмуляторы в фоне (если не запущены) и запускает `flutter test --platform chrome test/integration --dart-define=RUN_EMULATOR_TESTS=true`.
+- Обычные юнит-тесты (`flutter test`) интеграционные тесты на эмуляторах не запускают.

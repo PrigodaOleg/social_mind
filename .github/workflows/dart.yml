@@ -544,3 +544,68 @@ jobs:
         with:
           name: 'Closers-Windows'
           path: './domains/client/build/windows/x64/runner/Release/'
+
+  # Тесты схемы/миграции Supabase против локального стека (supabase/migrations).
+  # Прекоммит-джоба (как build/e2e-*): на push в main не гоняем.
+  supabase-tests:
+    # см. комментарий к job build: тяжёлые джобы — только прекоммит (PR) и вручную
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        working-directory: ./domains/client
+        run: flutter pub get
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Docker уже есть на ubuntu-раннере; db start поднимает локальный стек
+      # (postgres, kong/rest, auth, realtime) и применяет миграции из
+      # domains/client/supabase/migrations.
+      - name: Start local Supabase stack
+        working-directory: ./domains/client/supabase
+        run: supabase db start
+
+      - name: Export local Supabase keys
+        id: keys
+        working-directory: ./domains/client/supabase
+        run: |
+          status=$(supabase status -o env)
+          echo "service_role_key=$(echo "$status" | grep '^SERVICE_ROLE_KEY=' | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Supabase REST endpoint
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "apikey: ${{ steps.keys.outputs.service_role_key }}" \
+              http://127.0.0.1:54321/rest/v1/ || true)
+            [ "$code" = "200" ] && echo "REST endpoint ready" && exit 0
+            sleep 2
+          done
+          echo "::error::Supabase REST endpoint not ready after 120s"
+          exit 1
+
+      # Интеграционные тесты миграции (test/supabase_storage_test.dart):
+      # без --dart-define они пропускаются (skip), поэтому локальный
+      # `flutter test` остается зеленым.
+      - name: Run Supabase integration tests
+        working-directory: ./domains/client
+        run: |
+          flutter test test/supabase_storage_test.dart \
+            --dart-define=SUPABASE_TEST_URL=http://127.0.0.1:54321 \
+            --dart-define=SUPABASE_TEST_SERVICE_ROLE_KEY=${{ steps.keys.outputs.service_role_key }}
+
+      # Регрессионный прогон полного набора (без стека - интеграционные
+      # тесты в нем пропускаются).
+      - name: Run full test suite
+        working-directory: ./domains/client
+        run: flutter test
