@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:closers/repository/repository.dart';
-import 'contact_list.dart';
 import '../ui.dart';
 
 

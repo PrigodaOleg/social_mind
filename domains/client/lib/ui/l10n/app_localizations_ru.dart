@@ -57,6 +57,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contactListPageName => 'Контакты';
 
   @override
+  String get contactListEmpty => 'Контактов пока нет';
+
+  @override
+  String get contactListAdd => 'Добавить контакт';
+
+  @override
+  String get contactListEdit => 'Редактировать контакт';
+
+  @override
+  String get contactListDelete => 'Удалить';
+
+  @override
+  String contactListDeleteConfirm(Object name) {
+    return 'Удалить контакт \"$name\"?';
+  }
+
+  @override
+  String get contactListNameLabel => 'Имя';
+
+  @override
+  String get contactListNameRequired => 'Укажите имя';
+
+  @override
+  String get contactListUserIdLabel => 'ID пользователя';
+
+  @override
+  String get contactListUserIdRequired => 'Укажите ID пользователя';
+
+  @override
+  String get contactPickerTitle => 'Выберите контакты';
+
+  @override
   String get taskListViewAll => 'Все задачи';
 
   @override

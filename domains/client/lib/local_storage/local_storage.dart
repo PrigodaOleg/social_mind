@@ -16,6 +16,7 @@ abstract class LocalStorage {
     'Task': (json) => Task.fromJson(json),
     'TaskList': (json) => TaskList.fromJson(json),
     'ContactList': (json) => ContactList.fromJson(json),
+    'Contact': (json) => Contact.fromJson(json),
   };
 
   Future<void> init() async {}

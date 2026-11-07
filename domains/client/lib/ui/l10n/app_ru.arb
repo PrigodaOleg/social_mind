@@ -9,12 +9,22 @@
     "loginActionLabel": "Войти как:",
     "loginPutIdHintText": "Введите ID для входа",
     "loginExistingUserButtonText": "Существующий пользователь",
-    "loginExistingUserActionLabel": "Введите ваш ID",    
+    "loginExistingUserActionLabel": "Введите ваш ID",
     "loginNewUserButtonText": "Новый пользователь",
     "loginBlankUserButtonText": "Пустой пользователь",
     "unknownPageText": "Запрошенная страница не существует",
     "unknownPageTitle": "Неизвестная страница",
     "contactListPageName": "Контакты",
+    "contactListEmpty": "Контактов пока нет",
+    "contactListAdd": "Добавить контакт",
+    "contactListEdit": "Редактировать контакт",
+    "contactListDelete": "Удалить",
+    "contactListDeleteConfirm": "Удалить контакт \"{name}\"?",
+    "contactListNameLabel": "Имя",
+    "contactListNameRequired": "Укажите имя",
+    "contactListUserIdLabel": "ID пользователя",
+    "contactListUserIdRequired": "Укажите ID пользователя",
+    "contactPickerTitle": "Выберите контакты",
     "taskListViewAll": "Все задачи",
     "taskListViewActiveOnly": "Активные задачи",
     "taskListViewActiveFirst": "Сначала активные",
@@ -28,7 +38,5 @@
     "save": "Сохранить",
     "addTaskList": "Добавить список задач",
     "tasksListsTitle": "Списки задач",
-
     "userProjectionDescription": "Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно."
-    
 }

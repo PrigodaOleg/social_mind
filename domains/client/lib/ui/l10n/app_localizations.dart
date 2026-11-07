@@ -194,6 +194,66 @@ abstract class AppLocalizations {
   /// **'Контакты'**
   String get contactListPageName;
 
+  /// No description provided for @contactListEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Контактов пока нет'**
+  String get contactListEmpty;
+
+  /// No description provided for @contactListAdd.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить контакт'**
+  String get contactListAdd;
+
+  /// No description provided for @contactListEdit.
+  ///
+  /// In ru, this message translates to:
+  /// **'Редактировать контакт'**
+  String get contactListEdit;
+
+  /// No description provided for @contactListDelete.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить'**
+  String get contactListDelete;
+
+  /// No description provided for @contactListDeleteConfirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалить контакт \"{name}\"?'**
+  String contactListDeleteConfirm(Object name);
+
+  /// No description provided for @contactListNameLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Имя'**
+  String get contactListNameLabel;
+
+  /// No description provided for @contactListNameRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Укажите имя'**
+  String get contactListNameRequired;
+
+  /// No description provided for @contactListUserIdLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'ID пользователя'**
+  String get contactListUserIdLabel;
+
+  /// No description provided for @contactListUserIdRequired.
+  ///
+  /// In ru, this message translates to:
+  /// **'Укажите ID пользователя'**
+  String get contactListUserIdRequired;
+
+  /// No description provided for @contactPickerTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите контакты'**
+  String get contactPickerTitle;
+
   /// No description provided for @taskListViewAll.
   ///
   /// In ru, this message translates to:

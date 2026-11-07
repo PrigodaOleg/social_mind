@@ -1,90 +1,207 @@
-// Страница со списком всех пользователей, с которыми хоть как-нибудь связан пользователь
+// Contact list page: shows the contacts of the current user's contact list,
+// allows adding, editing and deleting them.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:closers/state/state.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:closers/state/state.dart';
 import '../ui.dart';
-
 
 class ContactListPage extends StatelessWidget {
   static const routeName = '/contacts';
+
   const ContactListPage(
-    this.repository,
-    {
-      super.key,
-      this.title,
-    }
-  );
+    this.repository, {
+    super.key,
+    this.title,
+  });
+
   final String? title;
   final Repository repository;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ContactListBloc(repository: repository),
-      child: const ContactListView(),
+      create: (context) => ContactListBloc(repository: repository)
+        ..add(const ContactListInitRequested()),
+      child: ContactListView(title: title),
     );
   }
 }
 
 class ContactListView extends StatelessWidget {
-  const ContactListView({super.key});
+  const ContactListView({super.key, this.title});
+
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final n = Navigator.of(context);
     final t = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final b = BlocProvider.of<ContactListBloc>(context);
-    return BlocProvider<ContactListBloc>(
-      create: (context) => context.read<ContactListBloc>()
-        ..add(const ContactListStateInitRequested()),
-      child: BlocBuilder<ContactListBloc, ContactListState>(
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: t.colorScheme.inversePrimary,
+        title: Text(title ?? l.contactListPageName),
+      ),
+      body: BlocBuilder<ContactListBloc, ContactListState>(
         builder: (context, state) {
-          return Scaffold(
-            appBar: AppBar(
-              backgroundColor: t.colorScheme.inversePrimary,
-              title: Text(l.contactListPageName),
-            ),
-            body: ListView(
-              children: [
-                // ignore: unused_local_variable
-                for (final User contact in state.contacts.values)
-                  ListTile(
-                    title: Text(contact.name),
-                    onTap: () => n.pop(contact.id),
-                  ),
-                Row(children: [
-                  IconButton(
-                    onPressed: () {
-                      b.add(
-                        const ContactCreateUserProjectionRequested('New contact')
-                      );
+          if (state.status != ContactListStatus.ready) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final contacts = state.contacts.values.toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+          if (contacts.isEmpty) {
+            return Center(
+              child: Text(l.contactListEmpty),
+            );
+          }
+          return ListView(
+            children: [
+              for (final contact in contacts)
+                ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text(contact.name),
+                  subtitle: Text(contact.userId),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: l.contactListDelete,
+                    onPressed: () async {
+                      final confirmed = await _confirmDelete(context, contact);
+                      if (confirmed) {
+                        b.add(ContactListContactDeleted(contactId: contact.id));
+                      }
                     },
-                    icon: const Icon(Icons.person_add)
                   ),
-                  IconButton(
-                    onPressed: () {
-                      b.add(
-                        const ContactHandshakeRequested('New contact')
-                      );
-                    },
-                    icon: const Icon(Icons.person_add)
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      b.add(
-                        const ContactInvitationRequested('New contact', 'Hello', 'TG')
-                      );
-                    },
-                    icon: const Icon(Icons.person_add)
-                  ),
-                ],)
-              ]
-            ),
+                  onTap: () => _showEditDialog(context, contact),
+                ),
+            ],
           );
-        }
-      )
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: l.contactListAdd,
+        onPressed: () => _showAddDialog(context),
+        child: const Icon(Icons.person_add),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context, Contact contact) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(AppLocalizations.of(dialogContext).contactListDelete),
+            content: Text(
+              AppLocalizations.of(dialogContext)
+                  .contactListDeleteConfirm(contact.name),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(MaterialLocalizations.of(dialogContext)
+                    .cancelButtonLabel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(AppLocalizations.of(dialogContext).contactListDelete),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _showAddDialog(BuildContext context) async {
+    final b = BlocProvider.of<ContactListBloc>(context);
+    final result = await _showContactFormDialog(context);
+    if (result != null && context.mounted) {
+      b.add(ContactListContactCreated(
+        name: result.$1,
+        userId: result.$2,
+      ));
+    }
+  }
+
+  Future<void> _showEditDialog(BuildContext context, Contact contact) async {
+    final b = BlocProvider.of<ContactListBloc>(context);
+    final result = await _showContactFormDialog(
+      context,
+      initialName: contact.name,
+      initialUserId: contact.userId,
+    );
+    if (result != null && context.mounted) {
+      b.add(ContactListContactEdited(
+        contactId: contact.id,
+        name: result.$1,
+      ));
+    }
+  }
+
+  /// Returns (name, userId) or null if cancelled.
+  Future<(String, String)?> _showContactFormDialog(
+    BuildContext context, {
+    String initialName = '',
+    String initialUserId = '',
+  }) async {
+    final nameController = TextEditingController(text: initialName);
+    final userIdController = TextEditingController(text: initialUserId);
+    final formKey = GlobalKey<FormState>();
+
+    return await showDialog<(String, String)>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          initialName.isEmpty
+              ? AppLocalizations.of(dialogContext).contactListAdd
+              : AppLocalizations.of(dialogContext).contactListEdit,
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(dialogContext).contactListNameLabel,
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? AppLocalizations.of(dialogContext).contactListNameRequired
+                    : null,
+              ),
+              TextFormField(
+                controller: userIdController,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(dialogContext).contactListUserIdLabel,
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? AppLocalizations.of(dialogContext).contactListUserIdRequired
+                    : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+                MaterialLocalizations.of(dialogContext).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(dialogContext).pop((
+                  nameController.text.trim(),
+                  userIdController.text.trim(),
+                ));
+              }
+            },
+            child:
+                Text(MaterialLocalizations.of(dialogContext).okButtonLabel),
+          ),
+        ],
+      ),
     );
   }
 }
