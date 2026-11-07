@@ -18,7 +18,13 @@ on:
     types: [completed]
 
 permissions:
+  # actions: read — нужен actions/download-artifact@v4 для скачивания артефакта
+  # `github-pages` из рана прекоммита (cross-run download). Без него шаг падает
+  # с "Resource not accessible by integration".
+  actions: read
   contents: read
+  # pull-requests: read — для gh api commits/{sha}/pulls и pulls/{n} в check-merged
+  pull-requests: read
   pages: write
   id-token: write
 
