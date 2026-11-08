@@ -11,6 +11,7 @@ import 'package:hashlib/hashlib.dart';
 
 import '../models/models.dart';
 import '../navigation/navigation_stack.dart';
+import '../registry/registry_manager.dart';
 
 
 typedef SyncListener = void Function(String id, dynamic syncedItem);
@@ -18,29 +19,6 @@ typedef MergeConflictListener = void Function(Map<String, Model> localChanges, M
 typedef AccessDeniedListener = void Function(Map<String, dynamic> items);
 typedef PeriodicCallback = void Function(int left);
 typedef DoneCallback = void Function();
-
-/// Абстрактное транспортное событие: в удаленном хранилище появилась новая
-/// транзакция, затрагивающая модели. Содержит только метаданные транзакции и
-/// сами изменившиеся модели - без какой-либо бизнес-интерпретации.
-/// [originatorId] - кто внес изменения (автор транзакции).
-class RepositoryTransactionEvent {
-  RepositoryTransactionEvent({
-    required this.registryId,
-    required this.originatorId,
-    required this.changeType,
-    required this.changedModelIds,
-    required this.changedModels,
-  });
-
-  final String registryId;
-  final String originatorId;
-  final String changeType;
-  final List<String> changedModelIds;
-  final Map<String, Model> changedModels;
-}
-
-typedef RepositoryEventListener = void Function(RepositoryTransactionEvent event);
-
 
 class RebaseCollision implements Exception {
   final String message;
@@ -186,151 +164,77 @@ class Repository {
     late = false;
   }
 
-  // # Реалтайм: подписка на изменения реестров в удаленных хранилищах.
-  // Подписываемся только на реестры (доменов пользователя и личный реестр),
-  // по входящим транзакциям определяем изменившиеся модели и дочитываем их по ID.
-  final registryWatchSubscriptions = <RemoteStorage, StreamSubscription>{};
-  Set<String> watchedRegistryIds = {};
+  // # Слой реестров: вся работа с реестрами (подписки, маршрутизация чтения,
+  // диффинг входящих транзакций, дочитывание изменившихся моделей) инкапсулирована
+  // в [RegistryManager]. Бизнес-слой получает только абстрактные события
+  // [ModelsChangedEvent] - без registryId, Transaction и changeType.
+  // Исходящий путь (syncWithRemoteStorage, _buildTransactions, _getRegistries,
+  // rebase) остается здесь как транспортная логика коллизий записи.
+  late final RegistryManager registryManager = RegistryManager(
+    localStorage: _localStorage,
+    remoteStorages: _remoteStorages,
+    fetchModels: _fetchModelsForRegistry,
+    getMyId: () => myId,
+    onModelsStored: _onIncomingModelsStored,
+  );
 
-  /// Подписаться на изменения реестров [registryIds] в соответствующих хранилищах.
-  /// Входящие события обрабатываются через [onRemoteRegistryChange].
-  Future<void> watchRegistries(Set<String> registryIds) async {
-    final newIds = registryIds.difference(watchedRegistryIds);
-    if (newIds.isEmpty) return;
-    watchedRegistryIds.addAll(newIds);
-    for (var storageEntry in _remoteStorages.entries) {
-      // Реестры маршрутизируем по storageKey родителя; для простоты подписываемся
-      // на все новые ID в каждом подключенном хранилище, лишние события отфильтруются
-      // при чтении (реестр не найдется в этом хранилище).
-      if (registryWatchSubscriptions.containsKey(storageEntry.value)) {
-        await registryWatchSubscriptions[storageEntry.value]?.cancel();
-      }
-      registryWatchSubscriptions[storageEntry.value] = storageEntry.value
-          .watchRegistries(watchedRegistryIds.toList())
-          .listen((event) => onRemoteRegistryChange(event.registryId));
-    }
-  }
+  // # Бизнес-события "изменились модели" (для подписчиков; интерпретация в бизнес-слое).
+  int addModelsChangedListener(void Function(ModelsChangedEvent event) listener) =>
+      registryManager.addModelsChangedListener(listener);
 
-  Future<void> stopWatchingRegistries() async {
-    for (var sub in registryWatchSubscriptions.values) {
-      await sub.cancel();
-    }
-    registryWatchSubscriptions.clear();
-    watchedRegistryIds.clear();
-  }
+  void removeModelsChangedListener(int id) => registryManager.removeModelsChangedListener(id);
 
-  /// Обработка события изменения реестра: перечитываем новые транзакции,
-  /// определяем изменившиеся модели, дочитываем их и кладем в локальное хранилище,
-  /// после чего уведомляем слушателей.
-  Future<void> onRemoteRegistryChange(String registryId) async {
-    if (_remoteStorages.isEmpty) return;
-    try {
-      final localRegistry = _localStorage.getRegistry(id: registryId, count: 1);
-      final lastLocalIndex = localRegistry?.lastTransactionIndex ?? -1;
-      // Читаем транзакции, опережающие локальную голову
-      final remoteRegistries = await _readRegistriesRoutedCounts([(registryId, 50)]);
-      final remoteRegistry = remoteRegistries[registryId];
-      if (remoteRegistry == null) return;
-      final freshTransactions = remoteRegistry.transactions.entries
-          .where((e) => e.key > lastLocalIndex)
-          .map((e) => e.value)
-          .toList();
-      if (freshTransactions.isEmpty) return;
-      // Сохраняем реестр локально
-      await _localStorage.storeItems({registryId: remoteRegistry});
-      // Определяем изменившиеся модели и дочитываем их
-      final changedModelIds = freshTransactions.expand((t) => t.changes).toSet().toList();
-      if (changedModelIds.isNotEmpty) {
-        final remoteModels = await _getFromAllRemoteStorages(changedModelIds);
-        // Ребейзим с локальными копиями, если они изменены локально
-        await _localStorage.storeItems(remoteModels.cast<String, Model>());
-        for (final id in changedModelIds) {
-          incomingSyncIds[id]?.forEach((subscriberId) {
-            final model = remoteModels[id];
-            if (model != null && model is Model) {
-              model.sync = SyncStatus.synced;
-              syncListeners[subscriberId]?.call(id, model);
-            }
-          });
-        }
-        // Уведомляем о транспортном событии (интерпретация - в бизнес-слое)
-        for (final transaction in freshTransactions) {
-          _notifyEventListeners(registryId, transaction, remoteModels.cast<String, Model>());
-        }
-      }
-      syncedThisTime.addAll(changedModelIds);
-    } catch (e) {
-      print('Error on remote registry change ($registryId): $e');
-    }
-  }
+  // # Реалтайм: подписки на изменения реестров - делегируются слою реестров.
+  Future<void> watchRegistries(Set<String> registryIds) => registryManager.watchRegistries(registryIds);
 
-  // # Транспортные события (для подписчиков; интерпретация в бизнес-слое).
-  final eventListeners = <int, RepositoryEventListener>{};
-  int eventListenersCounter = 0;
+  Future<void> stopWatchingRegistries() => registryManager.stopWatchingRegistries();
 
-  int addEventListener(RepositoryEventListener listener) {
-    eventListeners[eventListenersCounter] = listener;
-    return eventListenersCounter++;
-  }
-
-  void removeEventListener(int id) {
-    eventListeners.remove(id);
-  }
-
-  /// Уведомляем слушателей об абстрактном транспортном событии: приехала
-  /// чужая транзакция со списком изменившихся моделей. Репозиторий не
-  /// интерпретирует содержимое моделей - конкретные типы уведомлений
-  /// (назначение задачи, завершение и т.п.) выводит бизнес-слой.
-  @visibleForTesting
-  void onRemoteTransactionForTest(Transaction transaction, Map<String, Model> models) => _notifyEventListeners('', transaction, models);
-
-  void _notifyEventListeners(String registryId, Transaction transaction, Map<String, Model> models) {
-    // Собственные изменения (эхо своей транзакции) событий не порождают.
-    if (transaction.originatorId == myId) return;
-    final changedModels = <String, Model>{
-      for (final id in transaction.changes)
-        if (models[id] != null) id: models[id]!,
-    };
-    if (changedModels.isEmpty) return;
-    final event = RepositoryTransactionEvent(
-      registryId: registryId,
-      originatorId: transaction.originatorId,
-      changeType: transaction.changeType,
-      changedModelIds: List<String>.from(transaction.changes),
-      changedModels: changedModels,
-    );
-    for (final listener in eventListeners.values.toList()) {
-      listener(event);
-    }
-  }
+  /// Обработка события изменения реестра (входящий конвейер слоя реестров).
+  Future<void> onRemoteRegistryChange(String registryId) => registryManager.onRemoteRegistryChange(registryId);
 
   /// Обновление реестров всех доменов пользователя + личного реестра (мультиустройство).
   /// Вызывается после логина и при появлении новых доменов.
-  // Карта registryId -> storageKey родителя (домена/пользователя). Заполняется
-  // при подписке и используется для маршрутизации чтения реестров.
-  final Map<String, String> registryStorageKeys = {};
-
   Future<void> updateRegistryWatches() async {
     if (myId == null || _remoteStorages.isEmpty) return;
-    final registryIds = <String>{};
+    final userRegistries = <String, String>{};
     try {
       final meUser = me;
       if (meUser.registryId.isNotEmpty) {
-        registryIds.add(meUser.registryId);
-        registryStorageKeys[meUser.registryId] = meUser.storageKey;
+        userRegistries[meUser.registryId] = meUser.storageKey;
       }
       for (final domainId in meUser.domainsIds) {
         final domain = _localStorage.getItem(id: domainId);
         if (domain is Domain && domain.registryId.isNotEmpty) {
-          registryIds.add(domain.registryId);
-          registryStorageKeys[domain.registryId] = domain.storageKey;
+          userRegistries[domain.registryId] = domain.storageKey;
         }
       }
     } catch (_) {
       // me еще не инициализирован
       return;
     }
-    await watchRegistries(registryIds);
+    await registryManager.updateWatches(userRegistries);
+  }
+
+  // Дочитываем изменившиеся модели по ID с маршрутизацией по хранилищам
+  // (используется входящим конвейером слоя реестров).
+  Future<Map<String, Model>> _fetchModelsForRegistry(List<String> ids) async {
+    final items = await _getFromAllRemoteStorages(ids);
+    return items.cast<String, Model>();
+  }
+
+  // После сохранения приехавших моделей: помечаем их синхронизированными в этой
+  // сессии и уведомляем sync-слушателей, подписанных на конкретные ID.
+  void _onIncomingModelsStored(List<String> modelIds, Map<String, Model> models) {
+    for (final id in modelIds) {
+      incomingSyncIds[id]?.forEach((subscriberId) {
+        final model = models[id];
+        if (model != null) {
+          model.sync = SyncStatus.synced;
+          syncListeners[subscriberId]?.call(id, model);
+        }
+      });
+    }
+    syncedThisTime.addAll(modelIds);
   }
 
   // Подключенные удаленные хранилища (только для чтения извне; запись через
@@ -882,7 +786,7 @@ Uint8List? getImage(String name) {
     // или пока не обнаружим отсутствие прав на запись (пока индексы транзакций меняются при перечитывании).
     do {
       if (isRemoteRegistriesActual == false) {
-        latestRemoteRegistries = await _readRegistriesRouted(localRegistries.keys.toList());
+        latestRemoteRegistries = await registryManager.readRegistriesRouted(localRegistries.keys.toList());
         if (_isIndexesEqual(remoteRegistries, latestRemoteRegistries)) {
           // Индексы не изменились, значит нет прав на запись
           _rollbackLastTransaction(oldItems, localRegistries);
@@ -1212,43 +1116,6 @@ Uint8List? getImage(String name) {
     }
   }
 
-  // Резолвим хранилище для реестра: сперва по карте registryStorageKeys
-  // (заполняется при подписке), затем по storageKey локальной модели-родителя
-  // (registry.parentId), затем фолбэк на первое подключенное хранилище.
-  RemoteStorage? _storageForRegistry(String registryId) {
-    final storageKey = registryStorageKeys[registryId];
-    if (storageKey != null) {
-      final byKey = _storageByKey(storageKey);
-      if (byKey != null) return byKey;
-    }
-    final localRegistry = _localStorage.getRegistry(id: registryId, count: 1);
-    final parentId = localRegistry?.parentId;
-    if (parentId != null && parentId.isNotEmpty) {
-      final parentModel = _localStorage.getItem(id: parentId);
-      if (parentModel != null) {
-        final byParent = _storageForModel(parentModel);
-        if (byParent != null) return byParent;
-      }
-    }
-    return _remoteStorages.values.firstOrNull;
-  }
-
-  // Читаем реестры из их удаленных хранилищ. Каждый реестр лежит рядом со своим
-  // родителем (доменом или пользователем), поэтому маршрутизируем по storageKey родителя.
-  Future<Map<String, Registry>> _readRegistriesRouted(List<String> ids) async {
-    Map<String, Registry> registries = {};
-    final idsByStorage = <RemoteStorage, List<String>>{};
-    for (final id in ids) {
-      final storage = _storageForRegistry(id);
-      if (storage == null) continue;
-      idsByStorage.putIfAbsent(storage, () => []).add(id);
-    }
-    for (var entry in idsByStorage.entries) {
-      registries.addAll(await entry.key.readRegistries(ids: entry.value));
-    }
-    return registries;
-  }
-
   // Вычисляем и читаем опережающие цепочки транзакций по всем реестрам
   // Базовые индексы берем из [localRegistries], известные индексы вычисляем из объединения
   // [remoteRegistries] и [knownFragment]. Причем, так как мы не знаем, появились ли новые транзакции в УХ,
@@ -1275,22 +1142,7 @@ Uint8List? getImage(String name) {
       final count = latestRemoteIndex - lastLocalIndex + 2;
       registriesIdsToRead.add((localRegistry.id!, count));
     }
-    return await _readRegistriesRoutedCounts(registriesIdsToRead);
-  }
-
-  // Читаем реестры с указанным количеством транзакций, маршрутизируя по storageKey родителя.
-  Future<Map<String, Registry>> _readRegistriesRoutedCounts(List<(String, int)> registriesIdsToRead) async {
-    Map<String, Registry> registries = {};
-    final idsByStorage = <RemoteStorage, List<(String, int)>>{};
-    for (final (id, count) in registriesIdsToRead) {
-      final storage = _storageForRegistry(id);
-      if (storage == null) continue;
-      idsByStorage.putIfAbsent(storage, () => []).add((id, count));
-    }
-    for (var entry in idsByStorage.entries) {
-      registries.addAll(await entry.key.readRegistries(idsCounts: entry.value));
-    }
-    return registries;
+    return await registryManager.readRegistriesRoutedCounts(registriesIdsToRead);
   }
 
   // Читаем из удаленных хранилищ все изменения, перечисленные в [registries]

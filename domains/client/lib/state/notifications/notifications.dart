@@ -162,7 +162,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
 
   @override
   Future<void> close() {
-    if (_listenerId != null) _repo.removeEventListener(_listenerId!);
+    if (_listenerId != null) _repo.removeModelsChangedListener(_listenerId!);
     return super.close();
   }
 
@@ -175,9 +175,9 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     if (stored != null) {
       notificationRules = NotificationRules.fromJsonString(stored);
     }
-    _listenerId ??= _repo.addEventListener((event) {
-      // Бизнес-интерпретация транспортного события - в event_interpreter.dart
-      for (final notification in interpretRepositoryEvent(event, myId: _repo.myId ?? '')) {
+    _listenerId ??= _repo.addModelsChangedListener((event) {
+      // Бизнес-интерпретация события "изменились модели" - в event_interpreter.dart
+      for (final notification in interpretModelsChangedEvent(event, myId: _repo.myId ?? '')) {
         add(NotificationEventArrived(
           eventType: notification.eventType,
           subject: notification.subject,

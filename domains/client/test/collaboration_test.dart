@@ -439,11 +439,12 @@ void main() {
       final me = User(id: 'me', name: 'me');
       localStorage.lastModels['me'] = me;
 
-      // Репозиторий уведомляет об абстрактном транспортном событии (без
-      // бизнес-интерпретации): кто изменил (originatorId транзакции) и какие
-      // модели затронуты.
-      final events = <RepositoryTransactionEvent>[];
-      r.addEventListener((event) => events.add(event));
+      // Репозиторий уведомляет об абстрактном бизнес-событии "изменились
+      // модели" (без деталей реестров): кто изменил (actorId) и какие модели
+      // затронуты. Тип события не несет ни registryId, ни Transaction, ни
+      // changeType - только actorId, containerId и changedModels.
+      final events = <ModelsChangedEvent>[];
+      r.addModelsChangedListener((event) => events.add(event));
 
       final task = Task(
         title: 'Помыть посуду',
@@ -451,16 +452,23 @@ void main() {
         executorId: 'me',
       );
       final transaction = Transaction.next(null, 'user2', 'details', 'creation', [task.id], 'path');
-      notifyViaTransactionForTest(r, transaction, {task.id: task});
+      final registry = Registry(id: 'r1', parentId: 'domain1', transactions: {0: transaction});
+      remoteStorage.lastRegistries['r1'] = registry;
+      remoteStorage.lastModels[task.id] = task;
+
+      // Входящий конвейер слоя реестров через публичный путь репозитория:
+      // диффинг транзакций, дочитывание моделей, бизнес-событие.
+      await r.onRemoteRegistryChange('r1');
 
       expect(events.length, 1);
-      expect(events.first.originatorId, 'user2');
-      expect(events.first.changedModelIds, contains(task.id));
+      expect(events.first, isA<ModelsChangedEvent>());
+      expect(events.first.actorId, 'user2');
+      expect(events.first.containerId, 'domain1');
       expect(events.first.changedModels[task.id], isA<Task>());
 
       // Бизнес-интерпретация (state-слой): моя исполнительская задача, изменена
-      // чужой транзакцией -> task_assigned с актором из транзакции.
-      final interpreted = interpretRepositoryEvent(events.first, myId: 'me');
+      // чужим актором -> task_assigned с актором из события.
+      final interpreted = interpretModelsChangedEvent(events.first, myId: 'me');
       expect(interpreted.length, 1);
       expect(interpreted.first.eventType, 'task_assigned');
       expect(interpreted.first.actorId, 'user2');
@@ -468,19 +476,16 @@ void main() {
     });
 
     test('interpreter: completed task changed by another participant notifies', () async {
-      // Эвристика по актору транзакции, а не по ориджинатору модели: модель
+      // Эвристика по актору события, а не по ориджинатору модели: модель
       // может создать один пользователь, а изменять - любой участник домена.
-      // Задача не моя (не исполнитель) - завершение чужой транзакцией уведомляет.
+      // Задача не моя (не исполнитель) - завершение чужим актором уведомляет.
       final task = Task(title: 'Задача соседа', originatorId: 'me', executorId: '', isCompleted: true);
-      final transaction = Transaction.next(null, 'user2', 'details', 'creation', [task.id], 'path');
-      final event = RepositoryTransactionEvent(
-        registryId: 'r1',
-        originatorId: 'user2',
-        changeType: 'creation',
-        changedModelIds: [task.id],
+      final event = ModelsChangedEvent(
+        actorId: 'user2',
+        containerId: 'domain1',
         changedModels: {task.id: task},
       );
-      final interpreted = interpretRepositoryEvent(event, myId: 'me');
+      final interpreted = interpretModelsChangedEvent(event, myId: 'me');
       expect(interpreted.single.eventType, 'task_completed');
       expect(interpreted.single.actorId, 'user2');
     });
@@ -492,25 +497,27 @@ void main() {
       final me = User(id: 'me', name: 'me');
       localStorage.lastModels['me'] = me;
 
-      // Транспорт: собственная транзакция (эхо) событий не порождает
-      final events = <RepositoryTransactionEvent>[];
-      r.addEventListener((event) => events.add(event));
+      // Слой реестров: собственная транзакция (эхо) событий не порождает
+      final events = <ModelsChangedEvent>[];
+      r.addModelsChangedListener((event) => events.add(event));
 
       final task = Task(title: 'Своя задача', originatorId: 'me', executorId: 'me');
       final transaction = Transaction.next(null, 'me', 'details', 'creation', [task.id], 'path');
-      notifyViaTransactionForTest(r, transaction, {task.id: task});
+      final registry = Registry(id: 'r2', parentId: 'domain1', transactions: {0: transaction});
+      remoteStorage.lastRegistries['r2'] = registry;
+      remoteStorage.lastModels[task.id] = task;
+
+      await r.onRemoteRegistryChange('r2');
 
       expect(events, isEmpty);
 
       // Интерпретатор также отбрасывает собственные изменения (страховка)
-      final ownEvent = RepositoryTransactionEvent(
-        registryId: '',
-        originatorId: 'me',
-        changeType: 'creation',
-        changedModelIds: [task.id],
+      final ownEvent = ModelsChangedEvent(
+        actorId: 'me',
+        containerId: 'domain1',
         changedModels: {task.id: task},
       );
-      expect(interpretRepositoryEvent(ownEvent, myId: 'me'), isEmpty);
+      expect(interpretModelsChangedEvent(ownEvent, myId: 'me'), isEmpty);
     });
   });
 group('Security fixes from review', () {
@@ -586,11 +593,4 @@ group('Security fixes from review', () {
   });
 });
 
-}
-
-// Обертка для тестирования приватного метода Repository.
-void notifyViaTransactionForTest(Repository r, Transaction transaction, Map<String, Model> models) {
-  // Используем публичный контракт: событие доставляется через слушатель при
-  // обработке входящих транзакций. Для теста вызываем обработку напрямую.
-  r.onRemoteTransactionForTest(transaction, models);
 }
