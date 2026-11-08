@@ -573,7 +573,7 @@ jobs:
       # domains/client/supabase/migrations.
       - name: Start local Supabase stack
         working-directory: ./domains/client/supabase
-        run: supabase db start
+        run: supabase start --ignore-health-check
 
       - name: Export local Supabase keys
         id: keys
