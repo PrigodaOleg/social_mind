@@ -46,10 +46,10 @@ def sanitize(src: str) -> str:
 
 def main() -> None:
     src_path, dst_path = sys.argv[1], sys.argv[2]
-    with open(src_path) as f:
+    with open(src_path, encoding='utf-8') as f:
         src = f.read()
     rules = json.loads(sanitize(src))
-    with open(dst_path, 'w') as f:
+    with open(dst_path, 'w', encoding='utf-8') as f:
         json.dump(rules, f, indent=2)
     print(f'sanitized rules written to {dst_path}')
 

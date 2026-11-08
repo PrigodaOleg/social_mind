@@ -97,14 +97,18 @@ def get_old_rules_from_git(base_ref: str) -> str:
         ['git', '-C', CLIENT_DIR, 'rev-parse', '--show-toplevel'],
         capture_output=True, text=True, check=True).stdout.strip()
     rel = os.path.relpath(DEFAULT_RULES, repo_root)
-    r = subprocess.run(['git', '-C', CLIENT_DIR, 'show', f'{base_ref}:{rel}'],
-                       capture_output=True, text=True, check=True)
+    r = subprocess.run(
+        ['git', '-C', CLIENT_DIR, 'show', f'{base_ref}:{rel}'],
+        capture_output=True, text=True, encoding='utf-8')
+    if r.returncode != 0:
+        return None  # rules file does not exist on the base ref (new file)
     return r.stdout
 
 
 def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
     os.makedirs(WORK_DIR, exist_ok=True)
-    with open(os.path.join(WORK_DIR, 'rules.json'), 'w') as f:
+    with open(os.path.join(WORK_DIR, 'rules.json'), 'w',
+              encoding='utf-8') as f:
         f.write(sanitize(initial_rules))
     with open(os.path.join(WORK_DIR, 'firebase.json'), 'w') as f:
         json.dump({'database': {'rules': 'rules.json'},
@@ -159,7 +163,8 @@ def start_emulator(port: int, initial_rules: str) -> subprocess.Popen:
 def put_rules(port: int, rules_src: str) -> None:
     rules = sanitize(rules_src)
     json.loads(rules)  # fail fast on unparseable rules
-    with open(os.path.join(WORK_DIR, 'rules.json'), 'w') as f:
+    with open(os.path.join(WORK_DIR, 'rules.json'), 'w',
+              encoding='utf-8') as f:
         f.write(rules)
     url = (f'http://127.0.0.1:{port}/.settings/rules.json'
            f'?ns=rules-compat-test')
@@ -204,13 +209,18 @@ def main() -> int:
     ap.add_argument('--port', type=int, default=9100)
     args = ap.parse_args()
 
-    with open(args.new) as f:
+    with open(args.new, encoding='utf-8') as f:
         new_src = f.read()
     if args.old:
-        with open(args.old) as f:
+        with open(args.old, encoding='utf-8') as f:
             old_src = f.read()
     else:
         old_src = get_old_rules_from_git(args.base)
+    if old_src is None:
+        print('No rules file on the base ref: the rules are new, '
+              'there is nothing to compare against.')
+        print('OK: no backward-compatibility breaks')
+        return 0
 
     emulator = start_emulator(args.port, old_src)
     try:
