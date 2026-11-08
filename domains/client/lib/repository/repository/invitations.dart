@@ -7,7 +7,7 @@ import 'package:hashlib/hashlib.dart';
 import 'repository.dart';
 
 /// Строгий allowlist для ID, попадающих в пути удаленного хранилища.
-/// Защита от path injection через поля QR-кодов (/, ., $, #, [, ] - спецсимволы путей RTDB).
+/// Защита от path injection через поля QR-кодов (/, ., $, #, [, ] - спецсимволы путей).
 final _safeIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
 
 bool isSafeRemotePathId(String? id) {
@@ -27,8 +27,8 @@ bool isSafeRemotePathId(String? id) {
 ///
 /// Приглашение в домен (domainJoin):
 /// 1. Участник домена создает Invitation (domainJoin) в удаленном хранилище
-///    домена по пути invitations/<invitationId>, payload не шифруется в RTDB,
-///    но содержит только IDs (никаких чувствительных данных).
+///    домена по пути invitations/<invitationId>; payload содержит только IDs
+///    (никаких чувствительных данных).
 /// 2. Приглашаемому лично передается QR с invitationId (+ ключом шифрования
 ///    payload, когда payload будет содержать чувствительные данные).
 /// 3. При принятии: подключение хранилища домена (с подтверждением) и
@@ -281,13 +281,10 @@ class InvitationService {
     String instance, {
     Future<bool> Function(String storageKey, String instance)? onConfirm,
   }) async {
-    // Валидация: storageKey попадает в пути настроек и БД, instance - в URL.
+    // Валидация: storageKey попадает в пути настроек и БД. Валидация instance
+    // выполняется самими реализациями удаленных хранилищ (storage.init).
     if (!isSafeRemotePathId(storageKey)) {
       print('Rejected unsafe storage key: $storageKey');
-      return false;
-    }
-    if (!_isValidInstance(instance)) {
-      print('Rejected unsafe storage instance: $instance');
       return false;
     }
     final storageFactory = _repo.knownRemoteStorages[storageKey];
@@ -311,20 +308,6 @@ class InvitationService {
       _repo.addConnectedStorage(storageKey, storage);
     }
     return success;
-  }
-
-  /// Allowlist для URL/ID instance: https-URL Supabase или идентификатор Firebase-проекта.
-  bool _isValidInstance(String instance) {
-    if (instance.isEmpty || instance.length > 256) return false;
-    // Firebase project id
-    if (isSafeRemotePathId(instance)) return true;
-    // Supabase / произвольный https-URL: только https, без credentials в URL
-    final uri = Uri.tryParse(instance);
-    return uri != null &&
-        uri.hasScheme &&
-        uri.scheme == 'https' &&
-        uri.userInfo.isEmpty &&
-        uri.host.isNotEmpty;
   }
 
   /// Записать приглашение в удаленное хранилище по пути.

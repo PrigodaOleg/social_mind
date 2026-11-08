@@ -9,7 +9,7 @@
     "loginActionLabel": "Login as:",
     "loginPutIdHintText": "Put user ID to authenticate",
     "loginExistingUserButtonText": "Existing user",
-    "loginExistingUserActionLabel": "Please input your ID",    
+    "loginExistingUserActionLabel": "Please input your ID",
     "loginNewUserButtonText": "New user",
     "loginBlankUserButtonText": "Blank user",
     "unknownPageText": "The requested page does not exist",
@@ -20,7 +20,13 @@
     "contactListEdit": "Edit contact",
     "contactListDelete": "Delete",
     "contactListDeleteConfirm": "Delete contact \"{name}\"?",
-"@contactListDeleteConfirm": {"placeholders": {"name": {"type": "Object"}}},
+    "@contactListDeleteConfirm": {
+        "placeholders": {
+            "name": {
+                "type": "Object"
+            }
+        }
+    },
     "contactListNameLabel": "Name",
     "contactListNameRequired": "Name is required",
     "contactListUserIdLabel": "User ID",
@@ -39,5 +45,33 @@
     "save": "Save",
     "addTaskList": "Add task list",
     "tasksListsTitle": "Task lists",
-    "userProjectionDescription": "A user projection is not a real user, but an entity that plays the user's role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projection's context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly."
+    "userProjectionDescription": "A user projection is not a real user, but an entity that plays the user's role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projection's context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly.",
+    "invitationsPageTitle": "Invitations and acquaintances",
+    "invitationsAcquaintanceTitle": "Acquaintance",
+    "invitationsAcquaintanceHint": "Show this QR code when meeting in person. The other person will scan it and send you a reply invitation.",
+    "invitationsShowMyQr": "Show my QR",
+    "invitationsSendByQrTitle": "Send acquaintance by someone else''s QR",
+    "invitationsQrDataLabel": "QR code data of the other person",
+    "invitationsSendAcquaintance": "Send acquaintance",
+    "invitationsIncomingTitle": "Incoming acquaintances",
+    "invitationsAcceptIncoming": "Accept incoming acquaintances",
+    "invitationsDomainCreated": "Domain created: {count} participants",
+    "invitationsDomainJoinTitle": "Domain invitation",
+    "invitationsDomainJoinHint": "Pass this QR code to the invitee in person.",
+    "notificationsPageTitle": "Notifications",
+    "notificationsRulesTitle": "Notification rules",
+    "notificationsRulesHint": "Define which events and from whom you want to receive notifications.",
+    "notificationsAddRule": "Add rule (tasks and invitations)",
+    "notificationsPublishRules": "Publish rules to the server (for offline pushes)",
+    "notificationsRecentTitle": "Recent notifications",
+    "notificationsEmpty": "No notifications yet",
+    "notificationsEventTaskAssigned": "Task assigned",
+    "notificationsEventTaskCompleted": "Task completed",
+    "notificationsEventInvitation": "Invitation",
+    "notificationsFromAll": "all events",
+    "notificationsActorsFrom": "from everyone",
+    "notificationsActorsCount": "from {count} users",
+    "notificationsAllDomains": "all domains",
+    "notificationsDomainsCount": "{count} domains",
+    "notificationsFrom": "from {actor}"
 }

@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 """Convert the production Firebase RTDB rules file to strict JSON.
 
-The production rules (lib/remote_storage/firebase_realtime_database_rules.json)
+The production rules (database/database.rules.json)
 contain // comments and literal newlines inside string values, which the
 Firebase CLI / RTDB emulator cannot parse. The emulator silently falls back to
 fully permissive rules in that case, so this script emits a sanitized copy.

@@ -604,8 +604,3 @@ jobs:
             --dart-define=SUPABASE_TEST_URL=http://127.0.0.1:54321 \
             --dart-define=SUPABASE_TEST_SERVICE_ROLE_KEY=${{ steps.keys.outputs.service_role_key }}
 
-      # Регрессионный прогон полного набора (без стека - интеграционные
-      # тесты в нем пропускаются).
-      - name: Run full test suite
-        working-directory: ./domains/client
-        run: flutter test

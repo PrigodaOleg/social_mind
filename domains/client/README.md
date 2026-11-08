@@ -98,7 +98,7 @@ dart run build_runner build --delete-conflicting-outputs
 flutter gen-l10n
 
 # Firebase RTDB правила доступа
-Правила хранятся в `lib/remote_storage/firebase_realtime_database_rules.json`.
+Правила хранятся в `database/database.rules.json`.
 
 - Проверка обратной совместимости (запускается на каждый PR в CI, job
   `firebase-rules-compat` в `.github/workflows/dart.yml`): новые правила не

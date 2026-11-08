@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-RULES_SRC=lib/remote_storage/firebase_realtime_database_rules.json
+RULES_SRC=database/database.rules.json
 EMULATOR_DIR=.dart_tool/firebase_emulator
 PROJECT=closers-test
 

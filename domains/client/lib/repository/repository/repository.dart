@@ -19,6 +19,28 @@ typedef AccessDeniedListener = void Function(Map<String, dynamic> items);
 typedef PeriodicCallback = void Function(int left);
 typedef DoneCallback = void Function();
 
+/// Абстрактное транспортное событие: в удаленном хранилище появилась новая
+/// транзакция, затрагивающая модели. Содержит только метаданные транзакции и
+/// сами изменившиеся модели - без какой-либо бизнес-интерпретации.
+/// [originatorId] - кто внес изменения (автор транзакции).
+class RepositoryTransactionEvent {
+  RepositoryTransactionEvent({
+    required this.registryId,
+    required this.originatorId,
+    required this.changeType,
+    required this.changedModelIds,
+    required this.changedModels,
+  });
+
+  final String registryId;
+  final String originatorId;
+  final String changeType;
+  final List<String> changedModelIds;
+  final Map<String, Model> changedModels;
+}
+
+typedef RepositoryEventListener = void Function(RepositoryTransactionEvent event);
+
 
 class RebaseCollision implements Exception {
   final String message;
@@ -231,9 +253,9 @@ class Repository {
             }
           });
         }
-        // Уведомляем о событиях для пуших (назначение задач, изменения статусов...)
+        // Уведомляем о транспортном событии (интерпретация - в бизнес-слое)
         for (final transaction in freshTransactions) {
-          _notifyEventListeners(transaction, remoteModels.cast<String, Model>());
+          _notifyEventListeners(registryId, transaction, remoteModels.cast<String, Model>());
         }
       }
       syncedThisTime.addAll(changedModelIds);
@@ -242,11 +264,11 @@ class Repository {
     }
   }
 
-  // # События для уведомлений (фаза пуши).
-  final eventListeners = <int, void Function(String type, Model subject, String actorId)>{};
+  // # Транспортные события (для подписчиков; интерпретация в бизнес-слое).
+  final eventListeners = <int, RepositoryEventListener>{};
   int eventListenersCounter = 0;
 
-  int addEventListener(void Function(String type, Model subject, String actorId) listener) {
+  int addEventListener(RepositoryEventListener listener) {
     eventListeners[eventListenersCounter] = listener;
     return eventListenersCounter++;
   }
@@ -255,22 +277,30 @@ class Repository {
     eventListeners.remove(id);
   }
 
-  /// Определяем тип события из транзакции и уведомляем слушателей.
-  /// Пока поддерживаем: назначение исполнителя задачи и завершение задачи.
+  /// Уведомляем слушателей об абстрактном транспортном событии: приехала
+  /// чужая транзакция со списком изменившихся моделей. Репозиторий не
+  /// интерпретирует содержимое моделей - конкретные типы уведомлений
+  /// (назначение задачи, завершение и т.п.) выводит бизнес-слой.
   @visibleForTesting
-  void onRemoteTransactionForTest(Transaction transaction, Map<String, Model> models) => _notifyEventListeners(transaction, models);
+  void onRemoteTransactionForTest(Transaction transaction, Map<String, Model> models) => _notifyEventListeners('', transaction, models);
 
-  void _notifyEventListeners(Transaction transaction, Map<String, Model> models) {
-    if (transaction.originatorId == myId) return; // свои события не уведомляем
-    for (final modelId in transaction.changes) {
-      final model = models[modelId];
-      if (model is Task) {
-        if (model.executorId == myId && model.executorId.isNotEmpty) {
-          eventListeners.values.toList().forEach((l) => l('task_assigned', model, transaction.originatorId));
-        } else if (model.isCompleted) {
-          eventListeners.values.toList().forEach((l) => l('task_completed', model, transaction.originatorId));
-        }
-      }
+  void _notifyEventListeners(String registryId, Transaction transaction, Map<String, Model> models) {
+    // Собственные изменения (эхо своей транзакции) событий не порождают.
+    if (transaction.originatorId == myId) return;
+    final changedModels = <String, Model>{
+      for (final id in transaction.changes)
+        if (models[id] != null) id: models[id]!,
+    };
+    if (changedModels.isEmpty) return;
+    final event = RepositoryTransactionEvent(
+      registryId: registryId,
+      originatorId: transaction.originatorId,
+      changeType: transaction.changeType,
+      changedModelIds: List<String>.from(transaction.changes),
+      changedModels: changedModels,
+    );
+    for (final listener in eventListeners.values.toList()) {
+      listener(event);
     }
   }
 

@@ -1,7 +1,7 @@
 
 // End-to-end auth tests against the Firebase Local Emulator Suite
 // (Auth + Realtime Database) with the PRODUCTION security rules applied
-// (lib/remote_storage/firebase_realtime_database_rules.json, sanitized by
+// (database/database.rules.json, sanitized by
 // tool/prepare_firebase_rules.py — see tool/run_auth_e2e_tests.sh).
 //
 // The tests exercise the same flows the UI login page drives

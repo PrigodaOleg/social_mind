@@ -33,7 +33,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.dirname(HERE)
 DEFAULT_RULES = os.path.join(
-    CLIENT_DIR, 'lib', 'remote_storage', 'firebase_realtime_database_rules.json')
+    CLIENT_DIR, 'database', 'database.rules.json')
 WORK_DIR = os.path.join(CLIENT_DIR, '.dart_tool', 'firebase_rules_compat')
 
 sys.path.insert(0, HERE)

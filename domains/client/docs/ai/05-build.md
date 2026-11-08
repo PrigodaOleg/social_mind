@@ -96,9 +96,10 @@
 - Запуск: `supabase start` — приложение подключается к `http://127.0.0.1:54321` с локальным anon-ключом (см. `supabase/README.md`).
 - Накат миграций (`supabase/migrations/`): `make supabase-migrate` (= `supabase db reset`).
 
-### Firestore
+### Правила удаленных хранилищ
 
-- Правила для Cloud Firestore находятся в `firestore.rules` (пока пермиссивные для аутентифицированных, с TODO на per-user). Деплой: `firebase deploy --only firestore:rules`.
+- Правила RTDB: `database/database.rules.json` (Firebase-конвенция для RTDB rules).
+- Правила Cloud Firestore: `firestore/firestore.rules` (пока пермиссивные для аутентифицированных, с TODO на per-user). Деплой: `firebase deploy --only firestore:rules`.
 
 ### Запуск интеграционных тестов
 

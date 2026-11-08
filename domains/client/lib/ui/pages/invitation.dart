@@ -5,6 +5,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import 'package:closers/state/state.dart';
 import 'package:closers/repository/repository.dart';
+import '../ui.dart';
 
 class InvitationPage extends StatelessWidget {
   static const routeName = '/invitations';
@@ -34,11 +35,12 @@ class _InvitationViewState extends State<InvitationView> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final b = BlocProvider.of<InvitationBloc>(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: t.colorScheme.inversePrimary,
-        title: const Text('Приглашения и знакомства'),
+        title: Text(l.invitationsPageTitle),
       ),
       body: BlocBuilder<InvitationBloc, InvitationState>(
         builder: (context, state) {
@@ -52,14 +54,13 @@ class _InvitationViewState extends State<InvitationView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Знакомство', style: t.textTheme.titleLarge),
+                      Text(l.invitationsAcquaintanceTitle, style: t.textTheme.titleLarge),
                       const SizedBox(height: 8),
-                      const Text('Покажите этот QR-код при личной встрече. '
-                          'Собеседник отсканирует его и отправит вам ответное приглашение.'),
+                      Text(l.invitationsAcquaintanceHint),
                       const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: () => b.add(const AcquaintanceQrGenerated()),
-                        child: const Text('Показать мой QR'),
+                        child: Text(l.invitationsShowMyQr),
                       ),
                       if (state.acquaintanceQrPayload != null)
                         Center(
@@ -80,13 +81,13 @@ class _InvitationViewState extends State<InvitationView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Отправить знакомство по чужому QR'),
+                      Text(l.invitationsSendByQrTitle),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _qrInputController,
-                        decoration: const InputDecoration(
-                          labelText: 'Данные QR-кода собеседника',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l.invitationsQrDataLabel,
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -94,7 +95,7 @@ class _InvitationViewState extends State<InvitationView> {
                         onPressed: () {
                           b.add(AcquaintanceQrScanned(_qrInputController.text));
                         },
-                        child: const Text('Отправить знакомство'),
+                        child: Text(l.invitationsSendAcquaintance),
                       ),
                     ],
                   ),
@@ -108,17 +109,17 @@ class _InvitationViewState extends State<InvitationView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Входящие знакомства'),
+                      Text(l.invitationsIncomingTitle),
                       const SizedBox(height: 8),
                       ElevatedButton(
                         onPressed: () => b.add(const IncomingAcquaintancesAccepted()),
-                        child: const Text('Принять входящие знакомства'),
+                        child: Text(l.invitationsAcceptIncoming),
                       ),
                       for (final domain in state.createdDomains)
                         ListTile(
                           leading: const Icon(Icons.domain),
                           title: Text(domain.title),
-                          subtitle: Text('Домен создан: ${domain.participantsIds.length} участников'),
+                          subtitle: Text(l.invitationsDomainCreated(domain.participantsIds.length)),
                         ),
                     ],
                   ),
@@ -132,9 +133,9 @@ class _InvitationViewState extends State<InvitationView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Приглашение в домен', style: t.textTheme.titleLarge),
+                        Text(l.invitationsDomainJoinTitle, style: t.textTheme.titleLarge),
                         const SizedBox(height: 8),
-                        const Text('Передайте этот QR-код приглашаемому лично.'),
+                        Text(l.invitationsDomainJoinHint),
                         Center(
                           child: PrettyQr(
                             data: state.domainInvitationQrPayload!,

@@ -16,11 +16,19 @@ class FirebaseStorage extends RemoteStorage {
 
   @override
   Future<bool> init(String instance, {String? anonKey}) async {
+    // Валидация instance: идентификатор Firebase-проекта (allowlist).
+    // Защита от подключения к враждебному инстансу по данным из QR.
+    if (instance.isEmpty || instance.length > 64 || !_projectIdRegExp.hasMatch(instance)) {
+      print('FirebaseStorage: invalid instance (project id): $instance');
+      return false;
+    }
     // Connect and get instance
     app = Firebase.app(instance);
     database = FirebaseDatabase.instanceFor(app: app).ref();
     return true;
   }
+
+  static final RegExp _projectIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
 
   @override
   Future<bool> createUserAndAuth(String login, String password, {String? claim}) async {
@@ -60,12 +68,30 @@ class FirebaseStorage extends RemoteStorage {
       if (snapshot.exists) {
         var json = Map<String, dynamic>.from(snapshot.value as Map);
         if (!json.containsKey('type')) return;
-        return models[json['type']]?.call(json);
+        return models[json['type']]?.call(_normalizeRemoteLists(json));
       }
     } catch (error) {
       print(error);
     }
     return;
+  }
+
+  /// RTDB не умеет хранить пустые списки и представляет списки словарями
+  /// (ключ -> ''). Нормализуем список-как-словарь обратно в список до
+  /// десериализации - модели остаются агностичными к транспорту.
+  Map<String, dynamic> _normalizeRemoteLists(Map<String, dynamic> json) {
+    final normalized = Map<String, dynamic>.from(json);
+    for (final key in ['participantsIds', 'observersIds', 'domainsIds']) {
+      final value = normalized[key];
+      if (value is List) continue;
+      if (value is Map) {
+        normalized[key] = value.entries
+            .where((e) => e.value == true || e.value == '' || e.value == null)
+            .map((e) => e.key.toString())
+            .toList();
+      }
+    }
+    return normalized;
   }
 
   @override

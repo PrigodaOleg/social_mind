@@ -1,6 +1,7 @@
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:closers/state/notifications/event_interpreter.dart';
 import 'package:closers/state/notifications/notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:convert';
@@ -431,15 +432,18 @@ void main() {
       expect(restored.rules.first.action, NotificationAction.silent);
     });
 
-    test('repository event listener fires on task assignment', () async {
+    test('repository emits abstract event; interpreter derives task_assigned', () async {
       final localStorage = FakeLocalStorage();
       final remoteStorage = FakeRemoteStorage();
       final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
       final me = User(id: 'me', name: 'me');
       localStorage.lastModels['me'] = me;
 
-      final events = <(String, String)>[];
-      r.addEventListener((type, subject, actorId) => events.add((type, actorId)));
+      // Репозиторий уведомляет об абстрактном транспортном событии (без
+      // бизнес-интерпретации): кто изменил (originatorId транзакции) и какие
+      // модели затронуты.
+      final events = <RepositoryTransactionEvent>[];
+      r.addEventListener((event) => events.add(event));
 
       final task = Task(
         title: 'Помыть посуду',
@@ -450,8 +454,35 @@ void main() {
       notifyViaTransactionForTest(r, transaction, {task.id: task});
 
       expect(events.length, 1);
-      expect(events.first.$1, 'task_assigned');
-      expect(events.first.$2, 'user2');
+      expect(events.first.originatorId, 'user2');
+      expect(events.first.changedModelIds, contains(task.id));
+      expect(events.first.changedModels[task.id], isA<Task>());
+
+      // Бизнес-интерпретация (state-слой): моя исполнительская задача, изменена
+      // чужой транзакцией -> task_assigned с актором из транзакции.
+      final interpreted = interpretRepositoryEvent(events.first, myId: 'me');
+      expect(interpreted.length, 1);
+      expect(interpreted.first.eventType, 'task_assigned');
+      expect(interpreted.first.actorId, 'user2');
+      expect(interpreted.first.subject.id, task.id);
+    });
+
+    test('interpreter: completed task changed by another participant notifies', () async {
+      // Эвристика по актору транзакции, а не по ориджинатору модели: модель
+      // может создать один пользователь, а изменять - любой участник домена.
+      // Задача не моя (не исполнитель) - завершение чужой транзакцией уведомляет.
+      final task = Task(title: 'Задача соседа', originatorId: 'me', executorId: '', isCompleted: true);
+      final transaction = Transaction.next(null, 'user2', 'details', 'creation', [task.id], 'path');
+      final event = RepositoryTransactionEvent(
+        registryId: 'r1',
+        originatorId: 'user2',
+        changeType: 'creation',
+        changedModelIds: [task.id],
+        changedModels: {task.id: task},
+      );
+      final interpreted = interpretRepositoryEvent(event, myId: 'me');
+      expect(interpreted.single.eventType, 'task_completed');
+      expect(interpreted.single.actorId, 'user2');
     });
 
     test('own events do not trigger notifications', () async {
@@ -461,14 +492,25 @@ void main() {
       final me = User(id: 'me', name: 'me');
       localStorage.lastModels['me'] = me;
 
-      final events = <String>[];
-      r.addEventListener((type, subject, actorId) => events.add(type));
+      // Транспорт: собственная транзакция (эхо) событий не порождает
+      final events = <RepositoryTransactionEvent>[];
+      r.addEventListener((event) => events.add(event));
 
       final task = Task(title: 'Своя задача', originatorId: 'me', executorId: 'me');
       final transaction = Transaction.next(null, 'me', 'details', 'creation', [task.id], 'path');
       notifyViaTransactionForTest(r, transaction, {task.id: task});
 
       expect(events, isEmpty);
+
+      // Интерпретатор также отбрасывает собственные изменения (страховка)
+      final ownEvent = RepositoryTransactionEvent(
+        registryId: '',
+        originatorId: 'me',
+        changeType: 'creation',
+        changedModelIds: [task.id],
+        changedModels: {task.id: task},
+      );
+      expect(interpretRepositoryEvent(ownEvent, myId: 'me'), isEmpty);
     });
   });
 group('Security fixes from review', () {

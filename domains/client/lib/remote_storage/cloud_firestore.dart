@@ -16,6 +16,8 @@ import 'package:closers/repository/models/models.dart';
 class CloudFirestoreStorage extends RemoteStorage {
   CloudFirestoreStorage();
 
+  static final RegExp _projectIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
+
   static const emailSuffix = '@a.aa';
   FirebaseFirestore? _firestore;
   FirebaseAuth? _auth;
@@ -38,6 +40,12 @@ class CloudFirestoreStorage extends RemoteStorage {
 
   @override
   Future<bool> init(String instance, {String? anonKey}) async {
+    // Валидация instance: идентификатор Firebase-проекта (allowlist).
+    // Защита от подключения к враждебному инстансу по данным из QR.
+    if (instance.isEmpty || instance.length > 64 || !_projectIdRegExp.hasMatch(instance)) {
+      print('CloudFirestoreStorage: invalid instance (project id): $instance');
+      return false;
+    }
     _firestore = FirebaseFirestore.instanceFor(app: Firebase.app(instance));
     _auth = FirebaseAuth.instanceFor(app: Firebase.app(instance));
     return true;

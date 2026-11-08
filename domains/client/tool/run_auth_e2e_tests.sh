@@ -82,7 +82,7 @@ ANDROID_SYSTEM_IMAGE="${ANDROID_SYSTEM_IMAGE:-system-images;android-34;google_ap
 ANDROID_DEVICE_PROFILE="${ANDROID_DEVICE_PROFILE:-pixel_5}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
 
-RULES_SRC=lib/remote_storage/firebase_realtime_database_rules.json
+RULES_SRC=database/database.rules.json
 EMULATOR_DIR=.dart_tool/firebase_emulator
 PROJECT=closers-test
 AUTH_PORT=9099

@@ -28,6 +28,21 @@ class SupabaseStorage extends RemoteStorage {
   @override
   Future<bool> init(String instance, {String? anonKey}) async {
     // instance - URL проекта Supabase, например https://xyz.supabase.co
+    // Валидация instance: только https, без credentials в URL, host не пуст.
+    // Защита от подключения к враждебному серверу по данным из QR.
+    if (instance.isEmpty || instance.length > 256) {
+      print('SupabaseStorage: invalid instance: $instance');
+      return false;
+    }
+    final uri = Uri.tryParse(instance);
+    if (uri == null ||
+        !uri.hasScheme ||
+        uri.scheme != 'https' ||
+        uri.userInfo.isNotEmpty ||
+        uri.host.isEmpty) {
+      print('SupabaseStorage: instance must be a valid https URL: $instance');
+      return false;
+    }
     // Ключ anon берется из явного аргумента или из окружения (--dart-define).
     final key = (anonKey != null && anonKey.isNotEmpty)
         ? anonKey

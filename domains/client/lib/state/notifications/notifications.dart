@@ -4,6 +4,8 @@ import 'package:bloc/bloc.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:equatable/equatable.dart';
 
+import 'event_interpreter.dart';
+
 // # Правила уведомлений (фаза пуши).
 //
 // Философия: пользователь сам управляет тем, о каких событиях от каких
@@ -173,8 +175,15 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     if (stored != null) {
       notificationRules = NotificationRules.fromJsonString(stored);
     }
-    _listenerId ??= _repo.addEventListener((type, subject, actorId) {
-      add(NotificationEventArrived(eventType: type, subject: subject, actorId: actorId));
+    _listenerId ??= _repo.addEventListener((event) {
+      // Бизнес-интерпретация транспортного события - в event_interpreter.dart
+      for (final notification in interpretRepositoryEvent(event, myId: _repo.myId ?? '')) {
+        add(NotificationEventArrived(
+          eventType: notification.eventType,
+          subject: notification.subject,
+          actorId: notification.actorId,
+        ));
+      }
     });
     emit(state.copyWith(rules: () => List.from(notificationRules.rules)));
   }

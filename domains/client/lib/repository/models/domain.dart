@@ -22,9 +22,8 @@ class Domain extends Model {
     isPersonal = (json['isPersonal'] ?? json['isCompleted'] ?? false) as bool,
     originatorId = (json['originatorId'] ?? '') as String,
     registryId = (json['registryId'] ?? '') as String,
-    // RTDB хранит списки как словари (ключ -> ''), поэтому принимаем обе формы.
-    participantsIds = _listFromRemote(json['participantsIds']),
-    observersIds = _listFromRemote(json['observersIds']),
+    participantsIds = List<String>.from(json['participantsIds'] ?? []),
+    observersIds = List<String>.from(json['observersIds'] ?? []),
     models = Map<String, String>.from(json['models'] ?? {}),
     storageKey = (json['storageKey'] ?? '') as String,
     super.fromJson();
@@ -100,14 +99,4 @@ class Domain extends Model {
 
   @override
   List<Object> get props => super.props + [isPersonal, originatorId, registryId, participantsIds, observersIds, models, storageKey];
-}
-/// RTDB не умеет хранить пустые списки и представляет списки словарями
-/// (ключ -> ''). Превращаем обе формы обратно в список.
-List<String> _listFromRemote(dynamic value) {
-  if (value is List) return List<String>.from(value);
-  if (value is Map) return value.entries
-      .where((e) => e.value == true || e.value == '' || e.value == null)
-      .map((e) => e.key.toString())
-      .toList();
-  return [];
 }

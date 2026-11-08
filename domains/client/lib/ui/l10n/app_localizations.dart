@@ -337,6 +337,174 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.'**
   String get userProjectionDescription;
+
+  /// No description provided for @invitationsPageTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приглашения и знакомства'**
+  String get invitationsPageTitle;
+
+  /// No description provided for @invitationsAcquaintanceTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Знакомство'**
+  String get invitationsAcquaintanceTitle;
+
+  /// No description provided for @invitationsAcquaintanceHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Покажите этот QR-код при личной встрече. Собеседник отсканирует его и отправит вам ответное приглашение.'**
+  String get invitationsAcquaintanceHint;
+
+  /// No description provided for @invitationsShowMyQr.
+  ///
+  /// In ru, this message translates to:
+  /// **'Показать мой QR'**
+  String get invitationsShowMyQr;
+
+  /// No description provided for @invitationsSendByQrTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправить знакомство по чужому QR'**
+  String get invitationsSendByQrTitle;
+
+  /// No description provided for @invitationsQrDataLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Данные QR-кода собеседника'**
+  String get invitationsQrDataLabel;
+
+  /// No description provided for @invitationsSendAcquaintance.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправить знакомство'**
+  String get invitationsSendAcquaintance;
+
+  /// No description provided for @invitationsIncomingTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Входящие знакомства'**
+  String get invitationsIncomingTitle;
+
+  /// No description provided for @invitationsAcceptIncoming.
+  ///
+  /// In ru, this message translates to:
+  /// **'Принять входящие знакомства'**
+  String get invitationsAcceptIncoming;
+
+  /// No description provided for @invitationsDomainCreated.
+  ///
+  /// In ru, this message translates to:
+  /// **'Домен создан: {count} участников'**
+  String invitationsDomainCreated(int count);
+
+  /// No description provided for @invitationsDomainJoinTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приглашение в домен'**
+  String get invitationsDomainJoinTitle;
+
+  /// No description provided for @invitationsDomainJoinHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Передайте этот QR-код приглашаемому лично.'**
+  String get invitationsDomainJoinHint;
+
+  /// No description provided for @notificationsPageTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Уведомления'**
+  String get notificationsPageTitle;
+
+  /// No description provided for @notificationsRulesTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Правила уведомлений'**
+  String get notificationsRulesTitle;
+
+  /// No description provided for @notificationsRulesHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Определите, о каких событиях и от кого вы хотите получать уведомления.'**
+  String get notificationsRulesHint;
+
+  /// No description provided for @notificationsAddRule.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить правило (задачи и приглашения)'**
+  String get notificationsAddRule;
+
+  /// No description provided for @notificationsPublishRules.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выгрузить правила на сервер (для офлайн-пушей)'**
+  String get notificationsPublishRules;
+
+  /// No description provided for @notificationsRecentTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Последние уведомления'**
+  String get notificationsRecentTitle;
+
+  /// No description provided for @notificationsEmpty.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пока нет уведомлений'**
+  String get notificationsEmpty;
+
+  /// No description provided for @notificationsEventTaskAssigned.
+  ///
+  /// In ru, this message translates to:
+  /// **'Назначение задачи'**
+  String get notificationsEventTaskAssigned;
+
+  /// No description provided for @notificationsEventTaskCompleted.
+  ///
+  /// In ru, this message translates to:
+  /// **'Задача завершена'**
+  String get notificationsEventTaskCompleted;
+
+  /// No description provided for @notificationsEventInvitation.
+  ///
+  /// In ru, this message translates to:
+  /// **'Приглашение'**
+  String get notificationsEventInvitation;
+
+  /// No description provided for @notificationsFromAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'все события'**
+  String get notificationsFromAll;
+
+  /// No description provided for @notificationsActorsFrom.
+  ///
+  /// In ru, this message translates to:
+  /// **'от всех'**
+  String get notificationsActorsFrom;
+
+  /// No description provided for @notificationsActorsCount.
+  ///
+  /// In ru, this message translates to:
+  /// **'от {count} польз.'**
+  String notificationsActorsCount(int count);
+
+  /// No description provided for @notificationsAllDomains.
+  ///
+  /// In ru, this message translates to:
+  /// **'все домены'**
+  String get notificationsAllDomains;
+
+  /// No description provided for @notificationsDomainsCount.
+  ///
+  /// In ru, this message translates to:
+  /// **'{count} доменов'**
+  String notificationsDomainsCount(int count);
+
+  /// No description provided for @notificationsFrom.
+  ///
+  /// In ru, this message translates to:
+  /// **'от {actor}'**
+  String notificationsFrom(String actor);
 }
 
 class _AppLocalizationsDelegate

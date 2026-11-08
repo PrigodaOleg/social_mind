@@ -38,5 +38,61 @@
     "save": "Сохранить",
     "addTaskList": "Добавить список задач",
     "tasksListsTitle": "Списки задач",
-    "userProjectionDescription": "Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно."
+    "userProjectionDescription": "Проекция пользователя - это не настоящий пользователь, а некоторая сущность, которая выполняет роль пользователя. Технически с ней можно делать все то же самое, что с пользователем: назначать задачи, приглашать в домены... Однако реальный человек связан со своей проекцией только косвенно. Если существует канал связи с реальным человеком, то по нему можно попытаться доставить контекст проекции. Реальный человек существует как пользователь в базе, то контекст проекции можно передать ему непосредственно.",
+    "invitationsPageTitle": "Приглашения и знакомства",
+    "invitationsAcquaintanceTitle": "Знакомство",
+    "invitationsAcquaintanceHint": "Покажите этот QR-код при личной встрече. Собеседник отсканирует его и отправит вам ответное приглашение.",
+    "invitationsShowMyQr": "Показать мой QR",
+    "invitationsSendByQrTitle": "Отправить знакомство по чужому QR",
+    "invitationsQrDataLabel": "Данные QR-кода собеседника",
+    "invitationsSendAcquaintance": "Отправить знакомство",
+    "invitationsIncomingTitle": "Входящие знакомства",
+    "invitationsAcceptIncoming": "Принять входящие знакомства",
+    "invitationsDomainCreated": "Домен создан: {count} участников",
+    "@invitationsDomainCreated": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "invitationsDomainJoinTitle": "Приглашение в домен",
+    "invitationsDomainJoinHint": "Передайте этот QR-код приглашаемому лично.",
+    "notificationsPageTitle": "Уведомления",
+    "notificationsRulesTitle": "Правила уведомлений",
+    "notificationsRulesHint": "Определите, о каких событиях и от кого вы хотите получать уведомления.",
+    "notificationsAddRule": "Добавить правило (задачи и приглашения)",
+    "notificationsPublishRules": "Выгрузить правила на сервер (для офлайн-пушей)",
+    "notificationsRecentTitle": "Последние уведомления",
+    "notificationsEmpty": "Пока нет уведомлений",
+    "notificationsEventTaskAssigned": "Назначение задачи",
+    "notificationsEventTaskCompleted": "Задача завершена",
+    "notificationsEventInvitation": "Приглашение",
+    "notificationsFromAll": "все события",
+    "notificationsActorsFrom": "от всех",
+    "notificationsActorsCount": "от {count} польз.",
+    "@notificationsActorsCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "notificationsAllDomains": "все домены",
+    "notificationsDomainsCount": "{count} доменов",
+    "@notificationsDomainsCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "notificationsFrom": "от {actor}",
+    "@notificationsFrom": {
+        "placeholders": {
+            "actor": {
+                "type": "String"
+            }
+        }
+    }
 }
