@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
-import 'models/models.dart';
+import '../models/models.dart';
 
 /// Абстрактное бизнес-событие "изменились модели" для бизнес-слоя.
 ///

@@ -10,7 +10,7 @@ import 'package:hashlib/hashlib.dart';
 
 import '../models/models.dart';
 import '../navigation/navigation_stack.dart';
-import '../registry_manager.dart';
+import 'registry.dart';
 
 
 typedef PeriodicCallback = void Function(int left);
