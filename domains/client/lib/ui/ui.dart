@@ -11,3 +11,5 @@ export 'pages/unknown_page.dart';
 export 'pages/user_profile.dart';
 export 'pages/contact_list.dart';
 export 'widgets/contact_picker_dialog.dart';
+export 'pages/invitation.dart';
+export 'pages/notifications.dart';

@@ -1,0 +1,134 @@
+{
+  "rules": {
+    ".read": "now < 1798744695000",  // 2026-12-31
+    ".write": "now < 1798744695000",  // 2026-12-31
+    ".validate": "auth.uid !== null
+                  && auth.token.email.endsWith('@a.aa')",
+    "registries": {
+      "$rid": {
+        ".validate": "$rid != null",
+        "metadata": {
+          ".validate": "
+          	newData.hasChildren(['id'])
+          	&& newData.child('id').val() == $rid
+         	"
+        },
+        "transactions": {
+          "$tidx": {
+            ".validate": "
+            	newData.hasChildren(['changes', 'id', 'prevId', 'originatorId'])
+              && ((data.parent().parent().child('lastIdx').exists() && $tidx == data.parent().parent().child('lastIdx').val() + 1 + '')
+                  || (!data.parent().parent().child('lastIdx').exists() && $tidx == '0'))
+            ",
+            "changes": {
+              "$chid": {
+                ".validate": "newData.parent().parent().parent().parent().parent().parent().child('models').child($chid).val() != null"
+              }
+            }
+          }
+        }
+      }
+    },
+    "models": {
+      "$mid": {
+      	".validate": "
+      		newData.hasChildren(['id'])
+        	&& newData.child('id').val() == $mid
+        	&& ((newData.child('registryId').exists() && newData.parent().parent()
+               .child('registries')
+               .child(newData.child('registryId').val())
+               .child('transactions')
+               .child(newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val() + '')
+               .child('changes')
+               .child($mid).exists()
+              )
+              || newData.hasChild('parents'))
+      	",
+        "parents": {
+          "$pid": {
+            ".validate": "
+            	newData.parent().parent().parent().hasChild($pid)
+            	&& ((newData.parent().parent().parent().child($pid).hasChild('children')
+            	&& newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
+                || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
+            			&& newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid)))
+            "
+          }          
+        },
+        "children": {
+          "$chid": {
+          	".validate": "
+          		newData.parent().parent().parent().hasChild($chid)
+            	&& newData.parent().parent().parent().child($chid).hasChild('parents')
+            	&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          	"
+        	}
+        },
+        "domainsIds": {
+          "$did": {
+          	".validate": "
+          		newData.parent().parent().parent().hasChild($did)
+            	&& newData.parent().parent().parent().child($did).hasChild('parents')
+            	&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          	"
+        	}
+        }
+      }
+    },
+    // Приглашения (InvitationService): invitations/<invitationId> для domainJoin
+    // и invitations/by-user/<userId>/<invitationId> для знакомств.
+    //
+    // Голос участника (approvals/<voterId>):
+    //   - ключ голоса обязан совпадать с пользователем, выполняющим запись
+    //     (auth.token.email == <voterId>@a.aa), то есть пользователь может
+    //     оставить голос только от своего имени;
+    //   - значение голоса - строго boolean.
+    //
+    // ОГРАНИЧЕНИЯ (см. также firestore/firestore.rules):
+    //   1. RTDB .validate не умеет сравнивать старые и новые данные (нет diff),
+    //      поэтому клиентский протокол записи приглашения "целиком" не позволяет
+    //      применить правило "менять можно только свой ключ approvals" к
+    //      whole-object записи - правило ниже действует для записи ключа
+    //      approvals по дочернему пути (invitations/$iid/approvals/$voter).
+    //      Переход протокола записи на дочерние пути + серверная проверка
+    //      (Cloud Function) - последующая задача.
+    //   2. "Добавление нового участника домена только при одобрении всеми
+    //      участниками" проверяется на стороне Domain (models/<domainId>):
+    //      связать participantsIds модели с конкретным приглашением в правилах
+    //      RTDB невозможно (id приглашения не хранится в модели), поэтому
+    //      строгая проверка кворума остается за серверной частью.
+    "invitations": {
+      "by-user": {
+        "$uid": {
+          "$iid": {
+            ".validate": "
+            	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
+            	&& newData.child('status').val() == 'pending'
+            	&& newData.child('inviteeId').val() == $uid
+            ",
+            "approvals": {
+              "$voter": {
+                ".validate": "newData.isBoolean() && auth.token.email == $voter + '@a.aa'"
+              }
+            }
+          }
+        }
+      },
+      "$iid": {
+        ".validate": "
+        	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
+        	&& (newData.child('status').val() == 'pending'
+        		|| newData.child('status').val() == 'approved'
+        		|| newData.child('status').val() == 'declined'
+        		|| newData.child('status').val() == 'accepted'
+        		|| newData.child('status').val() == 'canceled')
+        ",
+        "approvals": {
+          "$voter": {
+            ".validate": "newData.isBoolean() && auth.token.email == $voter + '@a.aa'"
+          }
+        }
+      }
+    }
+  }
+}

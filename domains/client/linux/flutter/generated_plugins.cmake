@@ -3,7 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  app_links_linux
   file_selector_linux
+  isar_plus_flutter_libs
   url_launcher_linux
 )
 

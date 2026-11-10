@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Правила Cloud Firestore для CloudFirestoreStorage
+// (lib/remote_storage/cloud_firestore.dart).
+//
+// Сериализованные модели и реестры: любой аутентифицированный пользователь
+// имеет доступ (консистентность обеспечивается журналом транзакций).
+// TODO: ужесточить до per-user (участники домена / владелец модели).
+//
+// Приглашения (invitations_data/<doc>): защита голосования и консенсуса.
+// Аутентификация домена - email '<userId>@a.aa' (см. FirebaseStorage.emailSuffix).
+
+service cloud.firestore {
+  // Стандартный префикс для подпапок с данными (если будут использоваться).
+  match /databases/{database}/documents {
+    // Сериализованные модели.
+    match /models/{id} {
+      // TODO: per-user политики вместо общего "request.auth != null".
+      allow read, write: if request.auth != null;
+    }
+
+    // Реестры изменений (metadata + transactions/<idx> + lastIdx).
+    match /registries/{id} {
+      // TODO: per-user политики вместо общего "request.auth != null".
+      allow read, write: if request.auth != null;
+
+      match /transactions/{idx} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    // Raw storage (приглашения) использует составные id в одной коллекции.
+    match /invitations_data/{doc} {
+      allow read: if request.auth != null;
+
+      // Создание приглашения: корректный каркас документа.
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
+        && request.resource.data.status == 'pending';
+
+      // Обновление приглашения: авторизованный пользователь может менять
+      // ТОЛЬКО свой голос в approvals (approvals/<userId> == auth-пользователь).
+      // Изменения остальных полей (status, participants-переходы) этим правилом
+      // запрещены: статус pending -> approved с кворумом "одобрено всеми
+      // участниками" - только по явному списку полей (см. allow update ниже).
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvals'])
+        // измененные ключи approvals - только голос самого пользователя
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['approvals.' + request.auth.token.email.split('@a.aa')[0]]);
+
+      // Полное обновление (статус/прочие поля): разрешено только при строгом
+      // переходе pending -> accepted для знакомств (каждая сторона пишет свое)
+      // либо при статусе, который выставляет владелец документа.
+      // TODO: серверная проверка кворума (Cloud Function): правила Firestore
+      // не могут посчитать количество ключей approvals и сопоставить его с
+      // числом участников домена.
+      allow update: if request.auth != null
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.auth.token.email.split('@a.aa')[0] == resource.data.inviteeId;
+
+      allow delete: if false;
+    }
+  }
+}

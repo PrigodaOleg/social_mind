@@ -13,6 +13,7 @@ part 'task.dart';
 part 'contact_list.dart';
 part 'contact.dart';
 part 'registry.dart';
+part 'invitation.dart';
 // part 'models.g.dart';
 enum Location {
   local,

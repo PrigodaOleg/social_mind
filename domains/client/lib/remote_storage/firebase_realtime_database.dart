@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:closers/remote_storage/remote_storage.dart';
 import 'package:closers/repository/models/models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,12 +15,20 @@ class FirebaseStorage extends RemoteStorage {
   late FirebaseApp app;
 
   @override
-  Future<bool> init(String instance) async {
+  Future<bool> init(String instance, {String? anonKey}) async {
+    // Валидация instance: идентификатор Firebase-проекта (allowlist).
+    // Защита от подключения к враждебному инстансу по данным из QR.
+    if (instance.isEmpty || instance.length > 64 || !_projectIdRegExp.hasMatch(instance)) {
+      print('FirebaseStorage: invalid instance (project id): $instance');
+      return false;
+    }
     // Connect and get instance
     app = Firebase.app(instance);
     database = FirebaseDatabase.instanceFor(app: app).ref();
     return true;
   }
+
+  static final RegExp _projectIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
 
   @override
   Future<bool> createUserAndAuth(String login, String password, {String? claim}) async {
@@ -39,6 +49,18 @@ class FirebaseStorage extends RemoteStorage {
   }
 
   @override
+  Future<bool> updateUserPassword(String login, String oldPassword, String newPassword) async {
+    final auth = FirebaseAuth.instanceFor(app: app);
+    // Переавторизуемся со старым паролем и меняем его на новый
+    final credential = EmailAuthProvider.credential(email: '$login$emailSuffix', password: oldPassword);
+    final user = auth.currentUser;
+    if (user == null) return false;
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPassword);
+    return true;
+  }
+
+  @override
   Future<dynamic> getItem({required String id}) async {
     // Get item by ID
     try {
@@ -46,12 +68,30 @@ class FirebaseStorage extends RemoteStorage {
       if (snapshot.exists) {
         var json = Map<String, dynamic>.from(snapshot.value as Map);
         if (!json.containsKey('type')) return;
-        return models[json['type']]?.call(json);
+        return models[json['type']]?.call(_normalizeRemoteLists(json));
       }
     } catch (error) {
       print(error);
     }
     return;
+  }
+
+  /// RTDB не умеет хранить пустые списки и представляет списки словарями
+  /// (ключ -> ''). Нормализуем список-как-словарь обратно в список до
+  /// десериализации - модели остаются агностичными к транспорту.
+  Map<String, dynamic> _normalizeRemoteLists(Map<String, dynamic> json) {
+    final normalized = Map<String, dynamic>.from(json);
+    for (final key in ['participantsIds', 'observersIds', 'domainsIds']) {
+      final value = normalized[key];
+      if (value is List) continue;
+      if (value is Map) {
+        normalized[key] = value.entries
+            .where((e) => e.value == true || e.value == '' || e.value == null)
+            .map((e) => e.key.toString())
+            .toList();
+      }
+    }
+    return normalized;
   }
 
   @override
@@ -200,16 +240,100 @@ class FirebaseStorage extends RemoteStorage {
     final takeQuery = ref.limitToLast(count);
     final metaRef = database.child('registries/$id/metadata');
     final List<DataSnapshot> snapshots = await Future.wait([takeQuery.get(), metaRef.get()]);
-    for (DataSnapshot snapshot in snapshots) {
-      print(snapshot.value);
-    }
     Map<String, dynamic> registry = {};
     registry['transactions'] = {};
-    registry['metadata'] = Map<String, dynamic>.from(snapshots[1].value as Map);
+    final metaValue = snapshots[1].value;
+    if (metaValue is! Map) return null; // реестра еще нет в удаленном хранилище
+    registry['metadata'] = Map<String, dynamic>.from(metaValue);
     for (DataSnapshot child in snapshots[0].children) {
       registry['transactions'][child.key] = child.value;
     }
     // registry['transactions'] = snapshots[0].children.map((e) => e.value).toList();
     return Registry.fromJson(registry);
+  }
+
+  @override
+  Future<Map<String, Registry>> readRegistries({
+    List<String>? ids,
+    List<(String id, int? count)>? idsCounts,
+    int count = 1,
+  }) async {
+    final registries = <String, Registry>{};
+    final requests = idsCounts ?? [for (final id in (ids ?? [])) (id, count)];
+    for (final (id, c) in requests) {
+      try {
+        final registry = await readRegistry(id, count: c ?? count);
+        if (registry != null) registries[id] = registry;
+      } catch (e) {
+        print('readRegistry($id) error: $e');
+      }
+    }
+    return registries;
+  }
+
+  @override
+  Stream<RegistryChangeEvent> watchRegistries(List<String> ids) {
+    final controller = StreamController<RegistryChangeEvent>();
+    final subscriptions = <StreamSubscription>[];
+    for (final id in ids) {
+      // Подписываемся на метаданные реестра и на lastIdx - минимальный набор путей,
+      // чтобы не спамить подписками на все транзакции
+      final lastIdxSub = database.child('registries/$id/lastIdx').onValue.listen((event) {
+        final value = event.snapshot.value;
+        int? lastIndex;
+        if (value is int) lastIndex = value;
+        if (value is String) lastIndex = int.tryParse(value);
+        controller.add(RegistryChangeEvent(id, lastIndex));
+      });
+      subscriptions.add(lastIdxSub);
+    }
+    controller.onCancel = () {
+      for (final sub in subscriptions) {
+        sub.cancel();
+      }
+    };
+    return controller.stream;
+  }
+
+  @override
+  Future<bool> saveRaw(String path, Map<String, dynamic> json) async {
+    try {
+      await database.child(path).set(json);
+      return true;
+    } catch (e) {
+      print('saveRaw error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>?> readRaw(String path) async {
+    try {
+      final snapshot = await database.child(path).get();
+      if (snapshot.exists) {
+        return Map<String, dynamic>.from(snapshot.value as Map);
+      }
+    } catch (e) {
+      print('readRaw error: $e');
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> readRawPrefix(String pathPrefix) async {
+    final result = <Map<String, dynamic>>[];
+    try {
+      final snapshot = await database.child(pathPrefix).get();
+      if (snapshot.exists) {
+        for (final child in snapshot.children) {
+          if (child.value is Map) {
+            result.add(Map<String, dynamic>.from(child.value as Map));
+          }
+        }
+      }
+    } catch (e) {
+      print('readRawPrefix error: $e');
+    }
+    return result;
   }
 }

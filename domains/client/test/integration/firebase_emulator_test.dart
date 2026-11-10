@@ -10,7 +10,7 @@
 //   flutter test --platform chrome test_integration
 //
 // The Realtime Database rules under test are the production ones:
-//   lib/remote_storage/firebase_realtime_database_rules.json
+//   database/database.rules.json
 
 @TestOn('browser')
 library firebase_emulator_test;

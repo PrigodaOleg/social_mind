@@ -26,8 +26,8 @@ from prepare_firebase_rules import sanitize  # noqa: E402
 
 CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RULES_PATH = os.path.join(
-    CLIENT_DIR, 'lib', 'remote_storage',
-    'firebase_realtime_database_rules.json')
+    CLIENT_DIR, 'database',
+    'database.rules.json')
 
 
 def load_env_file(path: str) -> dict:

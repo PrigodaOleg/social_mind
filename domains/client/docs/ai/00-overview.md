@@ -21,7 +21,8 @@ lib/
 │   ├── remote_storage.dart
 │   ├── _pubspec.yaml
 │   ├── firebase_realtime_database.dart
-│   └── firebase_realtime_database_rules.json
+│   ├── cloud_firestore.dart
+│   └── supabase.dart
 ├── repository/
 │   ├── repository.dart
 │   ├── _pubspec.yaml

@@ -14,7 +14,7 @@
 //
 // They talk to the Firebase Local Emulator Suite over TCP (Auth :9099,
 // Realtime Database :9000) with the PRODUCTION security rules applied
-// (lib/remote_storage/firebase_realtime_database_rules.json, sanitized by
+// (database/database.rules.json, sanitized by
 // tool/prepare_firebase_rules.py — see tool/run_auth_e2e_tests.sh).
 library auth_e2e_scenarios;
 

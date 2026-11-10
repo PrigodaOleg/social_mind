@@ -2,7 +2,7 @@
 // Unit tests for the Firebase RTDB rules file.
 //
 // The production rules file
-// (lib/remote_storage/firebase_realtime_database_rules.json) contains
+// (database/database.rules.json) contains
 // // comments and literal newlines inside string values, which the Firebase
 // CLI and the RTDB emulator cannot parse (the emulator silently falls back to
 // fully permissive rules in that case). tool/prepare_firebase_rules.py
@@ -19,7 +19,7 @@ void main() {
   // Directory.current is the package root (domains/client) when running
   // `flutter test`.
   final rulesFile = File(
-      'lib/remote_storage/firebase_realtime_database_rules.json');
+      'database/database.rules.json');
   final prepareScript = File('tool/prepare_firebase_rules.py');
 
   // tool/prepare_firebase_rules.py prints a status line to stdout, so the
@@ -39,7 +39,7 @@ void main() {
   test('rules file exists', () {
     expect(rulesFile.existsSync(), isTrue,
         reason: 'rules file must exist at '
-            'lib/remote_storage/firebase_realtime_database_rules.json');
+            'database/database.rules.json');
     expect(prepareScript.existsSync(), isTrue,
         reason: 'tool/prepare_firebase_rules.py must exist');
   });

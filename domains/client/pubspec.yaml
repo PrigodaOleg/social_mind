@@ -45,9 +45,15 @@ dependencies:
   path_provider: ^2.1.6
 
   # remote_storage
-  # cloud_firestore: ^5.6.0
+  cloud_firestore: ^6.10.2
   firebase_database: ^12.4.1
   firebase_auth: ^6.5.1
+  supabase: ^2.16.5
+  supabase_flutter: ^2.18.3
+
+  # notifications
+  firebase_messaging: ^16.7.1
+  flutter_local_notifications: ^22.3.3
 
   # repository
   equatable: ^2.0.5
