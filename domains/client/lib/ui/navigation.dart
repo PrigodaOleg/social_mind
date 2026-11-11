@@ -99,21 +99,37 @@ AppRouterDelegate({
     return AppNavigator(
       key: navigatorKey,
       pages: [
-        for (var route in navStack)
+        for (var i = 0; i < navStack.length; i++)
           MaterialPage(
+            key: ValueKey('${navStack[i].path}#$i'),
             child: Function.apply(
-              _routes[route.path] ?? unknownRoute.constructor,
+              _routes[navStack[i].path] ?? unknownRoute.constructor,
               [repository],
-              _routes[route.path] != null ?
-                route.args.map((key, value) => MapEntry(Symbol(key), value)) :
+              _routes[navStack[i].path] != null ?
+                navStack[i].args.map((key, value) => MapEntry(Symbol(key), value)) :
                 unknownRoute.args.map((key, value) => MapEntry(Symbol(key), value))
             )
           )
       ],
       onDidRemovePage: (Page<Object?> page) {
-        navStack.removeLast();
-        _routePath = Uri.parse(navStack.last.path);
-        repository.lastNavStack = navStack;
+        // Определяем позицию удаленной страницы по её ключу ('path#index'),
+        // а не вслепую удаляем последний элемент стека.
+        final key = page.key;
+        var idx = -1;
+        if (key is ValueKey<String>) {
+          final parts = key.value.split('#');
+          if (parts.length == 2) {
+            final p = parts[0];
+            final i = int.tryParse(parts[1]);
+            if (i != null && i < navStack.length && navStack[i].path == p) idx = i;
+          }
+        }
+        if (idx < 0) idx = navStack.length - 1;
+        if (idx >= 0 && idx < navStack.length) navStack.removeAt(idx);
+        if (navStack.isNotEmpty) {
+          _routePath = Uri.parse(navStack.last.path);
+          repository.lastNavStack = navStack;
+        }
         notifyListeners();
       },
     );
@@ -175,5 +191,11 @@ AppRouterDelegate({
   replaceNavigationStack(List<NavStackEntry> newNavStack) {
     // Подменяем всю историю переходов кроме текущей страницы
     navStack = newNavStack;
+    // Держим маршрут-конфигурацию согласованной с восстановленным стеком,
+    // иначе после восстановления URL/глубокие ссылки остаются на '/splash'.
+    if (navStack.isNotEmpty) {
+      _routePath = Uri.parse(navStack.last.path);
+    }
+    notifyListeners();
   }
 }
