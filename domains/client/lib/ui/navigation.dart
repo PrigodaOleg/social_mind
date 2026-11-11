@@ -152,7 +152,7 @@ AppRouterDelegate({
     }
     final rootRoute = path.substring(0, path.lastIndexOf('/'));
     if (rootRoute.isNotEmpty && _routes.containsKey(rootRoute)) {
-      return NavStackEntry(path, {'id': uri.path.split('/').last, ...uri.queryParameters});
+      return NavStackEntry(rootRoute, {'id': uri.path.split('/').last, ...uri.queryParameters});
     }
     return NavStackEntry(unknownRoute.path, {});
   }

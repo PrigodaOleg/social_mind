@@ -153,13 +153,16 @@ void main() {
         expect(notifications, 1);
       });
 
-      test('known nested route keeps the full path and extracts id', () async {
+      test('known nested route stores the root route with id arg', () async {
         delegate.repository = _testRepository(userId: 'u1');
 
         await delegate.setNewRoutePath(Uri.parse('/tasks/task42'));
 
-        expect(delegate.navStack.single.path, '/tasks/task42');
+        // Запись стека согласована с pushNamed: корневой маршрут + id в args,
+        // иначе build() не найдет конструктор страницы в _routes.
+        expect(delegate.navStack.single.path, '/tasks');
         expect(delegate.navStack.single.args['id'], 'task42');
+        // Адресная строка показывает полный путь.
         expect(delegate.currentConfiguration, Uri.parse('/tasks/task42'));
       });
 
