@@ -1022,14 +1022,23 @@ class Repository {
 
   Future<void> initRemoteStorages() async {
     for (var storage in me.settings.getDeep('remote_storages', defaultValue: {}).entries) {
-      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+      final storageFactory = knownRemoteStorages[storage.key];
+      if (storageFactory == null) {
+        print('Unknown remote storage ${storage.key} is skipped');
+        continue;
+      }
+      _remoteStorages[storage.key] = storageFactory();
     }
     for (var storage in _remoteStorages.entries) {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
       String? instance = me.settings.getDeep(instanceFieldName);
       if (instance != null) {
         final anonKey = me.settings.getDeep('remote_storages.${storage.key}.anon_key');
-        await storage.value.init(instance, anonKey: anonKey);  // todo: wrap in try-catch and show error message to user
+        try {
+          await storage.value.init(instance, anonKey: anonKey);
+        } catch (e) {
+          print('Remote storage ${storage.key} init failed: $e');
+        }
       } else {
         print('No parameter $instanceFieldName is specified for ${storage.key}');
       }
@@ -1041,7 +1050,11 @@ class Repository {
       var passwordFieldName = 'remote_storages.${storage.key}.hashed_password';
       String? password = me.secrets.getDeep(passwordFieldName);
       if (password != null) {
-        await storage.value.auth(me.id, password);  // todo: wrap in try-catch and show error message to user
+        try {
+          await storage.value.auth(me.id, password);
+        } catch (e) {
+          print('Remote storage ${storage.key} auth failed: $e');
+        }
       } else {
         print('No parameter $passwordFieldName is specified for ${storage.key}');
       }
@@ -1079,7 +1092,13 @@ class Repository {
     bool success = true;
     final dummyUser = User(name: ''); // todo: некрасиво, настройки по-умолчанию должны где-то храниться и быть доступны для ввода до попытки логина
     for (var storage in dummyUser.settings.getDeep('remote_storages', defaultValue: {}).entries) {
-      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+      final storageFactory = knownRemoteStorages[storage.key];
+      if (storageFactory == null) {
+        print('Unknown remote storage ${storage.key} is skipped');
+        success = false;
+        continue;
+      }
+      _remoteStorages[storage.key] = storageFactory();
     }
     for (var storage in _remoteStorages.entries) {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
