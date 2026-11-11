@@ -66,13 +66,21 @@ class AppRouterDelegate extends RouterDelegate<Uri>
 AppRouterDelegate({
     required routes,
     required this.unknownRoute,
-    required this.initialRoute
+    required this.initialRoute,
+    this.loginRoutePath = '/login'
   }) : 
     _navigatorKey = GlobalKey<AppNavigatorState>(),
     _routePath = Uri.parse(initialRoute.path),
     navStack = [NavStackEntry(initialRoute.path, initialRoute.args)],
     _routes = {initialRoute.path: initialRoute.constructor}..addAll(routes)
   ;
+
+  // Маршрут логина (строкой, чтобы navigation.dart не зависел от страниц):
+  // на него уходит стек, когда веб-ссылка пришла без локального пользователя.
+  final String loginRoutePath;
+
+  // Отложенная цель веб-ссылки: холодный старт или отсутствие пользователя.
+  NavStackEntry? _pendingLink;
 
   @override
   GlobalKey<AppNavigatorState> get navigatorKey => _navigatorKey;
@@ -134,9 +142,50 @@ AppRouterDelegate({
     );
   }
 
+  // Преобразуем веб-ссылку в запись стека: известный маршрут - как есть,
+  // вложенный ('/task_list/<id>') - маршрут с id последнего сегмента,
+  // все остальное - UnknownPage.
+  NavStackEntry _entryFromUri(Uri uri) {
+    final path = uri.path;
+    if (_routes.containsKey(path)) {
+      return NavStackEntry(path, {...uri.queryParameters});
+    }
+    final rootRoute = path.substring(0, path.lastIndexOf('/'));
+    if (rootRoute.isNotEmpty && _routes.containsKey(rootRoute)) {
+      return NavStackEntry(path, {'id': uri.path.split('/').last, ...uri.queryParameters});
+    }
+    return NavStackEntry(unknownRoute.path, {});
+  }
+
   @override
   Future<void> setNewRoutePath(Uri path) async {
+    // Защита стартового сплеша: '/' и '/splash' не перестраивают стек.
+    if (path.path == '/' || path.path == initialRoute.path || path.path.isEmpty) {
+      _routePath = path;
+      return;
+    }
+    final entry = _entryFromUri(path);
+    // Холодный старт: репозиторий еще не инициализирован (splash выполняет
+    // locateUser) - запоминаем цель, стек не трогаем.
+    if (repository.late) {
+      _pendingLink = entry;
+      _routePath = path;
+      return;
+    }
+    if (repository.myId == null) {
+      // Нет пользователя: сначала логин, цель ссылки применится после входа.
+      _pendingLink = entry;
+      navStack
+        ..clear()
+        ..add(NavStackEntry(loginRoutePath, {}));
+    } else {
+      // Переход по ссылке строит свежий стек от целевой страницы.
+      navStack
+        ..clear()
+        ..add(entry);
+    }
     _routePath = path;
+    notifyListeners();
   }
 
   Future<T?> pushNamed<T extends Object?>(
@@ -183,6 +232,14 @@ AppRouterDelegate({
       notifyListeners();
       return null;
     }
+    // Вход выполнен (pushReplacementNamed(loginRoute) вызывается после set me):
+    // применяем отложенную цель веб-ссылки, если она была.
+    if (routeName == loginRoutePath && _pendingLink != null && repository.myId != null) {
+      final target = _pendingLink!;
+      _pendingLink = null;
+      navStack.removeLast();
+      return pushNamed(target.path, arguments: target.args);
+    }
     navStack.removeLast();
     return pushNamed(routeName, arguments: arguments);
   }
@@ -193,6 +250,12 @@ AppRouterDelegate({
     // Держим маршрут-конфигурацию согласованной с восстановленным стеком,
     // иначе после восстановления URL/глубокие ссылки остаются на '/splash'.
     if (navStack.isNotEmpty) {
+      _routePath = Uri.parse(navStack.last.path);
+    }
+    // Ссылка, пришедшая на холодном старте, ложится поверх восстановленного стека.
+    if (_pendingLink != null && repository.myId != null) {
+      navStack.add(_pendingLink!);
+      _pendingLink = null;
       _routePath = Uri.parse(navStack.last.path);
     }
     notifyListeners();

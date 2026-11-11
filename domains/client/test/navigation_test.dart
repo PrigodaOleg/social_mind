@@ -3,6 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:closers/ui/navigation.dart';
 
+import 'fake_local_storage.dart';
+
+// Репозиторий на фейковом хранилище: без Isar/Firebase. [initialized] имитирует
+// прошедший init (repository.late == false), как после locateUser на splash.
+Repository _testRepository({String? userId, bool initialized = true}) {
+  final repo = Repository(localStorage: FakeLocalStorage());
+  repo.knownRemoteStorages.clear();
+  if (initialized) repo.late = false;
+  if (userId != null) repo.myId = userId;
+  return repo;
+}
+
 Widget _dummyPageBuilder(Repository repository, {dynamic args}) => const SizedBox();
 
 void main() {
@@ -18,6 +30,7 @@ void main() {
         routes: {
           '/login': _dummyPageBuilder,
           '/home': _dummyPageBuilder,
+          '/tasks': _dummyPageBuilder,
         },
       );
       delegate.addListener(() => notifications++);
@@ -127,6 +140,96 @@ void main() {
       expect(delegate.navStack.length, 1);
       expect(delegate.navStack.single.path, '/splash');
       expect(notifications, 1);
+    });
+    group('web links (setNewRoutePath)', () {
+      test('known route with user set builds a fresh stack', () async {
+        delegate.repository = _testRepository(userId: 'u1');
+
+        await delegate.setNewRoutePath(Uri.parse('/home'));
+
+        expect(delegate.navStack.single.path, '/home');
+        expect(delegate.navStack.single.args, isEmpty);
+        expect(delegate.currentConfiguration, Uri.parse('/home'));
+        expect(notifications, 1);
+      });
+
+      test('known nested route keeps the full path and extracts id', () async {
+        delegate.repository = _testRepository(userId: 'u1');
+
+        await delegate.setNewRoutePath(Uri.parse('/tasks/task42'));
+
+        expect(delegate.navStack.single.path, '/tasks/task42');
+        expect(delegate.navStack.single.args['id'], 'task42');
+        expect(delegate.currentConfiguration, Uri.parse('/tasks/task42'));
+      });
+
+      test('unknown route lands on the unknown page', () async {
+        delegate.repository = _testRepository(userId: 'u1');
+
+        await delegate.setNewRoutePath(Uri.parse('/nope'));
+
+        expect(delegate.navStack.single.path, '/unknown');
+        expect(delegate.navStack.single.args, isEmpty);
+        expect(notifications, 1);
+      });
+
+      test('no user: login first, deferred target applied after login', () async {
+        delegate.repository = _testRepository();
+
+        await delegate.setNewRoutePath(Uri.parse('/home'));
+
+        // Стек заменен на логин, цель ссылки отложена.
+        expect(delegate.navStack.single.path, '/login');
+        expect(delegate.currentConfiguration, Uri.parse('/home'));
+
+        // "Логин": пользователь появился, экран логина делает pushReplacementNamed.
+        delegate.repository.myId = 'u1';
+        await delegate.pushReplacementNamed('/login');
+
+        expect(delegate.navStack.single.path, '/home');
+        expect(delegate.currentConfiguration, Uri.parse('/home'));
+      });
+
+      test('root and splash paths keep the stack untouched', () async {
+        delegate.repository = _testRepository(userId: 'u1');
+        await delegate.pushNamed('/home');
+        notifications = 0;
+
+        await delegate.setNewRoutePath(Uri.parse('/'));
+        expect(delegate.navStack.map((e) => e.path), ['/splash', '/home']);
+        await delegate.setNewRoutePath(Uri.parse('/splash'));
+        expect(delegate.navStack.map((e) => e.path), ['/splash', '/home']);
+        expect(notifications, 0);
+      });
+
+      test('cold start defers the link; restore puts it on top of the stack', () async {
+        // Репозиторий без init: repository.late == true (холодный старт).
+        final repo = _testRepository(initialized: false);
+        delegate.repository = repo;
+
+        await delegate.setNewRoutePath(Uri.parse('/home'));
+
+        expect(delegate.navStack.single.path, '/splash');
+        expect(delegate.currentConfiguration, Uri.parse('/home'));
+
+        repo.myId = 'u1';
+        repo.late = false;
+        delegate.replaceNavigationStack([NavStackEntry('/login', {})]);
+
+        expect(delegate.navStack.map((e) => e.path), ['/login', '/home']);
+        expect(delegate.currentConfiguration, Uri.parse('/home'));
+      });
+
+      test('route information parser round-trips the uri', () async {
+        final parser = AppRouteInformationParser();
+        final uri = Uri.parse('/home?x=1');
+
+        final parsed = await parser.parseRouteInformation(RouteInformation(uri: uri));
+        expect(parsed, uri);
+
+        final restored = parser.restoreRouteInformation(uri);
+        expect(restored!.uri, uri);
+      });
     });
   });
 }

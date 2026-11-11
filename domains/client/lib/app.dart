@@ -20,6 +20,11 @@ class App extends StatelessWidget {
     } catch (error) {
       print('Repository init failed: $error');
     }
+    // Нет локального пользователя - на дефолтный маршрут логина; сохраненный
+    // стек (в т.ч. с других устройств) восстановится после входа.
+    if (repository.myId == null) {
+      return null;
+    }
     // FCM: регистрация токена после того, как репозиторий знает пользователя.
     // Пуши не критичны для старта: requestPermission/getToken могут ждать сети
     // или ответа пользователя на диалог, поэтому не блокируем ими переход на
@@ -64,29 +69,31 @@ class App extends StatelessWidget {
         }
         return const Locale('en');
       },
-      routerDelegate: AppRouterDelegate(initialRoute: (
-        path: SplashScreen.routeName,
-        constructor: SplashScreen.new,
-        args: {
-          'nextRoute': LoginPage.routeName,
-          'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
-          'backgroundTask': locateUser
-        }
-      ), unknownRoute: (
-        args: {},
-        constructor: UnknownPage.new,
-        path: UnknownPage.routeName
-      ), routes: {
-        LoginPage.routeName: LoginPage.new,
-        HomePage.routeName: HomePage.new,
-        DomainListPage.routeName: DomainListPage.new,
-        DomainContentPage.routeName: DomainContentPage.new,
-        TaskListPage.routeName: TaskListPage.new,
-        ContactListPage.routeName: ContactListPage.new,
-        UserProfilePage.routeName: UserProfilePage.new,
-        InvitationPage.routeName: InvitationPage.new,
-        NotificationsPage.routeName: NotificationsPage.new
-      }),
+      routerDelegate: AppRouterDelegate(
+        loginRoutePath: LoginPage.routeName,
+        initialRoute: (
+          path: SplashScreen.routeName,
+          constructor: SplashScreen.new,
+          args: {
+            'nextRoute': LoginPage.routeName,
+            'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
+            'backgroundTask': locateUser
+          }
+          ), unknownRoute: (
+          args: {},
+          constructor: UnknownPage.new,
+          path: UnknownPage.routeName
+        ), routes: {
+          LoginPage.routeName: LoginPage.new,
+          HomePage.routeName: HomePage.new,
+          DomainListPage.routeName: DomainListPage.new,
+          DomainContentPage.routeName: DomainContentPage.new,
+          TaskListPage.routeName: TaskListPage.new,
+          ContactListPage.routeName: ContactListPage.new,
+          UserProfilePage.routeName: UserProfilePage.new,
+          InvitationPage.routeName: InvitationPage.new,
+          NotificationsPage.routeName: NotificationsPage.new
+        }),
       routeInformationParser: AppRouteInformationParser(),
     );
   }
