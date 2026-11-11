@@ -94,6 +94,25 @@ AppRouterDelegate({
   // Начинаем всегда со сплешскрина, а он должен вернуть 
   List<NavStackEntry> navStack;
 
+  // Событие удаления страницы может прийти как от системного pop, так и при
+  // перестроении стеков самим делегатом (pushReplacement). Во втором случае
+  // запись уже удалена из navStack - повторное удаление по identity не найдет
+  // совпадения и будет no-op, что защищает от двойного удаления новой страницы.
+  void handlePageRemoved(Page<Object?> page) {
+    final entry = page.key is ObjectKey ? (page.key as ObjectKey).value : null;
+    if (entry is NavStackEntry) {
+      final idx = navStack.indexWhere((e) => identical(e, entry));
+      if (idx >= 0) navStack.removeAt(idx);
+    }
+    // Стек не должен быть пустым: Navigator не принимает пустой список страниц.
+    if (navStack.isEmpty) {
+      navStack.add(NavStackEntry(initialRoute.path, initialRoute.args));
+    }
+    _routePath = Uri.parse(navStack.last.path);
+    repository.lastNavStack = navStack;
+    notifyListeners();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppNavigator(
@@ -101,7 +120,7 @@ AppRouterDelegate({
       pages: [
         for (var i = 0; i < navStack.length; i++)
           MaterialPage(
-            key: ValueKey('${navStack[i].path}#$i'),
+            key: ObjectKey(navStack[i]),
             child: Function.apply(
               _routes[navStack[i].path] ?? unknownRoute.constructor,
               [repository],
@@ -111,27 +130,7 @@ AppRouterDelegate({
             )
           )
       ],
-      onDidRemovePage: (Page<Object?> page) {
-        // Определяем позицию удаленной страницы по её ключу ('path#index'),
-        // а не вслепую удаляем последний элемент стека.
-        final key = page.key;
-        var idx = -1;
-        if (key is ValueKey<String>) {
-          final parts = key.value.split('#');
-          if (parts.length == 2) {
-            final p = parts[0];
-            final i = int.tryParse(parts[1]);
-            if (i != null && i < navStack.length && navStack[i].path == p) idx = i;
-          }
-        }
-        if (idx < 0) idx = navStack.length - 1;
-        if (idx >= 0 && idx < navStack.length) navStack.removeAt(idx);
-        if (navStack.isNotEmpty) {
-          _routePath = Uri.parse(navStack.last.path);
-          repository.lastNavStack = navStack;
-        }
-        notifyListeners();
-      },
+      onDidRemovePage: handlePageRemoved,
     );
   }
 

@@ -1227,13 +1227,18 @@ Uint8List? getImage(String name) {
 
   // ## Operational settings - always local
   // создать нового пользователя, получить его токен или креды, сохранить токен, креды или авторизацию
+  // Синхронный кеш id локального пользователя: setUserId асинхронен, а me/myId
+  // читаются сразу после set me (см. логин) - без кеша возможна гонка.
+  String? _cachedMyId;
+
   // Gel local uder Id
   String? get myId {
-    return _localStorage.getUserId();
+    return _cachedMyId ?? _localStorage.getUserId();
   }
 
   set myId(String? id) {
     // setUserId is async? so just start saving and leave
+    _cachedMyId = id;
     if (id != null) {
       _localStorage.setUserId(id);
     }
