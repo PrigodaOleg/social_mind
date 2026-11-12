@@ -71,7 +71,13 @@ class Timer {
     ).take(time);
     _timerSubscription = _timer?.listen(
       periodic,
-      onDone: done,
+      onDone: () {
+        // Отсчет завершен - снимаем активный таймер, чтобы последующий
+        // postpone мог запустить новый отсчет.
+        _timer = null;
+        _timerSubscription = null;
+        done?.call();
+      },
       cancelOnError: true
     );
   }
@@ -89,9 +95,14 @@ class Timer {
   }
 
   postpone([int? time]) {
+    // Коалисцируем отложенные вызовы: если отсчет уже идет - не перезапускаем
+    // его, иначе синхронизация откладывается бесконечно при постоянных
+    // обращениях к getModel/saveModel (нарушение local-first: изменения
+    // никогда не уезжают в облако и колбеки не приезжают).
     time = time ?? lastActualtime;
-    _start(time, lastActualPeriod);
     lastActualtime = time;
+    if (_timer != null && _timerSubscription != null) return;
+    _start(time, lastActualPeriod);
   }
 
   cancel() {
@@ -1152,7 +1163,14 @@ class Repository {
     subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
     if (immediate) {
-      await _delayedSync();
+      // Немедленная отправка не должна блокировать UI (local-first): будим
+      // таймер сейчас, синхронизация выполнится асинхронно.
+      // До init() таймера еще нет (например, в тестах) - синхронизируем напрямую.
+      if (late) {
+        await _delayedSync();
+      } else {
+        _sync.now();
+      }
     } else {
       postponeSync();
     }
@@ -1197,7 +1215,14 @@ class Repository {
     subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
     outgoingChanges.addAll(models);
     if (immediate) {
-      await _delayedSync();
+      // Немедленная отправка не должна блокировать UI (local-first): будим
+      // таймер сейчас, синхронизация выполнится асинхронно.
+      // До init() таймера еще нет (например, в тестах) - синхронизируем напрямую.
+      if (late) {
+        await _delayedSync();
+      } else {
+        _sync.now();
+      }
     } else {
       postponeSync();
     }

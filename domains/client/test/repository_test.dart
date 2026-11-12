@@ -596,4 +596,31 @@ void main() {
     });
 
   });
+group('Timer coalescing', () {
+  test('postpone does not restart an active countdown', () async {
+    var doneCalls = 0;
+    final t = Timer(() => doneCalls++);
+    t.start(2, 1);
+    // Два быстрых postpone не должны перезапустить отсчет
+    await Future.delayed(const Duration(milliseconds: 300));
+    t.postpone();
+    t.postpone();
+    // Если бы postpone перезапускал таймер, onDone пришел бы позже ~2.3s
+    await Future.delayed(const Duration(milliseconds: 2100));
+    expect(doneCalls, 1);
+    expect(t.lastActualtime, 2);
+  });
+
+  test('postpone starts a new countdown when no timer is active', () async {
+    var doneCalls = 0;
+    final t = Timer(() => doneCalls++);
+    t.start(2, 1);
+    await Future.delayed(const Duration(milliseconds: 2300));
+    expect(doneCalls, 1);
+    t.postpone(1);
+    await Future.delayed(const Duration(milliseconds: 1300));
+    expect(doneCalls, 2);
+  });
+});
+
 }
