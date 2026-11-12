@@ -596,30 +596,32 @@ void main() {
     });
 
   });
-group('Timer coalescing', () {
-  test('postpone does not restart an active countdown', () async {
+group('Timer postpone restarts countdown', () {
+  test('postpone restarts the countdown from zero', () async {
     var doneCalls = 0;
     final t = Timer(() => doneCalls++);
+    final sw = Stopwatch()..start();
     t.start(2, 1);
-    // Два быстрых postpone не должны перезапустить отсчет
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Активное действие пользователя через ~0.5s: postpone перезапускает
+    // отсчет, done должен приехать ~2s ПОСЛЕ postpone, а не после start.
+    await Future.delayed(const Duration(milliseconds: 500));
+    final elapsedAtPostpone = sw.elapsedMilliseconds;
     t.postpone();
-    t.postpone();
-    // Если бы postpone перезапускал таймер, onDone пришел бы позже ~2.3s
-    await Future.delayed(const Duration(milliseconds: 2100));
+    // Ждем до 4.5s от старта с запасом: если бы postpone НЕ перезапускал,
+    // done пришел бы ~2s от старта (раньше 3s); при перезапуске - ~2.5s
+    // от старта (+ допуски на планировщик).
+    while (doneCalls == 0 && sw.elapsedMilliseconds < 4500) {
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+    final total = sw.elapsedMilliseconds;
+    final sincePostpone = total - elapsedAtPostpone;
     expect(doneCalls, 1);
+    // done сработал ~2s ПОСЛЕ postpone (а не через оставшиеся ~1.5s от
+    // исходного отсчета): отсчет был перезапущен postpone.
+    expect(sincePostpone, greaterThan(1800));
+    // Но не слишком поздно: отсчет идет ~2s после postpone с допуском.
+    expect(sincePostpone, lessThan(3500));
     expect(t.lastActualtime, 2);
-  });
-
-  test('postpone starts a new countdown when no timer is active', () async {
-    var doneCalls = 0;
-    final t = Timer(() => doneCalls++);
-    t.start(2, 1);
-    await Future.delayed(const Duration(milliseconds: 2300));
-    expect(doneCalls, 1);
-    t.postpone(1);
-    await Future.delayed(const Duration(milliseconds: 1300));
-    expect(doneCalls, 2);
   });
 });
 

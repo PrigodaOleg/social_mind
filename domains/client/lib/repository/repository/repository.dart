@@ -95,13 +95,11 @@ class Timer {
   }
 
   postpone([int? time]) {
-    // Коалисцируем отложенные вызовы: если отсчет уже идет - не перезапускаем
-    // его, иначе синхронизация откладывается бесконечно при постоянных
-    // обращениях к getModel/saveModel (нарушение local-first: изменения
-    // никогда не уезжают в облако и колбеки не приезжают).
+    // Задумка: при активных действиях пользователя синхронизация откладывается,
+    // чтобы не плодить синхронизации незавершенных изменений - каждый новый
+    // postpone перезапускает отсчет.
     time = time ?? lastActualtime;
     lastActualtime = time;
-    if (_timer != null && _timerSubscription != null) return;
     _start(time, lastActualPeriod);
   }
 
@@ -1245,9 +1243,11 @@ Uint8List? getImage(String name) {
 }
   // Get user associated with this instance of application
   // User must be set already
-  // Синхронный кеш локального пользователя: set me сохраняет в локальное
-  // хранилище асинхронно (fire-and-forget), а me читается сразу после set me
-  // (HomePage.build и др.) - без кеша возможна гонка StateError.
+  // Синхронный кеш локального пользователя. Чтение из локального хранилища
+  // быстрое, но set me пишет туда асинхронно (fire-and-forget), а me читается
+  // сразу после set me (HomePage.build, initRemoteStorages) - до завершения
+  // записи getItem вернет null и me бросит StateError. Кеш закрывает окно
+  // гонки; после логаута очищается, последующие чтения идут из хранилища.
   User? _cachedMe;
 
   User get me {
