@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:closers/repository/repository.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -47,11 +49,14 @@ class LoginPage extends StatelessWidget {
                   );
                   if (isPerformed == true) {
                     repository.me = blankUser;
-                    await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
-                    String secret = const Uuid().v4();
-                    await repository.createUserRemoteStorages(secret);
-                    repository.me.secret = secret;
                     n.pushReplacementNamed(HomePage.routeName);
+                    // local-first: инициализация/создание учеток хранилищ - в фоне, после перехода
+                    unawaited(_finishLoginSetup(() async {
+                      await repository.initRemoteStorages();
+                      String secret = const Uuid().v4();
+                      await repository.createUserRemoteStorages(secret);
+                      repository.me.secret = secret;
+                    }));
                   }
                 },
                 child: Text(l.loginBlankUserButtonText)
@@ -67,9 +72,11 @@ class LoginPage extends StatelessWidget {
                   );
                   if (null != tryingUser) {
                     repository.me = tryingUser;
-                    // await repository.asyncSetMe(tryingUser); // todo: тут мы замораживаем UI
-                    // Тут наверное надо подтянуть из репозитория историю навигации
                     n.pushReplacementNamed(HomePage.routeName);
+                    // Асинхронная версия set me: сохраняет пользователя,
+                    // инициализирует и аутентифицирует удаленные хранилища -
+                    // иначе на свежем устройстве /home остается без синхронизации.
+                    unawaited(_finishLoginSetup(() => repository.asyncSetMe(tryingUser)));
                   }
                 },
                 child: Text(l.loginExistingUserButtonText),
@@ -92,9 +99,12 @@ class LoginPage extends StatelessWidget {
                   );
                   if (isPerformed == false) return;
                   repository.me = tryingUser;
-                  await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
-                  await repository.createUserRemoteStorages(tryingUser.secret);
                   n.pushReplacementNamed(HomePage.routeName);
+                  // local-first: инициализация/создание учеток хранилищ - в фоне, после перехода
+                  unawaited(_finishLoginSetup(() async {
+                    await repository.initRemoteStorages();
+                    await repository.createUserRemoteStorages(tryingUser.secret);
+                  }));
                 },
                 child: Text(l.loginNewUserButtonText),
               )
@@ -103,5 +113,14 @@ class LoginPage extends StatelessWidget {
         ],
       )
     );
+  }
+
+  Future<void> _finishLoginSetup(Future<void> Function() setup) async {
+    try {
+      await setup();
+      await Repository.instance.updateRegistryWatches();
+    } catch (error) {
+      print('Background login setup failed: $error');
+    }
   }
 }

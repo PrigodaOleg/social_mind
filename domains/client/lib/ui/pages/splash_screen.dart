@@ -25,7 +25,18 @@ class SplashScreen extends StatelessWidget {
   get splash => null;
 
   Future<String> routeFunction(BuildContext context) async {
-    final lastNavStack = await backgroundTask?.call(repository);
+    List<NavStackEntry>? lastNavStack;
+    try {
+      // Фоновая задача старта может упасть или зависнуть на сетевых операциях,
+      // но приложение обязано покинуть splash: таймаут возвращает управление,
+      // дальше показывается либо восстановленный стек, либо логин.
+      lastNavStack = await backgroundTask?.call(repository).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => null,
+      );
+    } catch (error) {
+      print('Splash background task failed: $error');
+    }
     if (lastNavStack == null) return nextRoute;
     if (lastNavStack.isEmpty) return nextRoute;
     final navigator = Navigator.of(context) as AppNavigatorState;

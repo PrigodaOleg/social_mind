@@ -71,7 +71,13 @@ class Timer {
     ).take(time);
     _timerSubscription = _timer?.listen(
       periodic,
-      onDone: done,
+      onDone: () {
+        // Отсчет завершен - снимаем активный таймер, чтобы последующий
+        // postpone мог запустить новый отсчет.
+        _timer = null;
+        _timerSubscription = null;
+        done?.call();
+      },
       cancelOnError: true
     );
   }
@@ -89,9 +95,12 @@ class Timer {
   }
 
   postpone([int? time]) {
+    // Задумка: при активных действиях пользователя синхронизация откладывается,
+    // чтобы не плодить синхронизации незавершенных изменений - каждый новый
+    // postpone перезапускает отсчет.
     time = time ?? lastActualtime;
-    _start(time, lastActualPeriod);
     lastActualtime = time;
+    _start(time, lastActualPeriod);
   }
 
   cancel() {
@@ -1022,14 +1031,23 @@ class Repository {
 
   Future<void> initRemoteStorages() async {
     for (var storage in me.settings.getDeep('remote_storages', defaultValue: {}).entries) {
-      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+      final storageFactory = knownRemoteStorages[storage.key];
+      if (storageFactory == null) {
+        print('Unknown remote storage ${storage.key} is skipped');
+        continue;
+      }
+      _remoteStorages[storage.key] = storageFactory();
     }
     for (var storage in _remoteStorages.entries) {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
       String? instance = me.settings.getDeep(instanceFieldName);
       if (instance != null) {
         final anonKey = me.settings.getDeep('remote_storages.${storage.key}.anon_key');
-        await storage.value.init(instance, anonKey: anonKey);  // todo: wrap in try-catch and show error message to user
+        try {
+          await storage.value.init(instance, anonKey: anonKey);
+        } catch (e) {
+          print('Remote storage ${storage.key} init failed: $e');
+        }
       } else {
         print('No parameter $instanceFieldName is specified for ${storage.key}');
       }
@@ -1041,7 +1059,11 @@ class Repository {
       var passwordFieldName = 'remote_storages.${storage.key}.hashed_password';
       String? password = me.secrets.getDeep(passwordFieldName);
       if (password != null) {
-        await storage.value.auth(me.id, password);  // todo: wrap in try-catch and show error message to user
+        try {
+          await storage.value.auth(me.id, password);
+        } catch (e) {
+          print('Remote storage ${storage.key} auth failed: $e');
+        }
       } else {
         print('No parameter $passwordFieldName is specified for ${storage.key}');
       }
@@ -1075,19 +1097,47 @@ class Repository {
     return success;
   }
 
+  // Пароли, выведенные из введенного секрета при последнем tryLogin
+  // (remote_storages.<storageKey>.hashed_password). Секрет не хранится в
+  // модели (сериализация его не пишет), поэтому после логина
+  // authRemoteStorages берет пароль отсюда - см. [asyncSetMe].
+  final Map<String, String> derivedLoginPasswords = {};
+
   Future<bool> tryLogin(String userId, String secret) async {
     bool success = true;
+    derivedLoginPasswords.clear();
     final dummyUser = User(name: ''); // todo: некрасиво, настройки по-умолчанию должны где-то храниться и быть доступны для ввода до попытки логина
     for (var storage in dummyUser.settings.getDeep('remote_storages', defaultValue: {}).entries) {
-      _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
+      final storageFactory = knownRemoteStorages[storage.key];
+      if (storageFactory == null) {
+        print('Unknown remote storage ${storage.key} is skipped');
+        success = false;
+        continue;
+      }
+      _remoteStorages[storage.key] = storageFactory();
     }
     for (var storage in _remoteStorages.entries) {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
       String? instance = dummyUser.settings.getDeep(instanceFieldName);
       if (instance != null) {
-        if (!await storage.value.init(instance)) success = false;  // todo: wrap in try-catch and show error message to user
+        // todo: show error message to user
+        try {
+          if (!await storage.value.init(instance)) success = false;
+        } catch (e) {
+          // Неавторизованное исключение здесь не давало модальному окну логина
+          // закрыться (переход на /home не происходил). Неинициализированное
+          // хранилище аутентифицировать нельзя - пропускаем.
+          print('Remote storage ${storage.key} init failed during login: $e');
+          success = false;
+          continue;
+        }
         String password = scrypt(utf8.encode(secret), utf8.encode('${storage.key}$instance')).toString();
-        if (!await storage.value.auth(userId, password)) success = false;  // todo: wrap in try-catch and show error message to user
+        // todo: wrap in try-catch and show error message to user
+        if (await storage.value.auth(userId, password)) {
+          derivedLoginPasswords[storage.key] = password;
+        } else {
+          success = false;
+        }
       } else {
         success = false;
         print('No parameter $instanceFieldName is specified for ${storage.key}');
@@ -1111,7 +1161,14 @@ class Repository {
     subscribeToSync(model.id, subscriberId);
     outgoingChanges.addLast(model);
     if (immediate) {
-      await _delayedSync();
+      // Немедленная отправка не должна блокировать UI (local-first): будим
+      // таймер сейчас, синхронизация выполнится асинхронно.
+      // До init() таймера еще нет (например, в тестах) - синхронизируем напрямую.
+      if (late) {
+        await _delayedSync();
+      } else {
+        _sync.now();
+      }
     } else {
       postponeSync();
     }
@@ -1129,7 +1186,9 @@ class Repository {
 
   Future<T?> getModelNow<T>(String modelId) async {
     T? model = _localStorage.getItem(id: modelId);
-    model = model ?? await _remoteStorages.values.first.getItem(id: modelId);
+    // На свежем устройстве до логина удаленные хранилища не подключены -
+    // возвращаем null вместо исключения "No element".
+    model = model ?? await _remoteStorages.values.firstOrNull?.getItem(id: modelId);
     return model;
   }
 
@@ -1154,7 +1213,14 @@ class Repository {
     subscribeToSyncAll(modelsMap.keys.toList(), subscriberId);
     outgoingChanges.addAll(models);
     if (immediate) {
-      await _delayedSync();
+      // Немедленная отправка не должна блокировать UI (local-first): будим
+      // таймер сейчас, синхронизация выполнится асинхронно.
+      // До init() таймера еще нет (например, в тестах) - синхронизируем напрямую.
+      if (late) {
+        await _delayedSync();
+      } else {
+        _sync.now();
+      }
     } else {
       postponeSync();
     }
@@ -1177,10 +1243,19 @@ Uint8List? getImage(String name) {
 }
   // Get user associated with this instance of application
   // User must be set already
+  // Синхронный кеш локального пользователя. Чтение из локального хранилища
+  // быстрое, но set me пишет туда асинхронно (fire-and-forget), а me читается
+  // сразу после set me (HomePage.build, initRemoteStorages) - до завершения
+  // записи getItem вернет null и me бросит StateError. Кеш закрывает окно
+  // гонки; после логаута очищается, последующие чтения идут из хранилища.
+  User? _cachedMe;
+
   User get me {
     if (myId == null) {
       throw StateError('Local user is unknown: $myId');
     }
+    final cached = _cachedMe;
+    if (cached != null && cached.id == myId) return cached;
     User? me = _localStorage.getItem(id: myId!);
     if (me == null) {
       throw StateError('No such user in local storage: $myId');
@@ -1189,6 +1264,7 @@ Uint8List? getImage(String name) {
   }
   // Call once at startup
   set me(User me) {
+    _cachedMe = me;
     // unfortunately store item is async, so set callback to sync user with remote storage
     _localStorage.storeItem(me).then((value) => _syncModel(me));
     // _syncModel(me);
@@ -1197,7 +1273,19 @@ Uint8List? getImage(String name) {
 
   Future<Model> asyncSetMe(Model me) async {
     await _localStorage.storeItem(me);
+    if (me is User) _cachedMe = me;
     myId = me.id;
+    // Пароли, выведенные tryLogin из введенного секрета, позволяют
+    // переавторизовать хранилища после логина существующего пользователя:
+    // его secrets приезжают из удаленного хранилища без hashed_password.
+    if (me is User) {
+      for (final entry in derivedLoginPasswords.entries) {
+        final fieldName = 'remote_storages.${entry.key}.hashed_password';
+        if (me.secrets.getDeep(fieldName) == null) {
+          me.secrets.setDeep(fieldName, entry.value);
+        }
+      }
+    }
     await initRemoteStorages();
     await authRemoteStorages();
     return me;
@@ -1208,14 +1296,21 @@ Uint8List? getImage(String name) {
 
   // ## Operational settings - always local
   // создать нового пользователя, получить его токен или креды, сохранить токен, креды или авторизацию
+  // Синхронный кеш id локального пользователя: setUserId асинхронен, а me/myId
+  // читаются сразу после set me (см. логин) - без кеша возможна гонка.
+  String? _cachedMyId;
+
   // Gel local uder Id
   String? get myId {
-    return _localStorage.getUserId();
+    return _cachedMyId ?? _localStorage.getUserId();
   }
 
   set myId(String? id) {
     // setUserId is async? so just start saving and leave
-    if (id != null) {
+    _cachedMyId = id;
+    if (id == null) {
+      _cachedMe = null; // logout
+    } else {
       _localStorage.setUserId(id);
     }
   }

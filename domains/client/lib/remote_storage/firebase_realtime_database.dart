@@ -22,8 +22,30 @@ class FirebaseStorage extends RemoteStorage {
       print('FirebaseStorage: invalid instance (project id): $instance');
       return false;
     }
-    // Connect and get instance
-    app = Firebase.app(instance);
+    // Приложение ищем по имени инстанса (e2e-харнесс регистрирует
+    // Firebase.initializeApp(name: instance)) или по projectId; если такого
+    // нет - фолбэк на дефолтное приложение: main.dart инициализирует Firebase
+    // БЕЗ name ([DEFAULT]), т.к. name: projectId ломает web без dart-define.
+    // Без фолбэка на свежем устройстве Firebase.app(instance) кидает no-app,
+    // tryLogin падает с необработанным исключением и логин существующего
+    // пользователя никогда не завершается переходом на /home.
+    try {
+      // Точное совпадение по имени приоритетнее совпадения по projectId:
+      // на android с google-services авто-инициализацией [DEFAULT] имеет
+      // projectId == instance, и совпадение по projectId затеняло бы
+      // именованное приложение, зарегистрированное е2е-харнессом (auth
+      // уходило в прод, а не в эмулятор).
+      app = Firebase.apps.firstWhere(
+        (a) => a.name == instance,
+        orElse: () => Firebase.apps.firstWhere(
+          (a) => a.options.projectId == instance,
+          orElse: () => Firebase.app(),
+        ),
+      );
+    } catch (e) {
+      print('FirebaseStorage: no Firebase app for instance "$instance": $e');
+      return false;
+    }
     database = FirebaseDatabase.instanceFor(app: app).ref();
     return true;
   }
