@@ -132,6 +132,7 @@ class DenyingRemoteStorage extends MockRemoteStorage {
 class TrackingRemoteStorage extends RemoteStorage {
   String? initInstance;
   bool initResult = true;
+  bool throwOnInit = false;
 
   String? authLogin;
   String? authPassword;
@@ -141,11 +142,20 @@ class TrackingRemoteStorage extends RemoteStorage {
   String? createPassword;
   bool throwOnCreate = false;
 
+  // Models served by getItem (simulates data stored in the remote storage).
+  final Map<String, Model> remoteModels = {};
+
   @override
   Future<bool> init(String instance, {String? anonKey}) async {
+    if (throwOnInit) {
+      throw Exception('init failed');
+    }
     initInstance = instance;
     return initResult;
   }
+
+  @override
+  Future<dynamic> getItem({required String id}) async => remoteModels[id];
 
   @override
   Future<bool> auth(String login, String password) async {
@@ -363,6 +373,82 @@ void main() {
 
       expect(success, false);
       expect(tracking.initInstance, 'closers-cd24f');
+    });
+
+    test('returns false instead of throwing when storage init throws', () async {
+      // Реальный случай (свежее устройство): Firebase.app(instance) кидал
+      // no-app, исключение не ловилось и модальное окно логина не закрывалось.
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage()..throwOnInit = true;
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+
+      final success = await r.tryLogin('user123', 'mysecret');
+
+      expect(success, false);
+    });
+
+    test('existing-user login initializes storages and returns the user', () async {
+      // Свежее устройство: локального пользователя нет, remoteStorages пусты;
+      // данные пользователя есть в удаленном хранилище.
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage();
+      final storedUser = User(id: 'user123', name: 'remote user');
+      tracking.remoteModels['user123'] = storedUser;
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      expect(r.connectedStorages, isEmpty);
+
+      final success = await r.tryLogin('user123', 'mysecret');
+
+      expect(success, true);
+      expect(r.connectedStorages, isNotEmpty); // tryLogin подключил хранилище
+      final restored = await r.getModelNow<User>('user123');
+      expect(restored, isNotNull);
+      expect(restored!.name, 'remote user');
+    });
+  });
+
+  group('Repository asyncSetMe after login', () {
+    test('initializes and authenticates storages with the derived password', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final tracking = TrackingRemoteStorage();
+      final r = TestRepository(localStorage: localStorage, testStorage: tracking);
+      expect(await r.tryLogin('user123', 'mysecret'), isTrue);
+
+      final user = User(id: 'user123', name: 'u');
+      await r.asyncSetMe(user);
+
+      expect(r.myId, 'user123');
+      expect(tracking.initInstance, 'closers-cd24f');
+      // Пароль, выведенный tryLogin из секрета, доезжает до authRemoteStorages
+      expect(tracking.authLogin, 'user123');
+      expect(tracking.authPassword, isNotNull);
+      // и сохраняется в secrets пользователя (в памяти сессии)
+      expect(user.secrets.getDeep('remote_storages.FirebaseRealtimeDatabase.hashed_password'), isNotNull);
+    });
+  });
+
+  group('Repository me store/read race', () {
+    test('me getter works immediately after set me', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {});
+      final user = User(id: 'race-user', name: 'race');
+
+      r.me = user;
+
+      // storeItem еще не обязан завершиться, а me уже должен работать
+      expect(r.me.id, 'race-user');
+      expect(r.me.name, 'race');
+    });
+
+    test('logout (myId = null) clears the cached me', () async {
+      final localStorage = ConfigurableLocalStorage();
+      final r = Repository(localStorage: localStorage, remoteStorages: {});
+      r.me = User(id: 'race-user', name: 'race');
+      expect(r.me.id, 'race-user');
+
+      r.myId = null;
+
+      expect(() => r.me, throwsStateError);
     });
   });
 

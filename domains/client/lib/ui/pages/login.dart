@@ -66,8 +66,10 @@ class LoginPage extends StatelessWidget {
                     }
                   );
                   if (null != tryingUser) {
-                    repository.me = tryingUser;
-                    // await repository.asyncSetMe(tryingUser); // todo: тут мы замораживаем UI
+                    // Асинхронная версия set me: сохраняет пользователя,
+                    // инициализирует и аутентифицирует удаленные хранилища -
+                    // иначе на свежем устройстве /home остается без синхронизации.
+                    await repository.asyncSetMe(tryingUser);
                     // Тут наверное надо подтянуть из репозитория историю навигации
                     n.pushReplacementNamed(HomePage.routeName);
                   }
