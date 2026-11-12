@@ -30,9 +30,17 @@ class FirebaseStorage extends RemoteStorage {
     // tryLogin падает с необработанным исключением и логин существующего
     // пользователя никогда не завершается переходом на /home.
     try {
+      // Точное совпадение по имени приоритетнее совпадения по projectId:
+      // на android с google-services авто-инициализацией [DEFAULT] имеет
+      // projectId == instance, и совпадение по projectId затеняло бы
+      // именованное приложение, зарегистрированное е2е-харнессом (auth
+      // уходило в прод, а не в эмулятор).
       app = Firebase.apps.firstWhere(
-        (a) => a.name == instance || a.options.projectId == instance,
-        orElse: () => Firebase.app(),
+        (a) => a.name == instance,
+        orElse: () => Firebase.apps.firstWhere(
+          (a) => a.options.projectId == instance,
+          orElse: () => Firebase.app(),
+        ),
       );
     } catch (e) {
       print('FirebaseStorage: no Firebase app for instance "$instance": $e');
