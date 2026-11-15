@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:equatable/equatable.dart';
@@ -59,16 +61,20 @@ class DomainListBloc extends Bloc<DomainEvent, DomainListState> {
     Emitter<DomainListState> emit,
   ) async {
     User me = _repo.me;
-    print(me);
 
+    // Local-first: show the new domain immediately, persist after. A
+    // persistence failure (e.g. offline/remote init failure) must not
+    // make the button appear dead - the domain is already visible
+    // locally.
     var newDomain = Domain(originatorId: me.id, title: event.title, storageKey: me.storageKey);
-    await me.linkTo(newDomain, listenerId);
-    // Подписываемся на реестр нового домена для реалтайм-обновлений
-    _repo.updateRegistryWatches();
-        
-    // Map<String, Domain> domains = _repo.getModels<Domain>(me.domainsIds, listenerId);
-    // emit(state.copyWith(domains: () => domains));
     emit(state.copyWith(domains: () => state.domains..addAll({newDomain.id: newDomain})));
+    try {
+      await me.linkTo(newDomain, listenerId);
+      // Подписываемся на реестр нового домена для реалтайм-обновлений
+      unawaited(_repo.updateRegistryWatches());
+    } catch (error) {
+      print('Domain creation persist failed (kept local-only): $error');
+    }
   }
 
   Future<void> _onSync(

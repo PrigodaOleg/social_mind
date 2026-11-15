@@ -57,8 +57,15 @@ class PushNotificationService {
     await initLocalNotifications();
     if (_messagingInitialized) return;
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
+      // FCM-сеть может не отвечать: не даём старту приложения зависнуть
+      // на requestPermission/getToken - ограничиваем ожидание таймаутом.
+      await _initFirebaseMessaging(repository).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('FirebaseMessaging init timed out');
+        },
+      );
       _messagingInitialized = true;
-      await _initFirebaseMessaging(repository);
     }
   }
 

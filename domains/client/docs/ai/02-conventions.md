@@ -55,3 +55,9 @@
 - Синхронный API у `LocalStorage`/`Repository` (`getModel`, `getItem`, `me`) не асинхронный, в отличие от `RemoteStorage`/`Repository.syncWithRemoteStorage`, которые всегда `Future`: сравните `T? getModel<T>(String modelId, [int? subscriberId])` (`lib/repository/repository/repository.dart:406-414`, без `async`) и `Future<int> syncWithRemoteStorage(...)` (`lib/repository/repository/repository.dart:566`).
 - Подписка на изменения удалённого хранилища сделана через `Stream`: `database.child('models/${ids[0]}').onChildChanged.listen((event) { ... })` в `FirebaseStorage.getItems` — `lib/remote_storage/firebase_realtime_database.dart:62-70`.
 - Callback-подписки на синхронизацию репозитория используют обычные `typedef`, не `Stream`: `typedef SyncListener = void Function(String id, dynamic syncedItem);`, `typedef MergeConflictListener = void Function(...)`, регистрируются через `addSyncListener(...)` и снимаются через `removeSyncListener(...)` — `lib/repository/repository/repository.dart:15-19, 233-254`; пример снятия подписки при закрытии BLoC — `_repo.removeSyncListener(listenerId)` в `ContactListBloc.close()` (`lib/state/contact_list/contact_list.dart:23-27`).
+
+## Local-first и асинхронность
+
+- Bloc'и и UI-обработчики не await'ят сеть: сетевые вызовы — только из слоя repository и только в фоне.
+- Локальная запись — немедленно: `repository.saveModel(...)` пишет в локальное хранилище сразу, обмен с облаком происходит позже по таймеру/подпискам.
+- Обновления UI приехавшими из облака данными — через sync-слушателей (`addSyncListener`) или события BLoC (`ModelsChangedEvent`), а не через ожидание сетевого future.

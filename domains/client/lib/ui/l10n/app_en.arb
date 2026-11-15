@@ -2,6 +2,8 @@
     "applicationTitle": "Closers",
     "homePageName": "Home",
     "taskListPageName": "Tasks",
+    "taskListsPageName": "Task lists",
+    "taskListDefaultName": "New task list",
     "userProfilePageName": "Profile",
     "domainListPageName": "Closee groups",
     "addTaskHint": "Add new task",

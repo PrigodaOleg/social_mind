@@ -573,7 +573,22 @@ jobs:
       # domains/client/supabase/migrations.
       - name: Start local Supabase stack
         working-directory: ./domains/client/supabase
-        run: supabase start --ignore-health-check
+        run: |
+          # Редкий flake на раннере: transient race при бинде портов контейнеров
+          # (например, "failed to bind host port 0.0.0.0:54324: address already in use").
+          # Ретраим с очисткой частично поднятых контейнеров между попытками.
+          ok=0
+          for attempt in 1 2 3; do
+            if supabase start --ignore-health-check; then ok=1; break; fi
+            echo "::warning::supabase start failed (attempt $attempt/3), cleaning up and retrying"
+            supabase stop --no-backup || true
+            docker ps -aq --filter "name=supabase_" | xargs -r docker rm -f || true
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::supabase start failed after 3 attempts"
+            exit 1
+          fi
 
       - name: Export local Supabase keys
         id: keys

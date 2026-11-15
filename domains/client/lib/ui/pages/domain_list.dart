@@ -20,7 +20,7 @@ class DomainListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => DomainListBloc(repository: repository),
+      create: (context) => DomainListBloc(repository: repository)..add(const DomainListStateInitRequested()),
       child: const DomainListView(),
     );
   }
@@ -36,9 +36,8 @@ class DomainListView extends StatelessWidget {
     final t = Theme.of(context);
     final b = BlocProvider.of<DomainListBloc>(context);
     // final repo = context.read(Repository);
-    return BlocProvider<DomainListBloc>(
-      create: (context) => context.read<DomainListBloc>()
-      ..add(const DomainListStateInitRequested()),
+    return BlocProvider<DomainListBloc>.value(
+      value: context.read<DomainListBloc>(),
       child: BlocBuilder<DomainListBloc, DomainListState>(
         builder: (context, state) {
           return Scaffold(

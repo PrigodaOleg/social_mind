@@ -122,6 +122,18 @@ abstract class AppLocalizations {
   /// **'Дела'**
   String get taskListPageName;
 
+  /// No description provided for @taskListsPageName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Списки задач'**
+  String get taskListsPageName;
+
+  /// No description provided for @taskListDefaultName.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новый список задач'**
+  String get taskListDefaultName;
+
   /// No description provided for @domainListPageName.
   ///
   /// In ru, this message translates to:

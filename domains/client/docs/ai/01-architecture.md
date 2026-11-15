@@ -93,3 +93,14 @@ UI не импортирует `local_storage`/`remote_storage` напрямую
 3. Для каждого такого `id` вызывается `_findAndCallListeners(id)`, который читает свежую модель через `_remoteStorages.values.first.getItem(id: id)` и вызывает подписанные `syncListeners[subscriberId]?.call(id, model)` — `lib/repository/repository/repository.dart:352-360`.
 4. `ContactListBloc` — пример подписчика: его callback в `addSyncListener` при получении `Contact` добавляет событие `ContactListContactsSynced` в себя — `lib/state/contact_list/contact_list.dart`.
 5. Обработчик события (`_onContactsSynced`) обновляет `ContactListState` и тем самым триггерит перерисовку `BlocBuilder<ContactListBloc, ContactListState>` в `lib/ui/pages/contact_list.dart`.
+
+## Принцип local-first
+
+- Локальное хранилище (Isar, `IsarStorage`) — источник истины. Приоритет всегда у данных на устройстве пользователя, удалённые хранилища — вторичная копия.
+- Все операции записи моделей — сначала только в локальное хранилище (`Repository.saveModel` → `_localStorage.storeItem`, `lib/repository/repository/repository.dart:396-404`). Для вызывающего (UI/BLoC) запись быстрая и фактически синхронная.
+- Обмен с удалёнными хранилищами — только в фоне, из слоя repository:
+  - по таймеру (`Timer`/`_delayedSync`), который перезапускается при каждом новом изменении через `_sync.postpone()` — намеренно: не синхронизировать незавершённые изменения (`lib/repository/repository/repository.dart:33-79, 403`);
+  - по подпискам на изменения реестров (`getItems`/`subscribeToSync`, входящие изменения — см. поток обратной синхронизации выше).
+- UI никогда не должен ожидать сетевых операций: переходы между экранами, кнопки и bloc-события не должны await'ить сетевые вызовы (`initRemoteStorages`, `createUserRemoteStorages`, `authRemoteStorages`, `syncWithRemoteStorage` и т.п.). Данные отображаются те, что есть локально; приехавшие из облака — по колбекам sync-слушателей (`addSyncListener`) или событиям BLoC (`ModelsChangedEvent`).
+- Реестры/транзакции/rebase (`Registry`, `Transaction`, `_rebaseTransaction`/`_rebaseModel`) — механизм разрешения конфликтов при фоновом обмене; бизнес-логика о них знать не должна.
+- Пример нарушения (не повторять): `await` сетевой инициализации до `pushReplacementNamed` в логине — зависание UI на несколько секунд до открытия следующего экрана.

@@ -165,3 +165,4 @@ domains/client/android/app/google-services.json
 # domains/client/lib/firebase_options.dart
 domains/client/firebase.json
 domains/client/.vscode/launch.json
+domains/client/.kilo/

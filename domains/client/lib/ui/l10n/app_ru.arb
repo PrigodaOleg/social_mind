@@ -3,6 +3,8 @@
     "homePageName": "Доска",
     "userProfilePageName": "Профиль пользователя",
     "taskListPageName": "Дела",
+    "taskListsPageName": "Списки задач",
+    "taskListDefaultName": "Новый список задач",
     "domainListPageName": "Близкие",
     "addTaskHint": "Добавить задачу",
     "loginHelloLabel": "Привет, дорогой друг!",

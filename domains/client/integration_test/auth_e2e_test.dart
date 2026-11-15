@@ -255,6 +255,75 @@ void main() {
       expect(restored!.name, 'existing_e2e');
     });
 
+    testWidgets('existing user on a fresh device: login initializes remote storages', (WidgetTester tester) async {
+      // Another device created the user: the account and the user model
+      // already exist in the remote storage.
+      final bootstrap = TestRepository(localStorage: MemoryLocalStorage());
+      final user = User(name: 'fresh_device_e2e');
+      user.secret = 'fresh-device-secret';
+      await createUserFlow(bootstrap, user);
+      await logout(bootstrap);
+
+      // Cold start on a fresh device: no local user, no connected storages.
+      final fresh = TestRepository(localStorage: MemoryLocalStorage());
+      await fresh.init();
+      expect(fresh.connectedStorages, isEmpty,
+          reason: 'repository.init without a local user must not connect storages');
+
+      // The login page flow: enter id + secret, then the post-login step
+      // (asyncSetMe instead of the fire-and-forget `set me`).
+      expect(await fresh.tryLogin(user.id, user.secret!), isTrue);
+      final tryingUser = await fresh.getModelNow<User>(user.id);
+      expect(tryingUser, isNotNull,
+          reason: 'the user model must be fetched from the remote storage');
+      await fresh.asyncSetMe(tryingUser!);
+
+      // /home prerequisites: me readable immediately, storages connected+authed.
+      expect(fresh.myId, user.id);
+      expect(fresh.me.id, user.id,
+          reason: 'me must be readable right after set me (store/read race)');
+      expect(fresh.connectedStorages, isNotEmpty,
+          reason: 'remote storages must be initialized after login');
+      expect(auth.currentUser?.email, '${user.id}@a.aa',
+          reason: 'remote storages must be authenticated after login');
+    });
+
+    testWidgets('fresh device: FirebaseStorage.init falls back to the default app', (WidgetTester tester) async {
+      // The real app (main.dart) registers Firebase under [DEFAULT] (no
+      // name), NOT under the instance name from User.settings - mirror that
+      // here. Regression: Firebase.app(instance) threw no-app, tryLogin
+      // crashed with an unhandled exception and the login modal never closed
+      // (no /home transition) on a real device.
+      // On android the native [DEFAULT] already exists (google-services
+      // auto-init): the first initializeApp registers it dart-side, and with
+      // different options throws duplicate-app - the app is still usable.
+      late FirebaseApp defaultApp;
+      try {
+        defaultApp = await Firebase.initializeApp(
+          options: FirebaseOptions(
+            // iOS validates options natively (NSException -> crash), so
+            // use the well-formed key/appId everywhere.
+            apiKey: 'AIzaSyD-9tJkeQsLFVi_9NvNleKzLb42i9SBnPo',
+            appId: '1:1234567890123:ios:abcdef0123456789abcdef',
+            messagingSenderId: '1',
+            projectId: project,
+            databaseURL: 'http://$emulatorHost:$dbPort/?ns=$project',
+          ),
+        );
+      } on FirebaseException catch (e) {
+        if (e.code != 'duplicate-app') rethrow;
+        defaultApp = Firebase.app();
+      }
+      // ignore: unused_local_variable
+      defaultApp;
+      final storage = FirebaseStorage();
+      expect(
+        await storage.init('instance-without-app-name'),
+        isTrue,
+        reason: 'init must fall back to the default Firebase app',
+      );
+    });
+
     testWidgets('blank user: creates account with empty name', (WidgetTester tester) async {
       final repository = TestRepository(localStorage: MemoryLocalStorage());
       // The "Blank user" flow on LoginPage.

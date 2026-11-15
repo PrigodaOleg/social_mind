@@ -48,7 +48,7 @@ class HomeView extends StatelessWidget {
         children: [
           Text(repository.me.id),
           IconButton(
-            onPressed: () {n.pushNamed(TaskListPage.routeName);},
+            onPressed: () {n.pushNamed(TaskListsPage.routeName);},
             icon: const Icon(Icons.task_alt)
           ),
           IconButton(

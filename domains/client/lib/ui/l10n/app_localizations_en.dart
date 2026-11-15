@@ -21,6 +21,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskListPageName => 'Tasks';
 
   @override
+  String get taskListsPageName => 'Task lists';
+
+  @override
+  String get taskListDefaultName => 'New task list';
+
+  @override
   String get domainListPageName => 'Closee groups';
 
   @override

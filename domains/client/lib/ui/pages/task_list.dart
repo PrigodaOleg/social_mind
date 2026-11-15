@@ -103,30 +103,62 @@ class TaskListView extends StatelessWidget {
   }
 
   Future<void> _editSettings(BuildContext context, TaskList list) async {
-    final l = AppLocalizations.of(context);
     final bloc = context.read<TaskListBloc>();
-    final controller = TextEditingController(text: list.title);
-    await showDialog<void>(
+    // Контроллер принадлежит виджету диалога, а не вызывающему коду:
+    // dispose после await showDialog срабатывает, пока exit-переход ещё
+    // строит TextField с этим контроллером, что приводит к ассерту
+    // фреймворка '_dependents.isEmpty'. State.dispose() вызывается только
+    // после полного удаления маршрута.
+    final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l.editTaskListSettings),
-        content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(labelText: l.taskListName)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(l.cancel)),
-          FilledButton(
-              onPressed: () {
-                bloc.add(TaskListTitleChanged(controller.text));
-                Navigator.pop(dialogContext);
-              },
-              child: Text(l.save)),
-        ],
-      ),
+      builder: (dialogContext) =>
+          _EditSettingsDialog(initialTitle: list.title),
     );
-    controller.dispose();
+    if (result == null || result.isEmpty) return;
+    bloc.add(TaskListTitleChanged(result));
+  }
+}
+
+class _EditSettingsDialog extends StatefulWidget {
+  const _EditSettingsDialog({required this.initialTitle});
+  final String initialTitle;
+
+  @override
+  State<_EditSettingsDialog> createState() => _EditSettingsDialogState();
+}
+
+class _EditSettingsDialogState extends State<_EditSettingsDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l.editTaskListSettings),
+      content: TextField(
+          controller: _controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.taskListName)),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.cancel)),
+        FilledButton(
+            onPressed: () => Navigator.pop(context, _controller.text.trim()),
+            child: Text(l.save)),
+      ],
+    );
   }
 }
