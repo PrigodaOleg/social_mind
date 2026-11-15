@@ -89,6 +89,7 @@ class App extends StatelessWidget {
           DomainListPage.routeName: DomainListPage.new,
           DomainContentPage.routeName: DomainContentPage.new,
           TaskListPage.routeName: TaskListPage.new,
+          TaskListsPage.routeName: TaskListsPage.new,
           ContactListPage.routeName: ContactListPage.new,
           UserProfilePage.routeName: UserProfilePage.new,
           InvitationPage.routeName: InvitationPage.new,
