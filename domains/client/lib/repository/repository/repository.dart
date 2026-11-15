@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
+import 'package:closers/repository/repository/remote_storage_config.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hashlib/hashlib.dart';
 
@@ -1077,13 +1078,22 @@ class Repository {
 
   Future<bool> tryLogin(String userId, String secret) async {
     bool success = true;
-    final dummyUser = User(name: ''); // todo: некрасиво, настройки по-умолчанию должны где-то храниться и быть доступны для ввода до попытки логина
-    for (var storage in dummyUser.settings.getDeep('remote_storages', defaultValue: {}).entries) {
+    // Use the pre-login remote storage profile chosen on this device
+    // (see RemoteStorageSettingsPage); fall back to User defaults if empty.
+    final config = getRemoteStorageConfig();
+    final settings = <String, dynamic>{};
+    if (config.isEmpty) {
+      final dummyUser = User(name: ''); // todo: некрасиво, настройки по-умолчанию должны где-то храниться и быть доступны для ввода до попытки логина
+      settings.addAll(dummyUser.settings);
+    } else {
+      config.applyToUserSettings(settings);
+    }
+    for (var storage in settings.getDeep('remote_storages', defaultValue: {}).entries) {
       _remoteStorages[storage.key] = knownRemoteStorages[storage.key]?.call();
     }
     for (var storage in _remoteStorages.entries) {
       var instanceFieldName = 'remote_storages.${storage.key}.instance';
-      String? instance = dummyUser.settings.getDeep(instanceFieldName);
+      String? instance = settings.getDeep(instanceFieldName);
       if (instance != null) {
         if (!await storage.value.init(instance)) success = false;  // todo: wrap in try-catch and show error message to user
         String password = scrypt(utf8.encode(secret), utf8.encode('${storage.key}$instance')).toString();
@@ -1222,6 +1232,23 @@ Uint8List? getImage(String name) {
 
   String? get lastRoute {
     return _localStorage.getOperational('lastRoute');
+  }
+
+  // # Pre-login remote storage profile (Option A)
+  // Chosen on RemoteStorageSettingsPage before any user exists; persisted
+  // locally and merged into every user's settings on login/creation.
+  RemoteStorageConfig getRemoteStorageConfig() {
+    return RemoteStorageConfig.decode(_localStorage.getOperational(RemoteStorageConfig.operationalKey));
+  }
+
+  Future<void> setRemoteStorageConfig(RemoteStorageConfig config) async {
+    await _localStorage.setOperational(RemoteStorageConfig.operationalKey, config.encode());
+  }
+
+  /// Merge the saved pre-login profile into a user's settings
+  /// (profile entries override user defaults for the same storageKey).
+  void applyRemoteStorageConfig(User user) {
+    getRemoteStorageConfig().applyToUserSettings(user.settings);
   }
 
   set lastRoute(String? lastRoute) {

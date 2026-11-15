@@ -48,6 +48,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginBlankUserButtonText => 'Blank user';
 
   @override
+  String get remoteStorageOpenSettings => 'Remote storage settings';
+
+  @override
+  String get remoteStoragePageTitle => 'Remote storage';
+
+  @override
+  String get remoteStoragePageHint =>
+      'Choose and configure the remote database(s) to sync with. The selection applies to every user created or logged in on this device.';
+
+  @override
+  String get remoteStorageInstanceLabel => 'Instance (project id / URL)';
+
+  @override
+  String get remoteStorageAnonKeyLabel => 'Anon key (optional)';
+
+  @override
+  String get remoteStorageTestConnection => 'Test connection';
+
+  @override
+  String get remoteStorageTestOk => 'Connection successful';
+
+  @override
+  String get remoteStorageTestFail => 'Connection failed';
+
+  @override
+  String get remoteStorageTestNoInstance => 'Specify an instance first';
+
+  @override
+  String get remoteStorageInvalidInstance =>
+      'Invalid instance: use letters, digits, _ or - (max 64 chars)';
+
+  @override
   String get unknownPageText => 'The requested page does not exist';
 
   @override

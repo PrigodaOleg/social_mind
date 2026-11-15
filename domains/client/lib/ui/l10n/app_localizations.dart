@@ -176,6 +176,66 @@ abstract class AppLocalizations {
   /// **'Пустой пользователь'**
   String get loginBlankUserButtonText;
 
+  /// No description provided for @remoteStorageOpenSettings.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки удалённого хранилища'**
+  String get remoteStorageOpenSettings;
+
+  /// No description provided for @remoteStoragePageTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удалённое хранилище'**
+  String get remoteStoragePageTitle;
+
+  /// No description provided for @remoteStoragePageHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выберите и настройте удалённые базы данных для синхронизации. Выбор применяется ко всем пользователям, созданным или вошедшим на этом устройстве.'**
+  String get remoteStoragePageHint;
+
+  /// No description provided for @remoteStorageInstanceLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Инстанс (id проекта / URL)'**
+  String get remoteStorageInstanceLabel;
+
+  /// No description provided for @remoteStorageAnonKeyLabel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Anon key (необязательно)'**
+  String get remoteStorageAnonKeyLabel;
+
+  /// No description provided for @remoteStorageTestConnection.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверить подключение'**
+  String get remoteStorageTestConnection;
+
+  /// No description provided for @remoteStorageTestOk.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подключение успешно'**
+  String get remoteStorageTestOk;
+
+  /// No description provided for @remoteStorageTestFail.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось подключиться'**
+  String get remoteStorageTestFail;
+
+  /// No description provided for @remoteStorageTestNoInstance.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сначала укажите инстанс'**
+  String get remoteStorageTestNoInstance;
+
+  /// No description provided for @remoteStorageInvalidInstance.
+  ///
+  /// In ru, this message translates to:
+  /// **'Некорректный инстанс: только буквы, цифры, \'_\' или \'-\' (до 64 символов)'**
+  String get remoteStorageInvalidInstance;
+
   /// No description provided for @unknownPageText.
   ///
   /// In ru, this message translates to:
