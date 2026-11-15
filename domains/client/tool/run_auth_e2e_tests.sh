@@ -428,6 +428,21 @@ run_android_tests() {
     -d "$ANDROID_SERIAL" \
     --dart-define=RUN_EMULATOR_TESTS=true \
     --timeout 300s ${extra[@]+"${extra[@]}"}
+
+  # create_buttons_e2e_test.dart reproduces/verifies the fix for the dead
+  # "create task" (TaskListPage FAB) and "create domain" (DomainListPage
+  # add button) buttons on an offline user. It uses the real on-device
+  # IsarStorage and needs no Firebase emulator, so it reuses the same
+  # already-booted android emulator (no extra boot cost in CI).
+  echo "== Running create-buttons e2e test on android emulator ($ANDROID_SERIAL) =="
+  # The create-buttons test requires a fresh app data state (empty Isar ->
+  # login page): wipe app data first.
+  local adb_bin="$(find_android_sdk)/platform-tools/adb"
+  [ -x "$adb_bin" ] || adb_bin="$(command -v adb || true)"
+  "$adb_bin" -s "$ANDROID_SERIAL" shell pm clear com.example.closers || true
+  flutter test integration_test/create_buttons_e2e_test.dart \
+    -d "$ANDROID_SERIAL" \
+    --timeout 300s ${extra[@]+"${extra[@]}"}
 }
 
 run_android_interactive() {
