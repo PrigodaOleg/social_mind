@@ -189,13 +189,26 @@ class Repository {
 
   Future<void> init() async {
     await _localStorage.init();
+    // instance до сетевых операций: Model.linkTo/linkFrom/unlinkFrom читают
+    // Repository.instance.saveModels(...), и если удаленная инициализация
+    // ниже упадет, instance все равно должен быть установлен - иначе
+    // ЛЮБОЕ создание модели через linkTo бросает LateInitializationError
+    // (кнопки создать молча умирают - см. app.dart::locateUser, который
+    // ловит исключение из init() и продолжает работу офлайн).
+    instance = this;
     if (myId != null) {
-      await initRemoteStorages();
-      await authRemoteStorages();
+      try {
+        await initRemoteStorages();
+        await authRemoteStorages();
+      } catch (error) {
+        print('Remote storages init failed (continue offline): $error');
+      }
     }
+    // Таймер фоновой синхронизации стартует только после того, как попытка
+    // инициализации удаленных хранилищ завершена (успешно или нет).
+    // До этого момента late == true и postponeSync() - no-op.
     _sync = Timer(_delayedSync);
     _sync.start();
-    instance = this;
     late = false;
   }
 
