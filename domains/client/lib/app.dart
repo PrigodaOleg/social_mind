@@ -79,7 +79,8 @@ class App extends StatelessWidget {
         ContactListPage.routeName: ContactListPage.new,
         UserProfilePage.routeName: UserProfilePage.new,
         InvitationPage.routeName: InvitationPage.new,
-        NotificationsPage.routeName: NotificationsPage.new
+        NotificationsPage.routeName: NotificationsPage.new,
+        RemoteStorageSettingsPage.routeName: RemoteStorageSettingsPage.new
       }),
       routeInformationParser: AppRouteInformationParser(),
     );

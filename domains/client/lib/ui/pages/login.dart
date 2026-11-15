@@ -46,6 +46,7 @@ class LoginPage extends StatelessWidget {
                     }
                   );
                   if (isPerformed == true) {
+                    repository.applyRemoteStorageConfig(blankUser);
                     repository.me = blankUser;
                     await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
                     String secret = const Uuid().v4();
@@ -91,6 +92,7 @@ class LoginPage extends StatelessWidget {
                     }
                   );
                   if (isPerformed == false) return;
+                  repository.applyRemoteStorageConfig(tryingUser);
                   repository.me = tryingUser;
                   await repository.initRemoteStorages(); // todo: тут мы замораживаем UI
                   await repository.createUserRemoteStorages(tryingUser.secret);
@@ -99,6 +101,12 @@ class LoginPage extends StatelessWidget {
                 child: Text(l.loginNewUserButtonText),
               )
             ],
+          ),
+          TextButton(
+            onPressed: () async {
+              await n.pushNamed(RemoteStorageSettingsPage.routeName);
+            },
+            child: Text(l.remoteStorageOpenSettings),
           )
         ],
       )

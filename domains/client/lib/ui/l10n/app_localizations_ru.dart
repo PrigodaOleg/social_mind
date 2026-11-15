@@ -48,6 +48,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get loginBlankUserButtonText => 'Пустой пользователь';
 
   @override
+  String get remoteStorageOpenSettings => 'Настройки удалённого хранилища';
+
+  @override
+  String get remoteStoragePageTitle => 'Удалённое хранилище';
+
+  @override
+  String get remoteStoragePageHint =>
+      'Выберите и настройте удалённые базы данных для синхронизации. Выбор применяется ко всем пользователям, созданным или вошедшим на этом устройстве.';
+
+  @override
+  String get remoteStorageInstanceLabel => 'Инстанс (id проекта / URL)';
+
+  @override
+  String get remoteStorageAnonKeyLabel => 'Anon key (необязательно)';
+
+  @override
+  String get remoteStorageTestConnection => 'Проверить подключение';
+
+  @override
+  String get remoteStorageTestOk => 'Подключение успешно';
+
+  @override
+  String get remoteStorageTestFail => 'Не удалось подключиться';
+
+  @override
+  String get remoteStorageTestNoInstance => 'Сначала укажите инстанс';
+
+  @override
+  String get remoteStorageInvalidInstance =>
+      'Некорректный инстанс: только буквы, цифры, _ или - (до 64 символов)';
+
+  @override
   String get unknownPageText => 'Запрошенная страница не существует';
 
   @override

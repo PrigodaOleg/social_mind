@@ -13,3 +13,4 @@ export 'pages/contact_list.dart';
 export 'widgets/contact_picker_dialog.dart';
 export 'pages/invitation.dart';
 export 'pages/notifications.dart';
+export 'pages/remote_storage_settings.dart';
