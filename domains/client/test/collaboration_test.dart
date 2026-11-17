@@ -7,6 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
+/// Собрать QR-URL из JSON-payload так же, как это делает InvitationService:
+/// base64url (без padding) от utf8(jsonEncode(payload)) в параметре `d`.
+String buildQrUrl(Map<String, dynamic> json, [String base = acquaintanceLinkBaseUrl]) {
+  final d = base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
+  return '$base?d=$d';
+}
+
 // Моки localStorage/remoteStorage - упрощенные версии из repository_test.dart
 class FakeLocalStorage extends LocalStorage {
   Map<String, Model> lastModels = {};
@@ -228,23 +235,49 @@ void main() {
   });
 
   group('InvitationService acquaintance', () {
-    test('acquaintance QR payload roundtrip', () {
+    test('acquaintance QR payload roundtrip (URL form)', () {
       final localStorage = FakeLocalStorage();
       final remoteStorage = FakeRemoteStorage();
       final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remoteStorage});
       final service = InvitationService(r);
-      final payload = service.acquaintanceQrPayload();
-      final encoded = jsonEncode(payload);
-      final parsed = InvitationService.parseAcquaintanceQr(encoded);
+      final url = service.acquaintanceQrPayload();
+      // URL-форма: лендинг + параметр d (base64url без padding)
+      expect(url.startsWith('$acquaintanceLinkBaseUrl?d='), isTrue);
+      final d = Uri.parse(url).queryParameters['d']!;
+      expect(d.contains('='), isFalse);
+      final parsed = InvitationService.parseAcquaintanceQr(url);
       expect(parsed, isNotNull);
-      expect(parsed!.userId, payload['userId']);
-      expect(parsed.name, payload['name']);
+      expect(parsed!.userId, r.me.id);
+      expect(parsed.name, r.me.name);
+      // Каноническая кастомная схема принимается с тем же payload
+      final parsedScheme = InvitationService.parseAcquaintanceQr('closers://join?d=$d');
+      expect(parsedScheme, isNotNull);
+      expect(parsedScheme!.userId, r.me.id);
+      expect(parsedScheme.name, r.me.name);
     });
 
     test('parseAcquaintanceQr rejects invalid payloads', () {
+      // Legacy raw JSON больше не принимается (clean break)
       expect(InvitationService.parseAcquaintanceQr('not json'), isNull);
-      expect(InvitationService.parseAcquaintanceQr(jsonEncode({'type': 'domainJoin'})), isNull);
-      expect(InvitationService.parseDomainInvitationQr(jsonEncode({'type': 'acquaintance'})), isNull);
+      expect(
+        InvitationService.parseAcquaintanceQr(jsonEncode({'type': 'acquaintance', 'userId': 'u1'})),
+        isNull,
+      );
+      // Чужие/неправильные URL
+      expect(InvitationService.parseAcquaintanceQr('https://evil.example.com/join.html?d=abc'), isNull);
+      expect(InvitationService.parseAcquaintanceQr('https://prigodaoleg.github.io/other/page?d=abc'), isNull);
+      expect(InvitationService.parseAcquaintanceQr('http://prigodaoleg.github.io/social_mind/join.html?d=abc'), isNull);
+      expect(InvitationService.parseAcquaintanceQr('closers://evil?d=abc'), isNull);
+      // Отсутствующий или мусорный параметр d
+      expect(InvitationService.parseAcquaintanceQr(acquaintanceLinkBaseUrl), isNull);
+      expect(InvitationService.parseAcquaintanceQr('$acquaintanceLinkBaseUrl?d=!!!garbage!!!'), isNull);
+      expect(
+        InvitationService.parseAcquaintanceQr('$acquaintanceLinkBaseUrl?d=${base64Url.encode(utf8.encode('not json'))}'),
+        isNull,
+      );
+      // Неверный тип внутри payload
+      expect(InvitationService.parseAcquaintanceQr(buildQrUrl({'type': 'domainJoin', 'invitationId': 'x'})), isNull);
+      expect(InvitationService.parseDomainInvitationQr(buildQrUrl({'type': 'acquaintance', 'userId': 'u'})), isNull);
     });
 
     test('sendAcquaintanceInvitation writes to by-user path and adds contact', () async {
@@ -360,6 +393,7 @@ void main() {
 
       final invitation = await service.createDomainInvitation(domain: domain, inviteeId: 'user3');
       final qr = service.domainInvitationQrPayload(invitation);
+      expect(qr.startsWith('$acquaintanceLinkBaseUrl?d='), isTrue);
       final parsed = InvitationService.parseDomainInvitationQr(qr);
       expect(parsed, isNotNull);
       expect(parsed!.invitationId, invitation.id);
@@ -523,7 +557,7 @@ void main() {
 group('Security fixes from review', () {
   test('parseAcquaintanceQr rejects path injection in userId', () {
     expect(
-      InvitationService.parseAcquaintanceQr(jsonEncode({
+      InvitationService.parseAcquaintanceQr(buildQrUrl({
         'type': 'acquaintance',
         'userId': '../../push_tokens/victim',
         'name': 'attacker',
@@ -531,7 +565,7 @@ group('Security fixes from review', () {
       isNull,
     );
     expect(
-      InvitationService.parseAcquaintanceQr(jsonEncode({
+      InvitationService.parseAcquaintanceQr(buildQrUrl({
         'type': 'acquaintance',
         'userId': 'ok_id-1_2',
         'name': 'friend',
@@ -542,7 +576,7 @@ group('Security fixes from review', () {
 
   test('parseDomainInvitationQr rejects path injection in invitationId', () {
     expect(
-      InvitationService.parseDomainInvitationQr(jsonEncode({
+      InvitationService.parseDomainInvitationQr(buildQrUrl({
         'type': 'domainJoin',
         'invitationId': 'by-user/someone_else/x',
       })),

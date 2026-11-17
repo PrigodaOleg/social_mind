@@ -6,6 +6,20 @@ import 'package:hashlib/hashlib.dart';
 
 import 'repository.dart';
 
+/// Базовый URL лендинга приглашений (статическая страница web/join.html на
+/// GitHub Pages). Центральная константа: при покупке доменов closee.app /
+/// closee.dev меняется здесь в одном месте (например на
+/// 'https://closee.app/join.html').
+const String acquaintanceLinkBaseUrl = 'https://prigodaoleg.github.io/social_mind/join.html';
+
+/// Кастомная схема приложения для deeplink-перехода с лендинга в приложение.
+/// Каноническая форма ссылки: `closers://join?d=<payload>` (host 'join',
+/// путь пустой или '/'), тот же параметр `d`, что и у https-лендинга.
+const String acquaintanceAppScheme = 'closers';
+
+/// Host кастомной схемы [acquaintanceAppScheme].
+const String acquaintanceAppSchemeHost = 'join';
+
 /// Строгий allowlist для ID, попадающих в пути удаленного хранилища.
 /// Защита от path injection через поля QR-кодов (/, ., $, #, [, ] - спецсимволы путей).
 final _safeIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
@@ -13,6 +27,64 @@ final _safeIdRegExp = RegExp(r'^[A-Za-z0-9_-]+$');
 bool isSafeRemotePathId(String? id) {
   if (id == null || id.isEmpty || id.length > 128) return false;
   return _safeIdRegExp.hasMatch(id);
+}
+
+/// Кодирование payload в параметр `d` URL:
+/// base64url (RFC 4648 section 5, алфавит A-Za-z0-9_-) от UTF-8 байтов
+/// JSON-объекта, БЕЗ padding (символы '=' удаляются). Декодирование
+/// восстанавливает padding через base64Url.normalize.
+String _encodeQrPayload(Map<String, dynamic> payload) {
+  return base64Url.encode(utf8.encode(jsonEncode(payload))).replaceAll('=', '');
+}
+
+/// Декодирование параметра `d` (см. [_encodeQrPayload]).
+/// Возвращает null для мусора/некорректного JSON/не-объекта.
+Map<String, dynamic>? _decodeQrPayload(String encoded) {
+  try {
+    final decoded = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(encoded))));
+    return decoded is Map<String, dynamic> ? decoded : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Собрать URL приглашения для QR-кода: `<landingBaseUrl>?d=<payload>`.
+String _buildInvitationUrl(Map<String, dynamic> payload) {
+  return '$acquaintanceLinkBaseUrl?d=${_encodeQrPayload(payload)}';
+}
+
+/// Разобрать QR-данные приглашения (общая часть для знакомства и домена).
+///
+/// Принимаются ровно две формы (с одинаковым параметром `d`):
+/// - https-URL лендинга [acquaintanceLinkBaseUrl]: scheme https, host и path
+///   должны точно совпадать с лендингом;
+/// - кастомная схема приложения: `closers://join?d=<payload>` (host 'join',
+///   путь пустой или '/') - такую ссылку отдает лендинг и доставляют
+///   app_links/in-app сканер.
+/// Все прочие данные (в т.ч. legacy raw JSON) отклоняются.
+/// Возвращает декодированный JSON-payload из параметра `d` или null.
+Map<String, dynamic>? _parseInvitationUrl(String qrData) {
+  final Uri uri;
+  try {
+    uri = Uri.parse(qrData.trim());
+  } catch (_) {
+    return null;
+  }
+  final scheme = uri.scheme.toLowerCase();
+  final String? d;
+  if (scheme == 'https') {
+    final landing = Uri.parse(acquaintanceLinkBaseUrl);
+    if (uri.host.toLowerCase() != landing.host || uri.path != landing.path) return null;
+    d = uri.queryParameters['d'];
+  } else if (scheme == acquaintanceAppScheme) {
+    if (uri.host.toLowerCase() != acquaintanceAppSchemeHost) return null;
+    if (uri.path.isNotEmpty && uri.path != '/') return null;
+    d = uri.queryParameters['d'];
+  } else {
+    return null;
+  }
+  if (d == null || d.isEmpty) return null;
+  return _decodeQrPayload(d);
 }
 
 /// Сервис знакомства и приглашений.
@@ -35,6 +107,11 @@ bool isSafeRemotePathId(String? id) {
 ///    авто-регистрация пользователя в нем.
 /// 4. Участники домена голосуют (approvals), при достижении кворума
 ///    приглашаемый добавляется в participantsIds домена.
+///
+/// Формат QR-данных: URL лендинга [acquaintanceLinkBaseUrl] с параметром `d`,
+/// содержащим base64url-закодированный JSON-payload (см. [_encodeQrPayload]).
+/// Тип приглашения различается полем `type` внутри JSON ('acquaintance' /
+/// 'domainJoin'). Legacy raw-JSON формат не поддерживается (clean break).
 class InvitationService {
   InvitationService(this._repo);
 
@@ -42,10 +119,12 @@ class InvitationService {
 
   // # Знакомство
 
-  /// Пayload для QR-кода инициатора знакомства.
-  Map<String, String> acquaintanceQrPayload() {
+  /// Полный URL для QR-кода инициатора знакомства:
+  /// `<acquaintanceLinkBaseUrl>?d=<base64url(utf8(json))>`, где json -
+  /// {type: 'acquaintance', userId, name, storageKey, storageInstance}.
+  String acquaintanceQrPayload() {
     final me = _repo.me;
-    return {
+    return _buildInvitationUrl({
       'type': 'acquaintance',
       'userId': me.id,
       'name': me.name,
@@ -53,13 +132,14 @@ class InvitationService {
           ? me.storageKey
           : _repo.connectedStorages.keys.firstOrNull ?? '',
       'storageInstance': me.settings.getDeep('remote_storages.${me.storageKey}.instance') ?? '',
-    };
+    });
   }
 
-  /// Разбор QR-кода инициатора.
+  /// Разбор QR-кода инициатора (URL-форма, см. [_parseInvitationUrl]).
   static ({String userId, String name, String storageKey, String storageInstance})? parseAcquaintanceQr(String qrData) {
     try {
-      final json = jsonDecode(qrData) as Map<String, dynamic>;
+      final json = _parseInvitationUrl(qrData);
+      if (json == null) return null;
       if (json['type'] != 'acquaintance') return null;
       final userId = json['userId'] as String;
       if (!isSafeRemotePathId(userId)) return null;
@@ -168,9 +248,12 @@ class InvitationService {
     return invitation;
   }
 
-  /// Payload QR-кода приглашения в домен (передается лично).
+  /// Полный URL для QR-кода приглашения в домен (тот же лендинг, что и у
+  /// знакомства; тип различается полем `type` внутри JSON-payload):
+  /// `<acquaintanceLinkBaseUrl>?d=<base64url(utf8(json))>`, где json -
+  /// {type: 'domainJoin', invitationId, storageKey, storageInstance}.
   String domainInvitationQrPayload(Invitation invitation) {
-    return jsonEncode({
+    return _buildInvitationUrl({
       'type': 'domainJoin',
       'invitationId': invitation.id,
       'storageKey': invitation.storageKey,
@@ -178,9 +261,11 @@ class InvitationService {
     });
   }
 
+  /// Разбор QR-кода приглашения в домен (URL-форма, см. [_parseInvitationUrl]).
   static ({String invitationId, String storageKey, String storageInstance})? parseDomainInvitationQr(String qrData) {
     try {
-      final json = jsonDecode(qrData) as Map<String, dynamic>;
+      final json = _parseInvitationUrl(qrData);
+      if (json == null) return null;
       if (json['type'] != 'domainJoin') return null;
       final invitationId = json['invitationId'] as String;
       if (!isSafeRemotePathId(invitationId)) return null;
