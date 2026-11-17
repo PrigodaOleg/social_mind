@@ -178,6 +178,39 @@ class AppLocalizationsRu extends AppLocalizations {
       'Передайте этот QR-код приглашаемому лично.';
 
   @override
+  String get invitationsScanQr => 'Сканировать QR';
+
+  @override
+  String get qrScannerTitle => 'Сканирование QR-кода';
+
+  @override
+  String get qrScannerHint => 'Наведите камеру на QR-код';
+
+  @override
+  String get qrScannerPermissionDenied =>
+      'Доступ к камере запрещён. Разрешите камеру в настройках системы и повторите попытку.';
+
+  @override
+  String get qrNotRecognized => 'QR-код не распознан';
+
+  @override
+  String get invitationsConfirmAcquaintanceTitle => 'Добавить знакомство?';
+
+  @override
+  String invitationsConfirmAcquaintanceBody(Object name) {
+    return 'Отправить приглашение на знакомство $name?';
+  }
+
+  @override
+  String get invitationsConfirmDomainJoinTitle => 'Присоединиться к домену?';
+
+  @override
+  String get invitationsConfirmDomainJoinBody => 'Принять приглашение в домен?';
+
+  @override
+  String get confirm => 'Подтвердить';
+
+  @override
   String get notificationsPageTitle => 'Уведомления';
 
   @override

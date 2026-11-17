@@ -135,7 +135,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get userProjectionDescription =>
-      'A user projection is not a real user, but an entity that plays the users role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projections context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly.';
+      'A user projection is not a real user, but an entity that plays the user\'s role. Technically, you can do everything with it that you can do with a user: assign tasks, invite to domains, etc. However, the real person is only indirectly connected to their projection. If there is a communication channel with the real person, the projection\'s context can be delivered through it. If the real person exists as a user in the database, the context can be passed to them directly.';
 
   @override
   String get invitationsPageTitle => 'Invitations and acquaintances';
@@ -177,6 +177,40 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get invitationsDomainJoinHint =>
       'Pass this QR code to the invitee in person.';
+
+  @override
+  String get invitationsScanQr => 'Scan QR';
+
+  @override
+  String get qrScannerTitle => 'Scan QR code';
+
+  @override
+  String get qrScannerHint => 'Point the camera at the QR code';
+
+  @override
+  String get qrScannerPermissionDenied =>
+      'Camera access is denied. Allow camera access in system settings and try again.';
+
+  @override
+  String get qrNotRecognized => 'QR code is not recognized';
+
+  @override
+  String get invitationsConfirmAcquaintanceTitle => 'Add acquaintance?';
+
+  @override
+  String invitationsConfirmAcquaintanceBody(Object name) {
+    return 'Send an acquaintance invitation to $name?';
+  }
+
+  @override
+  String get invitationsConfirmDomainJoinTitle => 'Join domain?';
+
+  @override
+  String get invitationsConfirmDomainJoinBody =>
+      'Accept the domain invitation?';
+
+  @override
+  String get confirm => 'Confirm';
 
   @override
   String get notificationsPageTitle => 'Notifications';

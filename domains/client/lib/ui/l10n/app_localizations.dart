@@ -422,6 +422,66 @@ abstract class AppLocalizations {
   /// **'Передайте этот QR-код приглашаемому лично.'**
   String get invitationsDomainJoinHint;
 
+  /// No description provided for @invitationsScanQr.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сканировать QR'**
+  String get invitationsScanQr;
+
+  /// No description provided for @qrScannerTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сканирование QR-кода'**
+  String get qrScannerTitle;
+
+  /// No description provided for @qrScannerHint.
+  ///
+  /// In ru, this message translates to:
+  /// **'Наведите камеру на QR-код'**
+  String get qrScannerHint;
+
+  /// No description provided for @qrScannerPermissionDenied.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступ к камере запрещён. Разрешите камеру в настройках системы и повторите попытку.'**
+  String get qrScannerPermissionDenied;
+
+  /// No description provided for @qrNotRecognized.
+  ///
+  /// In ru, this message translates to:
+  /// **'QR-код не распознан'**
+  String get qrNotRecognized;
+
+  /// No description provided for @invitationsConfirmAcquaintanceTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Добавить знакомство?'**
+  String get invitationsConfirmAcquaintanceTitle;
+
+  /// No description provided for @invitationsConfirmAcquaintanceBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправить приглашение на знакомство {name}?'**
+  String invitationsConfirmAcquaintanceBody(Object name);
+
+  /// No description provided for @invitationsConfirmDomainJoinTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Присоединиться к домену?'**
+  String get invitationsConfirmDomainJoinTitle;
+
+  /// No description provided for @invitationsConfirmDomainJoinBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Принять приглашение в домен?'**
+  String get invitationsConfirmDomainJoinBody;
+
+  /// No description provided for @confirm.
+  ///
+  /// In ru, this message translates to:
+  /// **'Подтвердить'**
+  String get confirm;
+
   /// No description provided for @notificationsPageTitle.
   ///
   /// In ru, this message translates to:
