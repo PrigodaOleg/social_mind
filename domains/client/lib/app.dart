@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'ui/ui.dart';
@@ -6,8 +6,38 @@ import 'ui/navigation.dart';
 import 'repository/repository.dart';
 import 'notifications/push_notification_service.dart';
 
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  late final AppRouterDelegate _routerDelegate = _createRouterDelegate();
+  DeepLinkHandler? _deepLinks;
+
+  @override
+  void initState() {
+    super.initState();
+    // Deeplink-ссылки: холодный старт (initial link) и теплый старт (поток).
+    // На платформах без поддержки app_links обработчик молча отключается.
+    try {
+      _deepLinks = DeepLinkHandler()..start(mapInvitationLinkToRouterUri, _onLink);
+    } catch (_) {
+      _deepLinks = null;
+    }
+  }
+
+  void _onLink(Uri uri) {
+    _routerDelegate.setNewRoutePath(uri);
+  }
+
+  @override
+  void dispose() {
+    _deepLinks?.dispose();
+    super.dispose();
+  }
 
   Future<List<NavStackEntry>?> locateUser(Repository repository) async {
     // This is the origin point of working with repository
@@ -43,6 +73,35 @@ class App extends StatelessWidget {
     return repository.lastNavStack;
   }
 
+  AppRouterDelegate _createRouterDelegate() {
+    return AppRouterDelegate(
+      loginRoutePath: LoginPage.routeName,
+      initialRoute: (
+        path: SplashScreen.routeName,
+        constructor: SplashScreen.new,
+        args: {
+          'nextRoute': LoginPage.routeName,
+          'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
+          'backgroundTask': locateUser
+        }
+        ), unknownRoute: (
+        args: {},
+        constructor: UnknownPage.new,
+        path: UnknownPage.routeName
+      ), routes: {
+        LoginPage.routeName: LoginPage.new,
+        HomePage.routeName: HomePage.new,
+        DomainListPage.routeName: DomainListPage.new,
+        DomainContentPage.routeName: DomainContentPage.new,
+        TaskListPage.routeName: TaskListPage.new,
+        TaskListsPage.routeName: TaskListsPage.new,
+        ContactListPage.routeName: ContactListPage.new,
+        UserProfilePage.routeName: UserProfilePage.new,
+        InvitationPage.routeName: InvitationPage.new,
+        NotificationsPage.routeName: NotificationsPage.new
+      });
+  }
+
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
@@ -69,32 +128,7 @@ class App extends StatelessWidget {
         }
         return const Locale('en');
       },
-      routerDelegate: AppRouterDelegate(
-        loginRoutePath: LoginPage.routeName,
-        initialRoute: (
-          path: SplashScreen.routeName,
-          constructor: SplashScreen.new,
-          args: {
-            'nextRoute': LoginPage.routeName,
-            'lottieAsset': "assets/Lottie/Animation - 1719759862682.json",
-            'backgroundTask': locateUser
-          }
-          ), unknownRoute: (
-          args: {},
-          constructor: UnknownPage.new,
-          path: UnknownPage.routeName
-        ), routes: {
-          LoginPage.routeName: LoginPage.new,
-          HomePage.routeName: HomePage.new,
-          DomainListPage.routeName: DomainListPage.new,
-          DomainContentPage.routeName: DomainContentPage.new,
-          TaskListPage.routeName: TaskListPage.new,
-          TaskListsPage.routeName: TaskListsPage.new,
-          ContactListPage.routeName: ContactListPage.new,
-          UserProfilePage.routeName: UserProfilePage.new,
-          InvitationPage.routeName: InvitationPage.new,
-          NotificationsPage.routeName: NotificationsPage.new
-        }),
+      routerDelegate: _routerDelegate,
       routeInformationParser: AppRouteInformationParser(),
     );
   }

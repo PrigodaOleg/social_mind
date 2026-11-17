@@ -1,6 +1,7 @@
 ﻿library ui;
 
 export 'l10n/app_localizations.dart';
+export 'deep_links.dart';
 export 'pages/home.dart';
 export 'pages/task_list.dart';
 export 'pages/splash_screen.dart';
@@ -14,3 +15,4 @@ export 'pages/contact_list.dart';
 export 'widgets/contact_picker_dialog.dart';
 export 'pages/invitation.dart';
 export 'pages/notifications.dart';
+export 'pages/qr_scanner.dart';
