@@ -1,4 +1,4 @@
-{
+﻿{
     "applicationTitle": "Близкие",
     "homePageName": "Доска",
     "userProfilePageName": "Профиль пользователя",
@@ -60,6 +60,23 @@
     },
     "invitationsDomainJoinTitle": "Приглашение в домен",
     "invitationsDomainJoinHint": "Передайте этот QR-код приглашаемому лично.",
+    "invitationsScanQr": "Сканировать QR",
+    "qrScannerTitle": "Сканирование QR-кода",
+    "qrScannerHint": "Наведите камеру на QR-код",
+    "qrScannerPermissionDenied": "Доступ к камере запрещён. Разрешите камеру в настройках системы и повторите попытку.",
+    "qrNotRecognized": "QR-код не распознан",
+    "invitationsConfirmAcquaintanceTitle": "Добавить знакомство?",
+    "invitationsConfirmAcquaintanceBody": "Отправить приглашение на знакомство {name}?",
+    "@invitationsConfirmAcquaintanceBody": {
+        "placeholders": {
+            "name": {
+                "type": "Object"
+            }
+        }
+    },
+    "invitationsConfirmDomainJoinTitle": "Присоединиться к домену?",
+    "invitationsConfirmDomainJoinBody": "Принять приглашение в домен?",
+    "confirm": "Подтвердить",
     "notificationsPageTitle": "Уведомления",
     "notificationsRulesTitle": "Правила уведомлений",
     "notificationsRulesHint": "Определите, о каких событиях и от кого вы хотите получать уведомления.",

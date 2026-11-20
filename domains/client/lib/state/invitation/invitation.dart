@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:bloc/bloc.dart';
 import 'package:closers/repository/repository.dart';
 import 'package:equatable/equatable.dart';
@@ -49,8 +47,8 @@ class InvitationBloc extends Bloc<InvitationEvent, InvitationState> {
     AcquaintanceQrGenerated event,
     Emitter<InvitationState> emit,
   ) async {
-    final payload = _invitationService.acquaintanceQrPayload();
-    emit(state.copyWith(acquaintanceQrPayload: () => jsonEncode(payload)));
+    final qrUrl = _invitationService.acquaintanceQrPayload();
+    emit(state.copyWith(acquaintanceQrPayload: () => qrUrl));
   }
 
   /// Отсканирован QR инициатора знакомства - отправляем ответное приглашение.
