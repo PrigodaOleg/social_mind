@@ -35,7 +35,11 @@ class LoginPage extends StatelessWidget {
         children: [
           Text(l.loginHelloLabel),
           Text(l.loginActionLabel),
-          Row(
+          // Wrap вместо Row: три кнопки не влезают в строку на узких экранах
+          // (на Samsung Galaxy A15 / 384dp Row переполнялся на 176px).
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
             children: [
               TextButton(
                 // Blank

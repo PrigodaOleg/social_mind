@@ -64,6 +64,22 @@ find_adb() {
   command -v adb || true
 }
 
+# Java для firebase-эмуляторов: на macOS без установленного JDK используем
+# JBR из Android Studio (эмулятору database нужна Java VM). /usr/bin/java на
+# macOS — это заглушка: она есть, но падает, поэтому проверяем работоспособность.
+if ! java -version >/dev/null 2>&1; then
+  for jh in \
+    "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+    "$HOME/Library/Java/JavaVirtualMachines"/*/Contents/Home \
+    /Library/Java/JavaVirtualMachines/*/Contents/Home; do
+    if [ -x "$jh/bin/java" ]; then
+      export JAVA_HOME="$jh"
+      export PATH="$JAVA_HOME/bin:$PATH"
+      break
+    fi
+  done
+fi
+
 ADB="$(find_adb)"
 if [ -z "$ADB" ]; then
   echo "ERROR: adb not found." >&2
@@ -75,7 +91,11 @@ fi
 # ------------------------------------------------------------- устройства ---
 # Список серийников устройств в состоянии 'device' (offline/unauthorized
 # игнорируем — на них тесты всё равно не встать).
-mapfile -t DEVICES < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
+# bash 3.2 (macOS) совместимость: без mapfile/readarray (bash 4+).
+DEVICES=()
+while IFS= read -r d; do
+  DEVICES+=("$d")
+done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
 
 if [ "${#DEVICES[@]}" -eq 0 ]; then
   echo "ERROR: no connected Android devices in state 'device'." >&2
@@ -176,10 +196,13 @@ for i in $(seq 1 10); do
 done
 
 # ------------------------------------------------------------- запуск -------
-# Хост эмуляторов с устройства: порты проброшены adb reverse -> localhost.
+# Хост эмуляторов с устройства: порты проброшены adb reverse -> loopback.
 # (На эмуляторе тест по умолчанию берёт 10.0.2.2; физическому устройству
 # нужен явный define — см. integration_test/auth_e2e_test.dart.)
-EMULATOR_HOST=localhost
+# ВАЖНО: именно 127.0.0.1, а не "localhost" — нативный firebase-android-sdk
+# молча подменяет хост "localhost" на 10.0.2.2 (алиас эмулятора), который
+# на физическом устройстве недостижим -> firebase_auth/network-request-failed.
+EMULATOR_HOST=127.0.0.1
 TEST_TIMEOUT="${FLUTTER_TEST_TIMEOUT:-300s}"
 
 # Фильтр сценариев: FILTER -> --plain-name (пустой FILTER — без фильтра).
@@ -197,7 +220,7 @@ for serial in "${TARGETS[@]}"; do
   echo "== Device $serial: adb reverse (emulator ports) =="
   echo "============================================================"
   # Пробрасываем порты эмуляторов на устройство. Физическое устройство не
-  # имеет алиаса 10.0.2.2; тест с define E2E_EMULATOR_HOST=localhost ходит
+  # имеет алиаса 10.0.2.2; тест с define E2E_EMULATOR_HOST=127.0.0.1 ходит
   # через reverse-прокси на хост.
   "$ADB" -s "$serial" reverse --remove-all >/dev/null 2>&1 || true
   "$ADB" -s "$serial" reverse "tcp:$AUTH_PORT" "tcp:$AUTH_PORT"

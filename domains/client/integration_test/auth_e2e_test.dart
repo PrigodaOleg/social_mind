@@ -42,7 +42,9 @@ const dbPort = 9000;
 // host.
 // ФИЗИЧЕСКОЕ android-устройство (tool/run_device_tests.sh) не знает алиаса
 // 10.0.2.2 — скрипт пробрасывает порты эмуляторов через `adb reverse` и
-// передаёт хост через --dart-define=E2E_EMULATOR_HOST=localhost.
+// передаёт хост через --dart-define=E2E_EMULATOR_HOST=127.0.0.1
+// (adb reverse + loopback; "localhost" нельзя — его подменяет
+// automaticHostMapping, см. setUpAll).
 // (String.fromEnvironment вычисляется при КОМПИЛЯЦИИ приложения на
 // устройстве — dart-define до него доходит, в отличие от iOS host-харнесса.)
 const emulatorHostDefine = String.fromEnvironment('E2E_EMULATOR_HOST');
@@ -182,7 +184,16 @@ void main() {
     // Repository.tryLogin / initRemoteStorages resolve it.
     app = await _initApp(defaultInstance);
     auth = fb_auth.FirebaseAuth.instanceFor(app: app);
-    await auth.useAuthEmulator(emulatorHost, authPort);
+    // automaticHostMapping: false — firebase_core на Android молча подменяет
+    // "localhost"/"127.0.0.1" на 10.0.2.2 (алиас ЭМУЛЯТОРА), который на
+    // физическом устройстве недостижим -> firebase_auth/network-request-failed.
+    // Здесь хост уже передан корректно (10.0.2.2 на эмуляторе, 127.0.0.1 на
+    // физическом устройстве через adb reverse, localhost на iOS-симуляторе).
+    await auth.useAuthEmulator(
+      emulatorHost,
+      authPort,
+      automaticHostMapping: false,
+    );
     fsProbe = FirebaseStorage();
     await fsProbe.init(defaultInstance);
   });

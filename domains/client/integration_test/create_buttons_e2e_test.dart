@@ -102,6 +102,10 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp.router(
+        // Фиксируем локаль: тест ищет английские строки ('Hi there' и т.п.),
+        // а физическое устройство может быть локализовано иначе (ru-RU у
+        // Samsung Galaxy A15) — тогда все find.text() не находят виджеты.
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerDelegate: delegate,
@@ -230,6 +234,10 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp.router(
+        // Фиксируем локаль: тест ищет английские строки ('Hi there' и т.п.),
+        // а физическое устройство может быть локализовано иначе (ru-RU у
+        // Samsung Galaxy A15) — тогда все find.text() не находят виджеты.
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerDelegate: delegate,
