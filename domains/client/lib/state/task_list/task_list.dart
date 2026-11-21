@@ -38,11 +38,27 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
 
   Future<void> _onAdd(
       TaskAddRequested event, Emitter<TaskListState> emit) async {
-    final list = state.list;
+    // Local-first fallback: список мог еще не доехать в локальное хранилище
+    // (например, только что создан на другом устройстве) - пробуем достать
+    // его напрямую, прежде чем молча отказаться от добавления задачи.
+    var list = state.list;
+    if (list == null) {
+      try {
+        list = await repository.getModelNow<TaskList>(parentId);
+      } catch (e) {
+        print('TaskListBloc._onAdd: failed to load list $parentId: $e');
+      }
+    }
     if (list == null) return;
     final task = Task(originatorId: selfUserId);
     list.addTask(task);
-    await repository.saveModels([list, task], _subscriberId);
+    try {
+      await repository.saveModels([list, task], _subscriberId);
+    } catch (e) {
+      // Local-first: показываем задачу сразу, даже если сохранение (или
+      // его синхронизация) упало - иначе нажатие кнопки выглядит как no-op.
+      print('TaskListBloc._onAdd: save failed: $e');
+    }
     final updated = Map<String, Task>.from(state.tasks)..[task.id] = task;
     emit(state.copyWith(list: list, tasks: updated));
   }
@@ -52,8 +68,12 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     final list = state.list;
     if (list == null) return;
     list.removeTask(event.task);
-    await repository.saveModel(list, _subscriberId);
-    repository.deleteModel(event.task, _subscriberId);
+    try {
+      await repository.saveModel(list, _subscriberId);
+      repository.deleteModel(event.task, _subscriberId);
+    } catch (e) {
+      print('TaskListBloc._onDelete: save failed: $e');
+    }
     final updated = Map<String, Task>.from(state.tasks)..remove(event.task.id);
     emit(state.copyWith(list: list, tasks: updated));
   }
@@ -65,7 +85,11 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     final task = event.task.copyWith(
         isCompleted: event.isComplited,
         completedAt: event.isComplited ? DateTime.now() : null);
-    await repository.saveModel(task, _subscriberId);
+    try {
+      await repository.saveModel(task, _subscriberId);
+    } catch (e) {
+      print('TaskListBloc._onComplete: save failed: $e');
+    }
     final updated = Map<String, Task>.from(state.tasks)..[task.id] = task;
     emit(state.copyWith(tasks: updated));
   }
@@ -75,7 +99,11 @@ class TaskListBloc extends Bloc<TaskEvent, TaskListState> {
     final list = state.list;
     if (list == null || event.submittedText.trim().isEmpty) return;
     final task = event.task.copyWith(title: event.submittedText);
-    await repository.saveModel(task, _subscriberId);
+    try {
+      await repository.saveModel(task, _subscriberId);
+    } catch (e) {
+      print('TaskListBloc._onSubmit: save failed: $e');
+    }
     final updated = Map<String, Task>.from(state.tasks)..[task.id] = task;
     emit(state.copyWith(list: list, tasks: updated));
   }

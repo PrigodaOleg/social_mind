@@ -625,4 +625,32 @@ group('Timer postpone restarts countdown', () {
   });
 });
 
+group('Timer sync error resilience', () {
+  test('a sync error does not kill the timer: repeated sync cycles survive', () async {
+    final localStorage = MockLocalStorage();
+    final remote = ThrowingSaveRemoteStorage();
+    final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remote});
+    final user = User(id: 'me', name: 'me');
+    // Постановка в очередь без немедленной синхронизации - как в local-first потоке.
+    await r.saveModel(user, null, false);
+    expect(r.outgoingChanges, isNotEmpty);
+    // Ошибка сохранения в удаленном хранилище не должна вылетать наружу
+    // (иначе подписка таймера умирает по cancelOnError и sync больше не
+    // запускается до конца сессии).
+    await r.runSyncForTest();
+    // Таймер "жив": следующий цикл запускается и завершается (мьютекс
+    // освобожден, исключение не накопилось).
+    await r.runSyncForTest();
+    // Незасинхронизированные изменения остаются в очереди для следующего цикла.
+    expect(r.outgoingChanges, isNotEmpty);
+  });
+});
+
+}
+
+class ThrowingSaveRemoteStorage extends TrackingRemoteStorage {
+  @override
+  Future<int> saveItems(Map<String, dynamic> items) async {
+    throw Exception('saveItems failed');
+  }
 }

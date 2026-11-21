@@ -274,10 +274,20 @@ class Repository {
     _syncInProgress = true;
   }
 
+  @visibleForTesting
+  Future<void> runSyncForTest() => _delayedSync();
+
   Future<void> _delayedSync() async {
     await _syncMutex();
     try {
       await _doDelayedSync();
+    } catch (e) {
+      // Ошибка синхронизации не должна убивать подписку таймера
+      // (Timer.listen использует cancelOnError: true) - иначе sync умирает
+      // до конца сессии и локальные изменения больше никогда не уедут в
+      // удаленное хранилище. Логируем и продолжаем: незасинхронизированные
+      // изменения остаются в очередях и будут отправлены в следующем цикле.
+      print('Sync failed: $e');
     } finally {
       _syncInProgress = false;
     }
