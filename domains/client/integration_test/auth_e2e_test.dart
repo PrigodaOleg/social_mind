@@ -40,7 +40,15 @@ const dbPort = 9000;
 // 10.0.2.2 is the Android-emulator alias for the host loopback, where the
 // Firebase emulators listen; from the iOS simulator "localhost" is the
 // host.
-final String emulatorHost = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+// ФИЗИЧЕСКОЕ android-устройство (tool/run_device_tests.sh) не знает алиаса
+// 10.0.2.2 — скрипт пробрасывает порты эмуляторов через `adb reverse` и
+// передаёт хост через --dart-define=E2E_EMULATOR_HOST=localhost.
+// (String.fromEnvironment вычисляется при КОМПИЛЯЦИИ приложения на
+// устройстве — dart-define до него доходит, в отличие от iOS host-харнесса.)
+const emulatorHostDefine = String.fromEnvironment('E2E_EMULATOR_HOST');
+final String emulatorHost = emulatorHostDefine.isNotEmpty
+    ? emulatorHostDefine
+    : (Platform.isAndroid ? '10.0.2.2' : 'localhost');
 
 // The default instance name used by User.settings
 // ('remote_storages.FirebaseRealtimeDatabase.instance') — Repository.tryLogin
