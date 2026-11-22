@@ -8,9 +8,12 @@
 //     the list (AppBar title updates, the rename persists across restart).
 //   - DomainListPage "create new domain" button (Icons.add_circle).
 //
-// NOTE: manual local runs need `adb shell pm clear com.example.closers`
-// first (or a fresh emulator): the test assumes NO local user data
-// (empty Isar -> login page).
+// NOTE: the test resets its own state at startup (deletes the Isar files
+// from the app's documents directory), so NO `pm clear` / uninstall is
+// required before a re-run: on iOS an uninstall+reinstall resets the
+// developer-profile trust ("Untrusted Developer" again) and needs a
+// manual Settings round-trip. Android `pm clear` in the runner stays as
+// extra hygiene, but the test is resilient without it too.
 //
 // Uses the REAL IsarStorage() on-device (not FakeLocalStorage) to catch
 // on-device storage issues; the test user is made fully offline by clearing
@@ -19,6 +22,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart' as pp;
 
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/repository/repository.dart';
@@ -78,10 +85,35 @@ Future<void> passSplash(WidgetTester tester) async {
   await tester.pump();
 }
 
+// Deletes the Isar database files (db + lock/tmp) from the app's documents
+// directory - the directory IsarStorage opens its default instance in
+// (lib/local_storage/isar/isar_storage.dart). userId and every model live
+// INSIDE Isar (OperationalBox 'userId' / ModelBox), so removing the files
+// fully resets local state.
+//
+// WHY in-test: on iOS, uninstalling the app to reset state also resets the
+// developer-profile trust -> the reinstall launches as "Untrusted Developer"
+// and every subsequent run needs a manual Settings round-trip. Deleting the
+// Isar files in-test keeps the app installed (trust intact) and makes the
+// test self-resetting on every platform.
+Future<void> resetIsarFiles() async {
+  final docsPath = (await pp.getApplicationDocumentsDirectory()).path;
+  final dir = Directory(docsPath);
+  if (!dir.existsSync()) return;
+  final isarFileRegExp = RegExp(r'^default\.(isar|lock)$|^default\.isar\.');
+  await for (final f in dir.list()) {
+    if (f is File && isarFileRegExp.hasMatch(f.path.split(Platform.pathSeparator).last)) {
+      await f.delete();
+    }
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('create-task and create-domain buttons work end to end', (tester) async {
+    await resetIsarFiles();
+
     final storage = IsarStorage();
     final repo = Repository(localStorage: storage);
     // No remote backend in this test: clearing the known-storage factories

@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 # Локальный «mini device farm» runner: запуск UI/интеграционных e2e-тестов
-# (integration_test/*.dart) на всех ПОДКЛЮЧЁННЫХ ФИЗИЧЕСКИХ android-устройствах
-# (USB/Wi-Fi adb: Samsung Galaxy A15 сейчас, другие позже).
+# (integration_test/*.dart) на подключённых ФИЗИЧЕСКИХ устройствах:
+#   - android (USB/Wi-Fi adb: Samsung Galaxy A15 и др.) — полная поддержка;
+#   - iOS (iPhone 8 через usbmuxd/flutter) — см. «iOS physical device» ниже.
+#
+# Экраны: устройства НЕ должны оставаться с постоянно включённым экраном.
+#   - android: перед тестами будим экран (KEYCODE_WAKEUP + MENU-свайп
+#     разблокировки; устройства с PIN-кодом нужно один раз разблокировать
+#     вручную) и на время прогона включаем stay_on_while_plugged_in=7
+#     («Stay awake» — иначе экран гаснет по таймауту и android СУСПЕНДИТ
+#     приложение: тесты «did not complete»), после тестов гасим экран
+#     (KEYCODE_SLEEP) и сбрасываем stay_on_while_plugged_in=0.
+#   - iOS: публичного CLI-управления экраном нет (devicectl не умеет ни
+#     wake, ни lock). Экран будим запуском приложения (установка/запуск из
+#     Xcode/flutter выводит экран изо сна при отсутствии пароля); перед
+#     первым запуском телефон нужно разблокировать вручную. После тестов
+#     экран гаснет сам по таймауту автоблокировки устройства.
 #
 # Чем отличается от tool/run_auth_e2e_tests.sh --platform android:
 #   - там всегда создаётся и загружается эмулятор (AVD closers-e2e);
@@ -89,7 +103,7 @@ if [ -z "$ADB" ]; then
 fi
 
 # ------------------------------------------------------------- устройства ---
-# Список серийников устройств в состоянии 'device' (offline/unauthorized
+# Android: серийники устройств в состоянии 'device' (offline/unauthorized
 # игнорируем — на них тесты всё равно не встать).
 # bash 3.2 (macOS) совместимость: без mapfile/readarray (bash 4+).
 DEVICES=()
@@ -97,8 +111,21 @@ while IFS= read -r d; do
   DEVICES+=("$d")
 done < <("$ADB" devices | awk 'NR>1 && $2=="device" {print $1}')
 
-if [ "${#DEVICES[@]}" -eq 0 ]; then
-  echo "ERROR: no connected Android devices in state 'device'." >&2
+# iOS physical device (flutter device id, напр. 4c81366c...). Устройство
+# перечисляется через `flutter devices --machine` (devicectl не видит
+# iOS 16-устройства); в ферме берём ПЕРВЫЙ ios-телефон. Требования:
+# телефон подключён кабелем, разблокирован, «Доверять этому компьютеру»
+# подтверждён, профиль разработчика доверенный (после этого uninstall
+# делать НЕЛЬЗЯ — доверие сбросится, поэтому состояние сбрасывает сам
+# тест, см. integration_test/create_buttons_e2e_test.dart).
+IOS_DEVICE_ID="${IOS_DEVICE_ID:-}"
+if [ -z "$IOS_DEVICE_ID" ]; then
+  IOS_DEVICE_ID=$(flutter devices --machine 2>/dev/null |
+    python3 -c "import json,sys;d=json.load(sys.stdin);print(next((x['id'] for x in d if x.get('targetPlatform')=='ios' and not x.get('emulator')), ''))" || true)
+fi
+
+if [ "${#DEVICES[@]}" -eq 0 ] && [ -z "$IOS_DEVICE_ID" ]; then
+  echo "ERROR: no connected Android devices in state 'device' and no iOS device found." >&2
   echo "" >&2
   echo "Как подключить физическое устройство (Samsung Galaxy A15 и др.):" >&2
   echo "  1. Включите «Параметры разработчика» (7 тапов по «Номеру сборки» в «Сведения о телефоне»)." >&2
@@ -109,7 +136,8 @@ if [ "${#DEVICES[@]}" -eq 0 ]; then
   exit 1
 fi
 
-# Целевое устройство(а): ANDROID_DEVICE_SERIAL ограничивает одним серийником.
+# Целевое устройство(а): ANDROID_DEVICE_SERIAL ограничивает одним серийником
+# (android), IOS_DEVICE_ID — одним id (iOS).
 TARGETS=()
 if [ -n "${ANDROID_DEVICE_SERIAL:-}" ]; then
   found=0
@@ -127,6 +155,64 @@ fi
 
 echo "== Connected devices (targets) =="
 printf '  %s\n' "${TARGETS[@]}"
+if [ -n "$IOS_DEVICE_ID" ]; then
+  echo "  ios: $IOS_DEVICE_ID"
+fi
+
+# ------------------------------------------- функции управления экраном ----
+# android wake: будим экран, свайпаем вверх (KEYCODE 82 / MENU работает как
+# разблокировка БЕЗ PIN-кода; устройства с PIN-кодом нужно один раз
+# разблокировать вручную — автоматической разблокировки с паролем нет) и
+# включаем «Stay awake» на время прогона: без него экран гаснет по таймауту
+# и android суспендит приложение под тестом (сценарии «did not complete»).
+android_wake() {
+  local serial="$1"
+  "$ADB" -s "$serial" shell settings put global stay_on_while_plugged_in 7 || true
+  "$ADB" -s "$serial" shell input keyevent KEYCODE_WAKEUP || true
+  "$ADB" -s "$serial" shell input keyevent 82 || true
+}
+
+# android screen off: гасим экран после тестов (устройства не должны
+# оставаться с включённым экраном).
+android_screen_off() {
+  local serial="$1"
+  "$ADB" -s "$serial" shell input keyevent KEYCODE_SLEEP || true
+}
+
+# Сбрасываем «не гаснуть пока на зарядке» в конце android-прогона
+# (android_wake ставил 7 на время тестов): 0 — дефолт, экран снова гаснет
+# по таймауту устройства.
+android_reset_stay_awake() {
+  local serial="$1"
+  "$ADB" -s "$serial" shell settings put global stay_on_while_plugged_in 0 || true
+}
+
+# ios wake: публичного wake-CLI нет НИ У devicectl, ни у ios-deploy (как и
+# lock). Пытаемся будить экран ЗАПУСКОМ приложения: devicectl (iOS 17+),
+# затем ios-deploy (работает и на iOS 16, где devicectl устройство вообще
+# не видит). Запуск выводит iPhone изо сна ТОЛЬКО если на телефоне нет
+# пароля; с паролем (или если телефон уже залочен) — нужно разблокировать
+# вручную, иначе launch падает с ошибкой про trust/signature. Отказ не
+# фатален: flutter test сам ставит и запускает приложение своим механизмом.
+IOS_BUNDLE_ID=com.example.closers
+ios_wake_by_launch() {
+  local device_id="$1"
+  echo "== [ios $device_id] wake attempt: launching $IOS_BUNDLE_ID =="
+  if xcrun devicectl device process launch --device "$device_id" "$IOS_BUNDLE_ID" >/dev/null 2>&1; then
+    echo "   (devicectl launch ok)"
+    return 0
+  fi
+  if [ -d build/ios/iphoneos/Runner.app ]; then
+    if ios-deploy --id "$device_id" --bundle build/ios/iphoneos/Runner.app \
+         --justlaunch --no-wifi >/dev/null 2>&1; then
+      echo "   (ios-deploy launch ok)"
+      return 0
+    fi
+  fi
+  echo "   (wake-by-launch failed — если экран iPhone залочен, разблокируйте вручную;" >&2
+  echo "    CLI-управления экраном iOS не существует; flutter test попробует запустить сам)" >&2
+  return 0
+}
 
 # ----------------------------------------------- Firebase-эмуляторы ---------
 # Та же конфигурация, что в run_auth_e2e_tests.sh / run_emulator_tests.sh.
@@ -149,14 +235,20 @@ else
   echo "== Starting Firebase emulators (auth:$AUTH_PORT, database:$DB_PORT) =="
   mkdir -p "$EMULATOR_DIR"
   python3 tool/prepare_firebase_rules.py "$RULES_SRC" "$EMULATOR_DIR/rules.json"
+  # host: 0.0.0.0 — на ФИЗИЧЕСКОМ iPhone «localhost» хоста недостижим; телефон
+  # стучится на IP Mac'а в общей Wi-Fi-сети (E2E_EMULATOR_HOST). android идёт
+  # через adb reverse на 127.0.0.1 — ему привязка к 0.0.0.0 тоже не мешает.
+  # ВАЖНО: host надо задавать КАЖДОМУ эмулятору — глобальный ключ
+  # "emulators.host" firebase-tools игнорирует (15.x). Без этого эмуляторы
+  # слушают только 127.0.0.1 и физический iPhone не достучится.
   cat > "$EMULATOR_DIR/firebase.json" <<EOF
 {
   "database": {
     "rules": "rules.json"
   },
   "emulators": {
-    "auth": { "port": $AUTH_PORT },
-    "database": { "port": $DB_PORT },
+    "auth": { "port": $AUTH_PORT, "host": "0.0.0.0" },
+    "database": { "port": $DB_PORT, "host": "0.0.0.0" },
     "hub": { "port": $HUB_PORT },
     "ui": { "enabled": false }
   }
@@ -167,8 +259,12 @@ EOF
   trap 'pkill -f "firebase emulators:start" 2>/dev/null || true; pkill -f "firebase-database-emulator" 2>/dev/null || true' EXIT
 
   for i in $(seq 1 90); do
+    # Готовность ОБАИХ эмуляторов: database отвечает и auth принимает
+    # соединения (auth поднимается последним; без этой проверки android-тесты
+    # стартуют раньше и падают "Failed to connect to 127.0.0.1:9099").
     if emulators_up &&
-       curl -s -o /dev/null "http://127.0.0.1:$DB_PORT/.info/connected.json?ns=$PROJECT" 2>/dev/null; then
+       curl -s -o /dev/null "http://127.0.0.1:$DB_PORT/.info/connected.json?ns=$PROJECT" 2>/dev/null &&
+       curl -s -o /dev/null "http://127.0.0.1:$AUTH_PORT/" 2>/dev/null; then
       break
     fi
     if [ "$i" -eq 90 ]; then
@@ -214,11 +310,17 @@ fi
 FAILED=()
 PASSED=()
 
+# ----------------------------------------------------------- android loop ---
 for serial in "${TARGETS[@]}"; do
   echo
   echo "============================================================"
-  echo "== Device $serial: adb reverse (emulator ports) =="
+  echo "== Device $serial: wake screen + adb reverse (emulator ports) =="
   echo "============================================================"
+  # Будим экран: тесты с «спящим» экраном флаттерить нечем тапать (да и
+  # wingman-требование: экраны не должны быть always-on; будим только на
+  # время прогона).
+  android_wake "$serial"
+
   # Пробрасываем порты эмуляторов на устройство. Физическое устройство не
   # имеет алиаса 10.0.2.2; тест с define E2E_EMULATOR_HOST=127.0.0.1 ходит
   # через reverse-прокси на хост.
@@ -235,9 +337,10 @@ for serial in "${TARGETS[@]}"; do
     --timeout "$TEST_TIMEOUT" \
     ${extra_filter[@]+"${extra_filter[@]}"} || rc=$?
 
-  # create_buttons_e2e_test требует чистого состояния приложения (пустой Isar
-  # -> экран логина), как и в CI: сначала pm clear, затем тест. Firebase ему
-  # не нужен, но reverse не мешает.
+  # create_buttons_e2e_test сбрасывает своё состояние сам (удаляет файлы Isar
+  # в test'е — uninstall на iOS сбрасывает доверие профиля разработчика).
+  # pm clear оставляем как гигиену (чистит и другие кэши), но тест корректен
+  # и без него.
   if [ "$rc" -eq 0 ] && [ -z "${FILTER:-}" ]; then
     echo "== [$serial] Running create-buttons e2e tests =="
     "$ADB" -s "$serial" shell pm clear com.example.closers || true
@@ -251,6 +354,12 @@ for serial in "${TARGETS[@]}"; do
   # adb-сервером между запусками.
   "$ADB" -s "$serial" reverse --remove-all >/dev/null 2>&1 || true
 
+  # Экран OFF + сброс «Stay awake» (предыдущий запуск фермы ставил
+  # stay_on_while_plugged_in=7 на A15): устройства не должны оставаться
+  # с постоянно включённым экраном.
+  android_screen_off "$serial"
+  android_reset_stay_awake "$serial"
+
   if [ "$rc" -eq 0 ]; then
     PASSED+=("$serial")
     echo "== [$serial] PASSED =="
@@ -259,6 +368,70 @@ for serial in "${TARGETS[@]}"; do
     echo "== [$serial] FAILED (rc=$rc) ==" >&2
   fi
 done
+
+# ------------------------------------------------------ iOS physical device --
+# ОГРАНИЧЕНИЯ iOS (честно):
+#   - wake: публичного wake-CLI нет; будим запуском приложения (работает
+#     только если на телефоне НЕТ пароля — иначе нужен ручной unlock).
+#   - screen off после тестов: публичного lock-CLI нет — экран гаснет сам
+#     по таймауту автоблокировки телефона. not fixable from CLI.
+#   - uninstall для сброса состояния НЕ применяем сознательно: reinstall
+#     сбрасывает доверие developer-профиля («Untrusted Developer») и требует
+#     ручного обхода Settings; состояние сбрасывает сам тест (in-test Isar
+#     file reset, см. integration_test/create_buttons_e2e_test.dart).
+if [ -n "$IOS_DEVICE_ID" ]; then
+  echo
+  echo "============================================================"
+  echo "== iOS device $IOS_DEVICE_ID: wake-by-launch =="
+  echo "============================================================"
+  ios_wake_by_launch "$IOS_DEVICE_ID"
+
+  # Физический iPhone не имеет алиаса хоста: до эмуляторов добирается через
+  # LAN/Wi-Fi IP Mac'а (эмуляторы слушают 0.0.0.0, см. конфиг выше). Телефон и
+  # Mac должны быть в ОДНОЙ Wi-Fi-сети; "localhost"/127.0.0.1 с телефона это
+  # сам телефон. CLOSERS_* defines — те же, что в run_auth_e2e_tests.sh
+  # (ios_emulator_defines): firebase_options.dart читает их для iOS.
+  # IP Mac'а в LAN: en0 (стандартный Wi-Fi) или en1 (эта машина), можно
+  # переопределить IOS_EMULATOR_HOST=<ip>.
+  IOS_EMULATOR_HOST="${IOS_EMULATOR_HOST:-$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || true)}"
+  if [ -z "$IOS_EMULATOR_HOST" ]; then
+    echo "ERROR: no en0/en1 IP (Mac not on Wi-Fi?) — физический iPhone не достучится до эмуляторов" >&2
+    exit 1
+  fi
+  echo "== [ios] emulators host: $IOS_EMULATOR_HOST =="
+
+  ios_rc=0
+  echo "== [ios] Running auth e2e tests =="
+  flutter test integration_test/auth_e2e_test.dart \
+    -d "$IOS_DEVICE_ID" \
+    --dart-define=RUN_EMULATOR_TESTS=true \
+    --dart-define=E2E_EMULATOR_HOST="$IOS_EMULATOR_HOST" \
+    --dart-define=CLOSERS_PROJECT_ID="$PROJECT" \
+    --dart-define=CLOSERS_PROJECT_NUMBER=1 \
+    --dart-define=CLOSERS_IOS_API_KEY=test-api-key \
+    --dart-define=CLOSERS_IOS_APP_ID=1:1:ios:1 \
+    --dart-define=CLOSERS_DATABASE_URL="http://$IOS_EMULATOR_HOST:$DB_PORT/?ns=$PROJECT" \
+    --timeout "$TEST_TIMEOUT" \
+    ${extra_filter[@]+"${extra_filter[@]}"} || ios_rc=$?
+
+  if [ "$ios_rc" -eq 0 ] && [ -z "${FILTER:-}" ]; then
+    echo "== [ios] Running create-buttons e2e tests =="
+    flutter test integration_test/create_buttons_e2e_test.dart \
+      -d "$IOS_DEVICE_ID" \
+      --timeout "$TEST_TIMEOUT" \
+      ${extra_filter[@]+"${extra_filter[@]}"} || ios_rc=$?
+  fi
+
+  # Screen off на iOS из CLI недоступен (нет публичного lock-API) — экран
+  # гаснет сам по таймауту автоблокировки телефона.
+  if [ "$ios_rc" -eq 0 ]; then
+    PASSED+=("ios:$IOS_DEVICE_ID")
+    echo "== [ios $IOS_DEVICE_ID] PASSED =="
+  else
+    FAILED+=("ios:$IOS_DEVICE_ID")
+    echo "== [ios $IOS_DEVICE_ID] FAILED (rc=$ios_rc) ==" >&2
+  fi
+fi
 
 echo
 echo "============================================================"
