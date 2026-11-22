@@ -40,11 +40,13 @@
 #        устройство, в отличие от эмулятора, НЕ имеет алиаса 10.0.2.2 —
 #        поэтому тест получает хост 'localhost' через
 #        --dart-define=E2E_EMULATOR_HOST, см. integration_test/auth_e2e_test.dart);
-#      - `flutter test integration_test/auth_e2e_test.dart -d <serial>` с теми
-#        же параметрами, что и CI-джоба e2e-android (--dart-define=
-#        RUN_EMULATOR_TESTS=true, --timeout 300s);
-#      - `adb shell pm clear com.example.closers` + create_buttons_e2e_test
-#        (как в CI: тесту нужен чистый локальный Isar -> экран логина).
+#      - ОДИН запуск ОБЕИХ e2e-сьютов через объединённый entrypoint
+#        integration_test/device_farm_e2e_test.dart (--dart-define=
+#        RUN_EMULATOR_TESTS=true --dart-define=E2E_EMULATOR_HOST=...,
+#        --timeout 300s). Один инсталл на устройство: на iOS reinstall
+#        сбрасывает доверие developer-профиля, поэтому вторая установка
+#        между сьютами недопустима; pm clear больше не нужен —
+#        create_buttons сбрасывает Isar сам внутри теста.
 #      Результат (pass/fail) собирается по каждому устройству.
 #   5. FILTER=<plain-name> — передаётся во flutter test как --plain-name
 #      (запуск одного сценария вместо всего набора).
@@ -328,27 +330,19 @@ for serial in "${TARGETS[@]}"; do
   "$ADB" -s "$serial" reverse "tcp:$AUTH_PORT" "tcp:$AUTH_PORT"
   "$ADB" -s "$serial" reverse "tcp:$DB_PORT" "tcp:$DB_PORT"
 
+  # ОБА сьюта одним процессом = ОДНА установка приложения на устройство
+  # (инсталл между сьютами на iOS сбросил бы доверие developer-профиля;
+  # на Android это просто вдвое быстрее). create_buttons сбрасывает Isar
+  # сам внутри теста, auth использует память + эмуляторы и не зависит от
+  # локального состояния устройства — pm clear не нужен ни одному из них.
   rc=0
-  echo "== [$serial] Running auth e2e tests =="
-  flutter test integration_test/auth_e2e_test.dart \
+  echo "== [$serial] Running merged device-farm e2e (create_buttons + auth) =="
+  flutter test integration_test/device_farm_e2e_test.dart \
     -d "$serial" \
     --dart-define=RUN_EMULATOR_TESTS=true \
     --dart-define=E2E_EMULATOR_HOST="$EMULATOR_HOST" \
     --timeout "$TEST_TIMEOUT" \
     ${extra_filter[@]+"${extra_filter[@]}"} || rc=$?
-
-  # create_buttons_e2e_test сбрасывает своё состояние сам (удаляет файлы Isar
-  # в test'е — uninstall на iOS сбрасывает доверие профиля разработчика).
-  # pm clear оставляем как гигиену (чистит и другие кэши), но тест корректен
-  # и без него.
-  if [ "$rc" -eq 0 ] && [ -z "${FILTER:-}" ]; then
-    echo "== [$serial] Running create-buttons e2e tests =="
-    "$ADB" -s "$serial" shell pm clear com.example.closers || true
-    flutter test integration_test/create_buttons_e2e_test.dart \
-      -d "$serial" \
-      --timeout "$TEST_TIMEOUT" \
-      ${extra_filter[@]+"${extra_filter[@]}"} || rc=$?
-  fi
 
   # Чистим reverse-прокси устройства, чтобы не оставлять порты «занятыми»
   # adb-сервером между запусками.
@@ -400,9 +394,12 @@ if [ -n "$IOS_DEVICE_ID" ]; then
   fi
   echo "== [ios] emulators host: $IOS_EMULATOR_HOST =="
 
+  # Один инсталл на оба сьюта: reinstall на iOS сбрасывает доверие
+  # developer-профиля (личный Apple ID) — запускать обе сьюты можно ТОЛЬКО
+  # из одного процесса (integration_test/device_farm_e2e_test.dart).
   ios_rc=0
-  echo "== [ios] Running auth e2e tests =="
-  flutter test integration_test/auth_e2e_test.dart \
+  echo "== [ios] Running merged device-farm e2e (create_buttons + auth) =="
+  flutter test integration_test/device_farm_e2e_test.dart \
     -d "$IOS_DEVICE_ID" \
     --dart-define=RUN_EMULATOR_TESTS=true \
     --dart-define=E2E_EMULATOR_HOST="$IOS_EMULATOR_HOST" \
@@ -413,14 +410,6 @@ if [ -n "$IOS_DEVICE_ID" ]; then
     --dart-define=CLOSERS_DATABASE_URL="http://$IOS_EMULATOR_HOST:$DB_PORT/?ns=$PROJECT" \
     --timeout "$TEST_TIMEOUT" \
     ${extra_filter[@]+"${extra_filter[@]}"} || ios_rc=$?
-
-  if [ "$ios_rc" -eq 0 ] && [ -z "${FILTER:-}" ]; then
-    echo "== [ios] Running create-buttons e2e tests =="
-    flutter test integration_test/create_buttons_e2e_test.dart \
-      -d "$IOS_DEVICE_ID" \
-      --timeout "$TEST_TIMEOUT" \
-      ${extra_filter[@]+"${extra_filter[@]}"} || ios_rc=$?
-  fi
 
   # Screen off на iOS из CLI недоступен (нет публичного lock-API) — экран
   # гаснет сам по таймауту автоблокировки телефона.
