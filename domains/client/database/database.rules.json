@@ -102,9 +102,13 @@
         "$uid": {
           "$iid": {
             ".validate": "
-            	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
-            	&& newData.child('status').val() == 'pending'
+            	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status'])
             	&& newData.child('inviteeId').val() == $uid
+            	&& (newData.child('status').val() == 'pending'
+            		|| newData.child('status').val() == 'approved'
+            		|| newData.child('status').val() == 'declined'
+            		|| newData.child('status').val() == 'accepted'
+            		|| newData.child('status').val() == 'canceled')
             ",
             "approvals": {
               "$voter": {

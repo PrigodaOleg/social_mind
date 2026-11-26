@@ -329,6 +329,19 @@ class FirebaseStorage extends RemoteStorage {
   }
 
   @override
+  Future<bool> saveRawChild(String path, Object? value) async {
+    try {
+      // set() с примитивом: RTDB хранит его как значение листа
+      // (правила проверяют newData.isBoolean()/val() на этом узле).
+      await database.child(path).set(value);
+      return true;
+    } catch (e) {
+      print('saveRawChild error: $e');
+      return false;
+    }
+  }
+
+  @override
   Future<Map<String, dynamic>?> readRaw(String path) async {
     try {
       final snapshot = await database.child(path).get();
