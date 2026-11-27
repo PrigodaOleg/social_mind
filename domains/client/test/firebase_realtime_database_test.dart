@@ -449,6 +449,42 @@ void main() {
       final count = await storage.saveItems({'t-err3': task('t-err3')});
       expect(count, 1);
     });
+
+    test('writes null for map keys removed vs oldItems (unlink reaches RTDB)', () async {
+      // Blocker 1: unlink/removeTask убирает ключ из map-поля; поключевая
+      // запись обязана доносить удаление до RTDB как null.
+      final list = models.TaskList(
+        id: 'tl-1',
+        title: 'list',
+        parents: {'u1': 'User'},
+      );
+      list.tasks['t-1'] = 't-1';
+      final old = models.TaskList(
+        id: 'tl-1',
+        title: 'list',
+        parents: {'u1': 'User', 'u2': 'User'},
+      );
+      old.tasks['t-1'] = 't-1';
+      old.tasks['t-gone'] = 't-gone';
+      old.parents['u2'] = 'User';
+      await storage.saveItems({'tl-1': list}, oldItems: {'tl-1': old});
+      final updates = (mockDb.log.lastWhere((e) => e['method'] == 'update'))['value'] as Map<String, Object?>;
+      expect(updates['models/tl-1/tasks/t-gone'], isNull);
+      expect(updates['models/tl-1/parents/u2'], isNull);
+      expect(updates['models/tl-1/tasks/t-1'], 't-1');
+      expect(updates['models/tl-1/parents/u1'], 'User');
+    });
+
+    test('empty map with oldItems diffs deletions instead of skipping', () async {
+      // Пустой map после unlink последней связи: раньше поле пропускалось
+      // вовсе, мёртвые ключи оставались в RTDB.
+      final list = models.TaskList(id: 'tl-2', title: 'l2');
+      final old = models.TaskList(id: 'tl-2', title: 'l2');
+      old.tasks['t-gone'] = 't-gone';
+      await storage.saveItems({'tl-2': list}, oldItems: {'tl-2': old});
+      final updates = (mockDb.log.lastWhere((e) => e['method'] == 'update'))['value'] as Map<String, Object?>;
+      expect(updates['models/tl-2/tasks/t-gone'], isNull);
+    });
   });
 
   group('FirebaseStorage deleteItems', () {

@@ -115,50 +115,66 @@
             // правилом не ограничена: цепочка Domain -> Project -> TaskList ->
             // Task проверяется этим же правилом на каждом уровне; новые уровни
             // добавляются строками в таблицу.
+            // !newData.exists(): null-запись (удаление ключа связи) обязана
+            // проходить - unlink удаляет ОБЕ стороны ссылки в одной пачке, и
+            // проверка бэклинка/таблицы типов на null всегда ложна (ребёнок
+            // уже не ссылается на родителя в итоговом дереве). Для записи
+            // значения (не null) проверка полная.
             ".validate": "
-              newData.parent().parent().parent().hasChild($pid)
-              && (
-                (newData.parent().parent().parent().child($pid).hasChild('children')
-                 && newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
-                || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
-                     && newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid))
-                || (newData.parent().parent().parent().child($pid).hasChild('tasks')
-                     && newData.parent().parent().parent().child($pid).child('tasks').hasChild($mid))
-                || (newData.parent().parent().parent().child($pid).hasChild('contactList')
-                     && newData.parent().parent().parent().child($pid).child('contactList').hasChild($mid))
-              )
-              && (
-                (newData.val() == 'User'
-                 && (newData.parent().parent().child('type').val() == 'Domain'
-                     || newData.parent().parent().child('type').val() == 'TaskList'
-                     || newData.parent().parent().child('type').val() == 'ContactList'))
-                || (newData.val() == 'Domain'
-                 && (newData.parent().parent().child('type').val() == 'TaskList'
-                     || newData.parent().parent().child('type').val() == 'Task'
-                     || newData.parent().parent().child('type').val() == 'Project'))
-                || (newData.val() == 'Project'
-                 && newData.parent().parent().child('type').val() == 'TaskList')
-                || (newData.val() == 'TaskList'
-                 && newData.parent().parent().child('type').val() == 'Task')
+              !newData.exists()
+              || (
+                newData.parent().parent().parent().hasChild($pid)
+                && (
+                  (newData.parent().parent().parent().child($pid).hasChild('children')
+                   && newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
+                       && newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('tasks')
+                       && newData.parent().parent().parent().child($pid).child('tasks').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('contactList')
+                       && newData.parent().parent().parent().child($pid).child('contactList').hasChild($mid))
+                )
+                && (
+                  (newData.val() == 'User'
+                   && (newData.parent().parent().child('type').val() == 'Domain'
+                       || newData.parent().parent().child('type').val() == 'TaskList'
+                       || newData.parent().parent().child('type').val() == 'ContactList'))
+                  || (newData.val() == 'Domain'
+                   && (newData.parent().parent().child('type').val() == 'TaskList'
+                       || newData.parent().parent().child('type').val() == 'Task'
+                       || newData.parent().parent().child('type').val() == 'Project'))
+                  || (newData.val() == 'Project'
+                   && newData.parent().parent().child('type').val() == 'TaskList')
+                  || (newData.val() == 'TaskList'
+                   && newData.parent().parent().child('type').val() == 'Task')
+                )
               )
             "
           }
         },
         "children": {
           "$chid": {
+          	// !newData.exists(): null-удаление ключа связи (см. parents/$pid).
           	".validate": "
-          		newData.parent().parent().parent().hasChild($chid)
-            	&& newData.parent().parent().parent().child($chid).hasChild('parents')
-            	&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          		!newData.exists()
+          		|| (
+          			newData.parent().parent().parent().hasChild($chid)
+            		&& newData.parent().parent().parent().child($chid).hasChild('parents')
+            		&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          		)
           	"
         	}
         },
         "domainsIds": {
           "$did": {
+          	// !newData.exists(): null-удаление ключа связи (см. parents/$pid).
           	".validate": "
-          		newData.parent().parent().parent().hasChild($did)
-            	&& newData.parent().parent().parent().child($did).hasChild('parents')
-            	&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          		!newData.exists()
+          		|| (
+          			newData.parent().parent().parent().hasChild($did)
+            		&& newData.parent().parent().parent().child($did).hasChild('parents')
+            		&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          		)
           	"
         	}
         }

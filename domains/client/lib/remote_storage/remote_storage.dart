@@ -57,7 +57,10 @@ abstract class RemoteStorage {  // todo: abstract?
     return items;
   }
   
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  // oldItems - база ребейза (состояние моделей до окна синхронизации): по ней
+  // транспорт считает diff map-полей и пишет null по исчезнувшим ключам
+  // (unlink/removeTask обязаны доезжать до удаленного хранилища).
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
     return 0;
   }
 

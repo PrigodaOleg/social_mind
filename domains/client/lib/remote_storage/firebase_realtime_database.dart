@@ -141,7 +141,7 @@ class FirebaseStorage extends RemoteStorage {
   }
   
   @override
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
     // https://firebase.google.com/docs/database/flutter/read-and-write
     // 15.12.2024
     // Тут надо не забыть обрабатывать ошибки связи с базой, ошибки прав доступа или правил работы с объектами.
@@ -165,34 +165,41 @@ class FirebaseStorage extends RemoteStorage {
     // 20.10.2025
     // Попробуем писать простые поля и списки по отдельности
 
-    // NB: объявлена вне try, чтобы catch мог различить состав пачки при
-    // диагностике отказов правил.
-    Map<String, Object?> updates = {};
     try {
+      final Map<String, Object?> updates = {};
       for (dynamic item in items.values) {
         if (item is Model) {
+          final Model? oldModel = oldItems[item.id];
           for (MapEntry<String, dynamic> field in item.toJson().entries) {
-            // Пустые Map-поля (children/parents и т.п.) НЕ пишем: update()
-            // превращает {} в null и УДАЛЯЕТ существующий узел - так
-            // частичная запись модели (rename) стирала связи, из-за чего
-            // следующие записи отвергались правилами (e2e acquaintance).
-            if (field.value is Map && (field.value as Map).isEmpty) {
+            // Пустые Map-поля (children/parents и т.п.) НЕ пишем узлом:
+            // update() превращает {} в null и УДАЛЯЕТ существующий узел. Но
+            // и просто пропускать их нельзя: удаление ключа связи (unlink,
+            // removeTask) обязано доезжать до RTDB. Поэтому по каждому
+            // map-полю считаем diff с oldItems (база ребейза - состояние
+            // модели до этого окна синхронизации): ключи, исчезнувшие из
+            // map, пишем как null (удаление узла ключа), присутствующие -
+            // поключево (узел целиком затирал ключи параллельного писца).
+            // Без oldItems (старые вызовы, test-storages) diff невозможен -
+            // пропускаем поле.
+            if (field.value is Map) {
+              final Map<dynamic, dynamic> newMap = field.value as Map;
+              final Map<dynamic, dynamic>? oldMap = oldModel == null
+                  ? null
+                  : (oldModel.toJson()[field.key] as Map?);
+              for (final key in oldMap?.keys ?? const <dynamic>[]) {
+                if (!newMap.containsKey(key)) {
+                  updates['models/${item.id}/${field.key}/$key'] = null;
+                }
+              }
+              newMap.forEach((key, value) {
+                updates['models/${item.id}/${field.key}/$key'] = value;
+              });
               continue;
             }
             if (field.value is List) {
               for (String value in field.value) {
                 updates['models/${item.id}/${field.key}/$value'] = '';
               }
-            }
-            else if (field.value is Map) {
-              // Поключевая запись map-полей связей (children/parents/tasks/...):
-              // запись узла ЦЕЛИКОМ затирала ключи, добавленные параллельным
-              // писцом (e2e acquaintance: пачка сканера перезаписала children
-              // домена без задачи инициатора -> у задачи пропал бэклинк ->
-              // следующая пачка отвергалась правилом parents/$pid).
-              (field.value as Map).forEach((key, value) {
-                updates['models/${item.id}/${field.key}/$key'] = value;
-              });
             }
             else {
               updates['models/${item.id}/${field.key}'] = field.value;

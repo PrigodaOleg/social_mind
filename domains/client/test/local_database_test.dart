@@ -322,5 +322,68 @@ void main() async {
       storage.clearHistoryQueueHead();
     });
 
+    test('full sync cycle: base advances to sent state after clear', () async {
+      // Blocker 2 (ревью): после success-path (storeItems слитого состояния +
+      // clear) базой следующего окна должно быть отправленное/слитое
+      // состояние, а не pre-rebase (иначе второй раунд давал ложный
+      // конфликт -> rollback -> потеря правок).
+      storage = await resetStorage();
+
+      // Окно 1: правка M1 -> M2, отправка, success-path storeItems + clear.
+      final m1 = User(name: 'm1');
+      await storage.storeItem(m1);
+      final m2 = User.fromJson(m1.toJson())..registryId = 'reg-m2';
+      await storage.storeItem(m2);
+      // Ребейз/отправка: getNext возвращает базу M1.
+      final base1 = storage.getNextItemsFromHistoryQueue();
+      expect(base1[m1.id], m1);
+      // Success-path: слитое состояние (здесь = m2) перезаписывает строку
+      // пакета пачки, clear продвигает базу на него.
+      await storage.storeItems({m2.id: m2});
+      storage.clearHistoryQueueHead();
+
+      // Окно 2: правка M2 -> M3. База обязана быть M2 (отправленное
+      // состояние), а не M1.
+      final m3 = User.fromJson(m2.toJson())..registryId = 'reg-m3';
+      await storage.storeItem(m3);
+      final base2 = storage.getNextItemsFromHistoryQueue();
+      expect(base2[m2.id], m2);
+      storage.clearHistoryQueueHead();
+    });
+
+    test('collision round: base stays pre-change, then advances to merged state', () async {
+      // Коллизионный раунд (blocker-2 трасса ревью): getNext до ребейза
+      // возвращает ДО-изменения состояние; после неудачи и повторного
+      // getNext (без clear) - ту же базу; success-path storeItems слитого
+      // состояния + clear делает слитое состояние базой следующего окна.
+      storage = await resetStorage();
+
+      final m1 = User(name: 'c1');
+      await storage.storeItem(m1);
+      final m2 = User.fromJson(m1.toJson())..registryId = 'reg-c1-v2';
+      await storage.storeItem(m2);
+
+      // Первый getNext - база M1 (до изменения).
+      final base1 = storage.getNextItemsFromHistoryQueue();
+      expect(base1[m1.id], m1);
+      // Повторный getNext до clear (попытка отправки в цикле do-while) -
+      // та же база (неразрушающее чтение).
+      final base1again = storage.getNextItemsFromHistoryQueue();
+      expect(base1again[m1.id], m1);
+
+      // Success-path: слитое состояние R (rename пережил ребейз) + clear.
+      final merged = User.fromJson(m2.toJson())..registryId = 'reg-c1-merged';
+      await storage.storeItems({merged.id: merged});
+      storage.clearHistoryQueueHead();
+
+      // Следующее окно: база = слитое состояние, НЕ pre-rebase M2-до-ребейза
+      // и не M1. Правка от слитого состояния видит корректную базу.
+      final m4 = User.fromJson(merged.toJson())..registryId = 'reg-c1-v3';
+      await storage.storeItem(m4);
+      final base2 = storage.getNextItemsFromHistoryQueue();
+      expect(base2[merged.id]?.registryId, 'reg-c1-merged');
+      storage.clearHistoryQueueHead();
+    });
+
   });
 }

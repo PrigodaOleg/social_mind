@@ -754,7 +754,10 @@ class Repository {
       }
       remoteRegistries = _buildTransactions(remoteRegistries, remoteUpdates, originatorId);
       try {
-        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())));
+        // oldItems - база ребейза (состояние до окна): транспорта считает по
+        // ней diff map-полей, удаленные ключи связей доезжают как null
+        // (blocker-1 ревью).
+        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())), oldItems: oldItems.cast<String, Model>());
         // Залилось
         localRegistries = remoteRegistries;
         if (localUpdates.isNotEmpty) _localStorage.storeItems({...localUpdates, ...localRegistries});
@@ -1399,7 +1402,7 @@ Uint8List? getImage(String name) {
   // Сохраняем модели в их удаленные хранилища. Каждая пачка кластеризуется
   // по родителю, и каждая пачка пишется ровно в одно хранилище - то, которое
   // указано в поле storageKey родителя.
-  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries) async {
+  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries, {Map<String, Model> oldItems = const {}}) async {
     int count = 0;
     Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
     // RTDB update - одна атомарная мультилокационная запись: правила требуют,
@@ -1435,7 +1438,7 @@ Uint8List? getImage(String name) {
       }
     }
     for (var storageEntry in updatesByStorage.entries) {
-      count += await storageEntry.key.saveItems(storageEntry.value);
+      count += await storageEntry.key.saveItems(storageEntry.value, oldItems: oldItems);
     }
     // Реестры, чей родитель не среди items и неизвестен локально (некому их
     // маршрутизировать), пишем в хранилище пользователя.

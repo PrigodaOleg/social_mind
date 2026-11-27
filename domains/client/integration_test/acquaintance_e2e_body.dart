@@ -143,7 +143,13 @@ class MemoryLocalStorage extends LocalStorage {
 
   @override
   void clearHistoryQueueHead() {
-    historyQueue.clear();
+    // Зеркало IsarStorage (blocker-2 ревью): слитое/отправленное состояние
+    // становится базой следующего окна, а не пустой базой - иначе второй
+    // раунд синхронизации давал ложный конфликт и rollback терял правки.
+    for (final id in modelsMap.keys) {
+      final model = modelsMap[id];
+      if (model != null) historyQueue[id] = model;
+    }
   }
 }
 
