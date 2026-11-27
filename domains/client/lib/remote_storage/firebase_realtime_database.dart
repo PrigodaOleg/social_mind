@@ -167,10 +167,17 @@ class FirebaseStorage extends RemoteStorage {
 
     try {
       Map<String, Object?> updates = {};
-      
+
       for (dynamic item in items.values) {
         if (item is Model) {
           for (MapEntry<String, dynamic> field in item.toJson().entries) {
+            // Пустые Map-поля (children/parents и т.п.) НЕ пишем: update()
+            // превращает {} в null и УДАЛЯЕТ существующий узел - так
+            // частичная запись модели (rename) стирала связи, из-за чего
+            // следующие записи отвергались правилами (e2e acquaintance).
+            if (field.value is Map && (field.value as Map).isEmpty) {
+              continue;
+            }
             if (field.value is List) {
               for (String value in field.value) {
                 updates['models/${item.id}/${field.key}/$value'] = '';
@@ -199,6 +206,7 @@ class FirebaseStorage extends RemoteStorage {
       }
       await database.update(updates);
     } on FirebaseException catch (e) {
+      print('saveItems error (${e.code}): ${e.message}');
       switch (e.code) {
         case 'permission-denied':
           // Отказано в доступе.

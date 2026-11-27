@@ -48,34 +48,35 @@ OPERATIONS = [
     ('read_registry_metadata', 'GET', 'registries/r1/metadata', None),
     ('read_registry_transactions', 'GET', 'registries/r1/transactions', None),
     ('create_registry', 'PATCH', '',
-     {'registries/r1/metadata': {'id': 'r1'}}),
+     {'registries/r1/metadata': {'id': 'r1', 'parentId': 'p1'}}),
     ('create_first_model_with_transaction', 'PATCH', '',
-     {'models/m1': {'id': 'm1', 'registryId': 'r1'},
+     {'models/m1': {'id': 'm1', 'type': 'User', 'registryId': 'r1'},
       'registries/r1/lastIdx': 0,
       'registries/r1/transactions/0': {
           'id': '0', 'prevId': '', 'originatorId': 'u1',
-          'changes': {'m1': True}}}),
+          'changes': {'m1': ''}}}),
     ('append_transaction_and_model', 'PATCH', '',
-     {'models/m2': {'id': 'm2', 'registryId': 'r1'},
+     {'models/m2': {'id': 'm2', 'type': 'User', 'registryId': 'r1'},
       'registries/r1/lastIdx': 1,
       'registries/r1/transactions/1': {
           'id': '1', 'prevId': '0', 'originatorId': 'u1',
-          'changes': {'m2': True}}}),
+          'changes': {'m2': ''}}}),
     ('link_child_model', 'PATCH', '',
      {'registries/r1/lastIdx': 2,
       'registries/r1/transactions/2': {
           'id': '2', 'prevId': '1', 'originatorId': 'u1',
-          'changes': {'m1': True, 'c1': True}},
-      'models/c1': {'id': 'c1', 'registryId': 'r1',
-                    'parents': {'m1': True}},
-      'models/m1/children/c1': True}),
+          'changes': {'m2': '', 'c1': ''}},
+      # User -> TaskList (как в клиенте: me.linkTo(newList) через children)
+      'models/c1': {'id': 'c1', 'type': 'TaskList',
+                    'parents': {'m2': 'User'}},
+      'models/m2/children/c1': 'TaskList'}),
     ('update_model_field', 'PATCH', '',
      {'registries/r1/lastIdx': 3,
       'registries/r1/transactions/3': {
           'id': '3', 'prevId': '2', 'originatorId': 'u1',
-          'changes': {'m1': True}},
-      'models/m1/field1': 'value1'}),
-    ('delete_model', 'PATCH', '', {'models/m1': None}),
+          'changes': {'m2': ''}},
+      'models/m2/field1': 'value1'}),
+    ('delete_model', 'PATCH', '', {'models/m2': None}),
 ]
 
 

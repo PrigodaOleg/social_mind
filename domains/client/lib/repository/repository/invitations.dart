@@ -245,7 +245,17 @@ class InvitationService {
     );
     domain.participantsIds.addAll([me.id, otherUserId]);
     me.domainsIds.add(domain.id);
-    await _repo.saveModels([domain, me]);
+    // Домен линкуется к создателю: правило RTDB models/$mid/domainsIds/$did
+    // требует, чтобы домен $did в ТОЙ ЖЕ записи имел parents/$mid (запись
+    // domainsIds у юзера отвергает весь батч [domain, me] - до remote не
+    // доходило ничего, знакомство застревало: у B не появлялся общий домен).
+    domain.link(from: me);
+    me.link(to: domain);
+    // Немедленная отправка: приглашение в домен кладется в инбокс партнера
+    // сразу после этого, и он может прочитать его раньше, чем debounced
+    // запись домена дойдет до remote (тогда acceptDomainInvitation не найдет
+    // домен и вернется за ним на следующем опросе).
+    await _repo.saveModels([domain, me], null, true);
     await _addContact(me.id, otherUserId);
     _repo.updateRegistryWatches();
     return domain;
@@ -341,27 +351,39 @@ class InvitationService {
     }
     // 2. Читаем домен из хранилища и добавляем себе
     final storage2 = _repo.connectedStorages[invitation.storageKey];
-    if (storage2 != null) {
-      final domain = await storage2.getItem(id: invitation.domainId) as Domain?;
-      if (domain != null) {
-        domain.storageKey = invitation.storageKey;
-        // Подтягиваем реестр домена ДО сохранения модели: без него
-        // _getRegistries создаст НОВЫЙ реестр (форк) вместо продолжения
-        // цепочки транзакций создателя домена, и первая же запись в домен
-        // упрётся в коллизию индексов (см. collaboration_emulator_test).
-        if (domain.registryId.isNotEmpty) {
-          final registry = await storage2.readRegistry(domain.registryId);
-          if (registry != null) {
-            await _repo.localStorage.storeItems({registry.id!: registry});
-          }
-        }
-        await _repo.saveModel(domain);
-        if (!me.domainsIds.contains(domain.id)) me.domainsIds.add(domain.id);
-        await _repo.saveModel(me);
-        _repo.updateRegistryWatches();
+    final domain =
+        await storage2?.getItem(id: invitation.domainId) as Domain?;
+    // Домен может быть еще не записан создателем в remote (запись домена -
+    // debounced, а приглашение кладется в инбокс сразу): НЕ отмечаем
+    // принятие и возвращаем null, чтобы следующий опрос повторил попытку.
+    // Иначе приглашение навсегда застрянет "принятым" без домена
+    // (e2e acquaintance: сканер 5 минут опрашивал инбокс, имея локальную
+    // копию в статусе accepted, и не мог присоединиться).
+    if (domain == null || storage2 == null) return null;
+    domain.storageKey = invitation.storageKey;
+    // Подтягиваем реестр домена ДО сохранения модели: без него
+    // _getRegistries создаст НОВЫЙ реестр (форк) вместо продолжения
+    // цепочки транзакций создателя домена, и первая же запись в домен
+    // упрётся в коллизию индексов (см. collaboration_emulator_test).
+    if (domain.registryId.isNotEmpty) {
+      final registry = await storage2.readRegistry(domain.registryId);
+      if (registry != null) {
+        await _repo.localStorage.storeItems({registry.id!: registry});
       }
     }
-    // 3. Отмечаем принятие
+    if (!me.domainsIds.contains(domain.id)) me.domainsIds.add(domain.id);
+    // Линкуем домен и юзера взаимно и пишем ОДНОЙ атомарной записью: правило
+    // RTDB models/$mid/domainsIds/$did требует у домена parents/$mid, а
+    // models/$mid/parents/$did - обратную ссылку domainsIds на юзера.
+    // Раздельные saveModel отвергались правилами (в записи юзера домена нет,
+    // в записи домена - юзера с обратной ссылкой): domainsIds юзера
+    // отвергался на каждом sync-цикле, юзер и его реестр навсегда
+    // застревали локальными (e2e acquaintance, сторона сканера).
+    domain.link(from: me);
+    me.link(to: domain);
+    await _repo.saveModels([domain, me], null, true);
+    _repo.updateRegistryWatches();
+    // 3. Отмечаем принятие - ТОЛЬКО после успешного получения домена
     invitation.status = InvitationStatus.accepted;
     await _repo.saveModel(invitation);
     await _putInvitationAtPath('${invitation.id}', invitation);

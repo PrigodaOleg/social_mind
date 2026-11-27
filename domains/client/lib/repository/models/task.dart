@@ -56,7 +56,13 @@ class Task extends Model {
     DateTime? dueAt,
     DateTime? completedAt
   }) {
-    return Task(
+    // Связи (parents/children) переносятся: маршрутизация синхронизации
+    // (Repository._getParent -> кластер домена) идет по parents, и копия без
+    // связей писалась как сирота в хранилище юзера, а не домена - вторая
+    // сторона никогда не видела завершение задачи (e2e acquaintance).
+    // copyWith используется продуктом (TaskListBloc._onComplete), поэтому
+    // чинится здесь, а не в месте вызова.
+    final copy = Task(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
@@ -67,6 +73,9 @@ class Task extends Model {
       dueAt: dueAt ?? this.dueAt,
       completedAt: completedAt ?? this.completedAt,
     );
+    copy.parents.addAll(this.parents);
+    copy.children.addAll(this.children);
+    return copy;
   }
 
   @override

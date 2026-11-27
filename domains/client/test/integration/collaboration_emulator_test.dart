@@ -229,6 +229,9 @@ void main() {
       task.link(from: domain);
       domain.link(to: task);
       await repoA.saveModels([task, domain], null, true);
+      // immediate-запись будит таймер синхронизации, но не ждет ее: без
+      // явного прогона чтение B гонится с асинхронным _delayedSync.
+      await repoA.runSyncForTest();
 
       // B syncs and sees the task (deterministic pull, not realtime streams).
       final seen = await repoB.getModelNow<Task>(task.id);
@@ -300,6 +303,9 @@ void main() {
           reason: 'A must accept the invitation sent by B');
       final domain = domains.first;
       expect(domain.participantsIds, containsAll([userA.id, userB.id]));
+      // createMutualDomain зовет saveModels(immediate: true), но immediate
+      // лишь будит таймер синхронизации, не ждет ее - прогоняем явно.
+      await repoA.runSyncForTest();
 
       // B sees the shared domain too. The domain lands in the remote storage
       // asynchronously (debounced sync), so poll for it.
@@ -314,6 +320,23 @@ void main() {
       }
       expect(seen, isNotNull, reason: 'B must see the shared domain');
       expect(seen!.participantsIds, containsAll([userA.id, userB.id]));
+
+      // A renames the shared domain; B must see the new title through the
+      // remote model. rename идет через copyWith (продуктовый путь) - копия
+      // обязана нести parents/children, иначе запись теряет маршрутизацию.
+      final renamed = domain.copyWith(title: 'renamed-by-test');
+      await repoA.saveModels([renamed], null, true);
+      await repoA.runSyncForTest();
+      String? remoteTitle;
+      for (var i = 0; i < 100 && remoteTitle != 'renamed-by-test'; i++) {
+        final item = await remoteB.getItem(id: domain.id) as Domain?;
+        remoteTitle = item?.title;
+        if (remoteTitle != 'renamed-by-test') {
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+      }
+      expect(remoteTitle, 'renamed-by-test',
+          reason: 'B must see the domain rename');
     });
   });
 }

@@ -784,7 +784,9 @@ class Repository {
         // Тогда ситуация отсутствия реестра будет только в том случае, если пользователь или домен только что создан.
         // Создаем новый реестр с нулевой транзакцией.
         ?? Registry(parentId: item.id);
-      // Линкуем реестр к контейнеру и сохраняем в локальное хранилище
+      // Линкуем реестр к контейнеру и сохраняем в локальное хранилище.
+      // Реестры существуют ТОЛЬКО у контейнеров (User/Domain) — бизнес-правило
+      // проекта; дочерние модели фиксируются в реестре своего родителя.
       if (item is Domain) item.registryId = registry.id!;
       if (item is User) item.registryId = registry.id!;
       registries[registry.id!] = registry;
@@ -1389,6 +1391,16 @@ Uint8List? getImage(String name) {
   Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries) async {
     int count = 0;
     Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
+    // RTDB update - одна атомарная мультилокационная запись: правила требуют,
+    // чтобы кросс-ссылки моделей (domainsIds/parents/children) и изменения
+    // реестров (changes/$chid -> models/$chid) указывали на модели из ТОЙ ЖЕ
+    // записи. Поэтому все кластеры одного хранилища сливаются в ОДИН
+    // saveItems-вызов: разбиение по кластерам роняло каждую запись, где
+    // модель ссылалась на модель другого кластера (saveModels([domain, me])
+    // при знакомстве: юзер получает domainsIds -> домен, который шел
+    // отдельным вызовом, - обе записи отвергались правилами, и модели
+    // навсегда застревали локальными).
+    final updatesByStorage = <RemoteStorage, Map<String, dynamic>>{};
     for (var parentEntry in parentItems.entries) {
       final parent = parentEntry.key;
       var storage = _storageForModel(parent);
@@ -1399,15 +1411,32 @@ Uint8List? getImage(String name) {
         print('No remote storage configured for ${parent.runtimeType} ${parent.id}'); // todo: показывать ошибку пользователю
         continue;
       }
-      count += await storage.saveItems({...parentEntry.value, ...registries});
+      final bucket =
+          updatesByStorage.putIfAbsent(storage, () => <String, dynamic>{});
+      bucket.addAll(parentEntry.value);
+      // Реестр едет строго с моделями своего родителя: правило
+      // registries/$rid/transactions/$tidx/changes/$chid требует модели
+      // $chid в той же записи.
+      for (var registryEntry in registries.entries) {
+        if (registryEntry.value.parentId == parent.id) {
+          bucket[registryEntry.key] = registryEntry.value;
+        }
+      }
     }
-    // Реестры, чей родитель не среди items (например, личный реестр пользователя),
-    // пишем в хранилище пользователя.
+    for (var storageEntry in updatesByStorage.entries) {
+      count += await storageEntry.key.saveItems(storageEntry.value);
+    }
+    // Реестры, чей родитель не среди items и неизвестен локально (некому их
+    // маршрутизировать), пишем в хранилище пользователя.
     final orphanRegistries = <String, Registry>{};
     for (var registryEntry in registries.entries) {
       if (items.containsKey(registryEntry.value.parentId)) continue;
       final parentModel = _localStorage.getItem(id: registryEntry.value.parentId ?? '');
-      if (parentModel != null && items.containsKey(parentModel.id)) continue;
+      // Родитель известен локально: его реестр либо ушел вместе с кластером
+      // родителя выше, либо новых транзакций не имеет. Перезапись уже
+      // закоммиченной транзакции запрещена правилами (index == lastIdx + 1) -
+      // она уронила бы весь батч.
+      if (parentModel != null) continue;
       orphanRegistries[registryEntry.key] = registryEntry.value;
     }
     if (orphanRegistries.isNotEmpty) {

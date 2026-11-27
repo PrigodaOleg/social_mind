@@ -22,7 +22,7 @@ class User extends Model {
       : name = json['name'] as String,
         domainsIds = List<String>.from(json['domainsIds'] is List
             ? json['domainsIds']
-            : json['domainsIds']?.keys ?? []),
+            : (json['domainsIds'] as Map?)?.keys ?? []),
         registryId = (json['registryId'] ?? '') as String,
         avatarUrl = (json['avatarUrl'] ?? '') as String,
         firstName = (json['firstName'] ?? '') as String,
