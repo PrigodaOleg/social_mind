@@ -97,8 +97,15 @@ class MemoryLocalStorage extends LocalStorage {
   Future<int> storeItems(Map<String, dynamic> items) async {
     for (final item in items.values) {
       if (item is Model) {
+        // База для 3-way ребейза на коллизии: состояние ДО изменения (так же
+        // снимает head-пакет IsarStorage). Для новой модели база - само
+        // создание. putIfAbsent: база окна синхронизации - первое состояние,
+        // повторные записи в окне ее не затирают (иначе базой ребейза станет
+        // само новое состояние, ребейз сочтет поля неизмененными локально и
+        // приоритет отдаст remote - локальные правки терялись: rename домена
+        // не доезжал до второй стороны).
+        historyQueue.putIfAbsent(item.id, () => modelsMap[item.id] ?? item);
         modelsMap[item.id] = item;
-        historyQueue[item.id] = item;
       }
       if (item is Registry) registriesMap[item.id!] = item;
     }
@@ -128,13 +135,16 @@ class MemoryLocalStorage extends LocalStorage {
 
   @override
   Map<String, dynamic> getNextItemsFromHistoryQueue() {
-    final items = Map<String, dynamic>.from(historyQueue);
-    historyQueue.clear();
-    return items;
+    // Неразрушающее чтение head-пакета (как в IsarStorage): пакет живет до
+    // clearHistoryQueueHead после успешной отправки, повторный getNext до
+    // того вернет ту же базу ребейза.
+    return Map<String, dynamic>.from(historyQueue);
   }
 
   @override
-  void clearHistoryQueueHead() {}
+  void clearHistoryQueueHead() {
+    historyQueue.clear();
+  }
 }
 
 class TestRepository extends Repository {

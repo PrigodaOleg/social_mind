@@ -256,19 +256,57 @@ class IsarStorage extends LocalStorage {
     if (item is Model) {
       String? serializedItem = jsonEncode(item);
       isar.write((isar) {
+        final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
+        final headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+        // Текущее состояние ДО записи - база для 3-way ребейза (_rebaseModel).
+        final ModelBox? oldRow = isar.modelBoxs.where()
+            .modelIdEqualTo(item.id)
+            .historyIdxEqualTo(0)
+            .findFirst();
+        // Есть ли уже строка модели в head-пакете (база снята ранее в этом окне).
+        final bool hasRowAtHead = oldRow != null &&
+            isar.modelBoxs.where()
+                .modelIdEqualTo(item.id)
+                .historyIdxEqualTo(headIdx.value)
+                .findFirst() != null;
+        // Снимок СТАРОГО состояния в head-пакет: getNextItemsFromHistoryQueue
+        // читает строки head-пакета как oldItems для ребейза. Без снимка базой
+        // ребейза становится само новое состояние -> ребейз считает поля
+        // "неизмененными локально" и отдает приоритет remote - локальные правки
+        // терялись (e2e acquaintance: rename домена не доезжал до второй
+        // стороны).
+        if (oldRow != null && !hasRowAtHead) {
+          isar.modelBoxs.put(
+            ModelBox()
+            ..id = isar.modelBoxs.autoIncrement()
+            ..modelId = item.id
+            ..historyIdx = headIdx.value
+            ..modelData = oldRow.modelData
+          );
+        }
+        // Строка нового состояния. Когда очередь пуста (head == tail), пакет
+        // head занят снимком базы (или строками pull), поэтому новое состояние
+        // пишем в отдельный пакет: getNext берет последнюю строку модели в
+        // пакете, и новая строка затерла бы базу ребейза.
+        int newIdx = tailIdx.value;
+        if (oldRow != null && headIdx.value == tailIdx.value) {
+          newIdx = tailIdx.value + 1;
+          tailIdx.value = newIdx;
+          isar.historyQueueTailIdxs.put(tailIdx);
+        }
+        isar.modelBoxs.put(
+          ModelBox()
+          ..id = isar.modelBoxs.autoIncrement()
+          ..modelId = item.id
+          ..historyIdx = newIdx
+          ..modelData = serializedItem
+        );
+        // Актуальная копия (historyIdx = 0).
         isar.modelBoxs.put(
           ModelBox()
           ..id = isar.modelBoxs.autoIncrement()
           ..modelId = item.id
           ..historyIdx = 0
-          ..modelData = serializedItem
-        );
-        final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
-        isar.modelBoxs.put(
-          ModelBox()
-          ..id = isar.modelBoxs.autoIncrement()
-          ..modelId = item.id
-          ..historyIdx = tailIdx.value
           ..modelData = serializedItem
         );
       });
@@ -313,14 +351,45 @@ class IsarStorage extends LocalStorage {
       }
     }
     isar.write((isar) {
-      isar.modelBoxs.putAll(rawModels);
-      isar.registryBoxs.putAll(rawRegistry);
       final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
-      final rawHistoricalModels = rawModels.map((e) => e.copyWith(
-        historyIdx: tailIdx.value,
-        id: isar.modelBoxs.autoIncrement())
-      ).toList();
-      isar.modelBoxs.putAll(rawHistoricalModels);
+      final headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+      for (final entry in rawModels) {
+        final ModelBox? oldRow = isar.modelBoxs.where()
+            .modelIdEqualTo(entry.modelId!)
+            .historyIdxEqualTo(0)
+            .findFirst();
+        final bool hasRowAtHead = oldRow != null &&
+            isar.modelBoxs.where()
+                .modelIdEqualTo(entry.modelId!)
+                .historyIdxEqualTo(headIdx.value)
+                .findFirst() != null;
+        // Снимок старого состояния в head - база для 3-way ребейза
+        // (см. комментарий в storeItem).
+        if (oldRow != null && !hasRowAtHead) {
+          isar.modelBoxs.put(
+            ModelBox()
+            ..id = isar.modelBoxs.autoIncrement()
+            ..modelId = entry.modelId
+            ..historyIdx = headIdx.value
+            ..modelData = oldRow.modelData
+          );
+        }
+        // Строка нового состояния в отдельном пакете при пустой очереди
+        // (head == tail), чтобы не затереть базу ребейза в head-пакете.
+        int newIdx = tailIdx.value;
+        if (oldRow != null && headIdx.value == tailIdx.value) {
+          newIdx = tailIdx.value + 1;
+          tailIdx.value = newIdx;
+        }
+        isar.modelBoxs.put(entry.copyWith(
+          historyIdx: newIdx,
+          id: isar.modelBoxs.autoIncrement(),
+        ));
+        // Актуальная копия (historyIdx = 0).
+        isar.modelBoxs.put(entry);
+      }
+      isar.historyQueueTailIdxs.put(tailIdx);
+      isar.registryBoxs.putAll(rawRegistry);
     });
     return rawModels.length + rawRegistry.length;
   }

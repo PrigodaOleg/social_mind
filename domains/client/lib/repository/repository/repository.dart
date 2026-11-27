@@ -981,9 +981,14 @@ class Repository {
         if (localMap.containsKey(field)) {
           // поле изменилось в обоих местах
           if (remoteMap[field] != localMap[field]) {
+            if (oldMap.containsKey(field) && remoteMap[field] == oldMap[field]) {
+              // Remote не менял поле - берем локальное значение.
+              remoteMap[field] = localMap[field];
+              continue;
+            }
             // нужно решить конфликт
             if (remoteMap[field] is Map) {
-              remoteMap[field] = _rebaseMap(remoteMap[field], localMap[field]);
+              remoteMap[field] = _rebaseMap(remoteMap[field], localMap[field], oldMap[field] is Map ? oldMap[field] as Map : null);
             } else if (remoteMap[field] is List) {
               remoteMap[field] = {...remoteMap[field], ...(localMap[field] as List)}.toList();
             } else {
@@ -1000,12 +1005,13 @@ class Repository {
     return FirebaseStorage().models[remoteModel.type]!(remoteMap);
   }
 
-  Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
+  Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap, [Map? oldMap]) {
     final keys = <String>{...remoteMap.keys, ...localMap.keys};
     for (final key in keys) {
       if (remoteMap.containsKey(key) && localMap.containsKey(key)) {
         if (remoteMap[key] is Map && localMap[key] is Map) {
-          final rebasedMap = _rebaseMap(remoteMap[key], localMap[key]);
+          final oldVal = oldMap?[key];
+          final rebasedMap = _rebaseMap(remoteMap[key], localMap[key], oldVal is Map ? oldVal : null);
           if (rebasedMap == null) return null;
           remoteMap[key] = rebasedMap;
         } else if ( remoteMap[key] is List && localMap[key] is List) {
@@ -1013,6 +1019,11 @@ class Repository {
         } else {
           if (remoteMap[key] != localMap[key]) {
             // нужно решить конфликт
+            if (oldMap != null && oldMap.containsKey(key) && remoteMap[key] == oldMap[key]) {
+              // remote не менял значение (совпадает со старым) - берем локальное
+              remoteMap[key] = localMap[key];
+              continue;
+            }
             // todo: пока берем удаленную версию, локальные изменения теряем
             return null;
           }

@@ -9,8 +9,8 @@ import 'package:isar_plus/isar_plus.dart';
 
 void main() async {
 
-  late final IsarStorage storage;
-  
+  late IsarStorage storage;
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
@@ -37,6 +37,17 @@ void main() async {
   tearDownAll(() {
     storage.isar.close(deleteFromDisk: true); // Assuming you have a close method in your storage class
   });
+
+  // Полный сброс хранилища: clearHistoryQueueHead очищает только head-пакет
+  // очереди истории, строки прошлых тестов на других индексах остаются и
+  // искажают семантику очереди. Тесты истории очереди должны начинаться
+  // с чистой базы.
+  Future<IsarStorage> resetStorage() async {
+    await storage.isar.close(deleteFromDisk: true);
+    final fresh = IsarStorage();
+    await fresh.init();
+    return fresh;
+  }
 
   group('IsarStorage', () {
 
@@ -229,6 +240,7 @@ void main() async {
     });
 
     test('Check history of one item', () async {
+      storage = await resetStorage();
       storage.clearHistoryQueueHead();
       // Сперва просто пишем и читаем с проверкой истории
       final testItem0 = User(name: 'test_user');
@@ -269,6 +281,7 @@ void main() async {
     });
 
     test('Check history of many items', () async {
+      storage = await resetStorage();
       storage.clearHistoryQueueHead();
       // Сперва просто пишем и читаем с проверкой истории
       final testItem0 = User(name: 'test_user');

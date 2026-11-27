@@ -165,9 +165,10 @@ class FirebaseStorage extends RemoteStorage {
     // 20.10.2025
     // Попробуем писать простые поля и списки по отдельности
 
+    // NB: объявлена вне try, чтобы catch мог различить состав пачки при
+    // диагностике отказов правил.
+    Map<String, Object?> updates = {};
     try {
-      Map<String, Object?> updates = {};
-
       for (dynamic item in items.values) {
         if (item is Model) {
           for (MapEntry<String, dynamic> field in item.toJson().entries) {
@@ -182,6 +183,16 @@ class FirebaseStorage extends RemoteStorage {
               for (String value in field.value) {
                 updates['models/${item.id}/${field.key}/$value'] = '';
               }
+            }
+            else if (field.value is Map) {
+              // Поключевая запись map-полей связей (children/parents/tasks/...):
+              // запись узла ЦЕЛИКОМ затирала ключи, добавленные параллельным
+              // писцом (e2e acquaintance: пачка сканера перезаписала children
+              // домена без задачи инициатора -> у задачи пропал бэклинк ->
+              // следующая пачка отвергалась правилом parents/$pid).
+              (field.value as Map).forEach((key, value) {
+                updates['models/${item.id}/${field.key}/$key'] = value;
+              });
             }
             else {
               updates['models/${item.id}/${field.key}'] = field.value;
