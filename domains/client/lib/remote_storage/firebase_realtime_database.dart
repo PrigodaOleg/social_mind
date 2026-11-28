@@ -141,7 +141,7 @@ class FirebaseStorage extends RemoteStorage {
   }
   
   @override
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     // https://firebase.google.com/docs/database/flutter/read-and-write
     // 15.12.2024
     // Тут надо не забыть обрабатывать ошибки связи с базой, ошибки прав доступа или правил работы с объектами.
@@ -169,29 +169,17 @@ class FirebaseStorage extends RemoteStorage {
       final Map<String, Object?> updates = {};
       for (dynamic item in items.values) {
         if (item is Model) {
-          final Model? oldModel = oldItems[item.id];
           for (MapEntry<String, dynamic> field in item.toJson().entries) {
-            // Пустые Map-поля (children/parents и т.п.) НЕ пишем узлом:
-            // update() превращает {} в null и УДАЛЯЕТ существующий узел. Но
-            // и просто пропускать их нельзя: удаление ключа связи (unlink,
-            // removeTask) обязано доезжать до RTDB. Поэтому по каждому
-            // map-полю считаем diff с oldItems (база ребейза - состояние
-            // модели до этого окна синхронизации): ключи, исчезнувшие из
-            // map, пишем как null (удаление узла ключа), присутствующие -
-            // поключево (узел целиком затирал ключи параллельного писца).
-            // Без oldItems (старые вызовы, test-storages) diff невозможен -
-            // пропускаем поле.
+            // Map-поля (children/parents и т.п.) пишем поключево: запись узла
+            // целиком затирала ключи, добавленные параллельным писцом (e2e
+            // acquaintance: пачка сканера перезаписала children домена без
+            // задачи инициатора -> у задачи пропал бэклинк -> следующая пачка
+            // отвергалась правилами parents/$pid). Удаления (unlink,
+            // removeTask)Repository доносит отдельно: tombstones - map
+            // {modelId: {field: {ключи}}} от базы ребейза; транспорт не знает
+            // прежнего состояния моделей.
             if (field.value is Map) {
-              final Map<dynamic, dynamic> newMap = field.value as Map;
-              final Map<dynamic, dynamic>? oldMap = oldModel == null
-                  ? null
-                  : (oldModel.toJson()[field.key] as Map?);
-              for (final key in oldMap?.keys ?? const <dynamic>[]) {
-                if (!newMap.containsKey(key)) {
-                  updates['models/${item.id}/${field.key}/$key'] = null;
-                }
-              }
-              newMap.forEach((key, value) {
+              (field.value as Map).forEach((key, value) {
                 updates['models/${item.id}/${field.key}/$key'] = value;
               });
               continue;
@@ -205,6 +193,13 @@ class FirebaseStorage extends RemoteStorage {
               updates['models/${item.id}/${field.key}'] = field.value;
             }
           }
+          // Tombstones: удалённые ключи map-полей пишутся null (удаление
+          // узла в RTDB).
+          deletions[item.id]?.forEach((field, keys) {
+            for (final key in keys) {
+              updates['models/${item.id}/$field/$key'] = null;
+            }
+          });
         }
         if (item is Registry) {
           updates['registries/${item.id}/metadata'] = item.metadata.toJson();

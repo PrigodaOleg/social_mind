@@ -90,7 +90,7 @@ class FakeRemoteStorage extends RemoteStorage {
   Map<String, Map<String, dynamic>> rawStorage = {};
 
   @override
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     for (final item in items.values) {
       if (item is Registry) {
         if ((item.lastTransactionIndex ?? -1) <= (lastRegistries[item.id]?.lastTransactionIndex ?? -1)) {

@@ -754,10 +754,11 @@ class Repository {
       }
       remoteRegistries = _buildTransactions(remoteRegistries, remoteUpdates, originatorId);
       try {
-        // oldItems - база ребейза (состояние до окна): транспорта считает по
-        // ней diff map-полей, удаленные ключи связей доезжают как null
-        // (blocker-1 ревью).
-        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())), oldItems: oldItems.cast<String, Model>());
+        // Tombstones (удалённые ключи map-полей) считаются здесь, в
+        // repository, по базе ребейза - транспорт получает готовые удаления
+        // и не знает прежнего состояния моделей (blocker-1 ревью, архитектура
+        // 996dc23 переделана на tombstones).
+        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())), deletions: _buildMapDeletions(oldItems.cast<String, Model>(), remoteUpdates));
         // Залилось
         localRegistries = remoteRegistries;
         if (localUpdates.isNotEmpty) _localStorage.storeItems({...localUpdates, ...localRegistries});
@@ -1399,10 +1400,36 @@ Uint8List? getImage(String name) {
     return items;
   }
 
+  // Tombstones для транспорта: удалённые ключи map-полей (unlink/removeTask)
+  // в виде {modelId: {field: {ключи}}}. Считаются здесь, в repository, по
+  // базе ребейза (oldItems - состояние моделей до окна синхронизации из
+  // head-пакета очереди): ключ есть в базе, но исчез из нового состояния -
+  // доносится до удалённого хранилища как удаление. Транспорт прежнего
+  // состояния не знает (архитектурное решение: только repository владеет
+  // историей). Модели, удалённые целиком, обрабатываются deleteItems - здесь
+  // только исчезнувшие ключи выживших моделей.
+  Map<String, Map<String, Set<String>>> _buildMapDeletions(Map<String, Model> oldItems, Map<String, Model> newItems) {
+    final deletions = <String, Map<String, Set<String>>>{};
+    for (final entry in newItems.entries) {
+      final oldModel = oldItems[entry.key];
+      if (oldModel == null) continue;
+      final oldJson = oldModel.toJson();
+      for (final field in entry.value.toJson().entries) {
+        if (field.value is! Map) continue;
+        final newKeys = (field.value as Map).keys.map((k) => k.toString()).toSet();
+        final oldKeys = ((oldJson[field.key] as Map?)?.keys ?? const <String>[]).map((k) => k.toString()).toSet();
+        final removed = oldKeys.difference(newKeys);
+        if (removed.isEmpty) continue;
+        deletions.putIfAbsent(entry.key, () => {})[field.key] = removed;
+      }
+    }
+    return deletions;
+  }
+
   // Сохраняем модели в их удаленные хранилища. Каждая пачка кластеризуется
   // по родителю, и каждая пачка пишется ровно в одно хранилище - то, которое
   // указано в поле storageKey родителя.
-  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     int count = 0;
     Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
     // RTDB update - одна атомарная мультилокационная запись: правила требуют,
@@ -1438,7 +1465,7 @@ Uint8List? getImage(String name) {
       }
     }
     for (var storageEntry in updatesByStorage.entries) {
-      count += await storageEntry.key.saveItems(storageEntry.value, oldItems: oldItems);
+      count += await storageEntry.key.saveItems(storageEntry.value, deletions: deletions);
     }
     // Реестры, чей родитель не среди items и неизвестен локально (некому их
     // маршрутизировать), пишем в хранилище пользователя.

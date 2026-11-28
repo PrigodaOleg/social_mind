@@ -69,7 +69,7 @@ class MockRemoteStorage extends RemoteStorage {
   Map<String, Registry> lastRegistries = {};
   Map<String, dynamic> get lastItems => {...lastModels, ...lastRegistries};
   @override
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     for (final item in items.values.toList().reversed) {
       if (item is Registry) {
         if ((item.lastTransactionIndex ?? -1) <= (lastRegistries[item.id]?.lastTransactionIndex ?? -1)) {
@@ -119,7 +119,7 @@ class DenyingRemoteStorage extends MockRemoteStorage {
   bool deny = false;
 
   @override
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     if (deny) {
       throw RemoteStorageWriteCollision('access denied', 403);
     }
@@ -650,7 +650,7 @@ group('Timer sync error resilience', () {
 
 class ThrowingSaveRemoteStorage extends TrackingRemoteStorage {
   @override
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     throw Exception('saveItems failed');
   }
 }

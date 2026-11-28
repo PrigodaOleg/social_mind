@@ -57,10 +57,11 @@ abstract class RemoteStorage {  // todo: abstract?
     return items;
   }
   
-  // oldItems - база ребейза (состояние моделей до окна синхронизации): по ней
-  // транспорт считает diff map-полей и пишет null по исчезнувшим ключам
-  // (unlink/removeTask обязаны доезжать до удаленного хранилища).
-  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Model> oldItems = const {}}) async {
+  // deletions - tombstones от repository: удалённые ключи map-полей
+  // (unlink/removeTask) в виде {modelId: {field: {ключи}}}. Repository
+  // вычисляет их по базе ребейза; транспорт только доносит удаления до
+  // хранилища и не знает прежнего состояния моделей.
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     return 0;
   }
 
