@@ -1,9 +1,11 @@
+import 'dart:async' show Completer, unawaited;
+import 'dart:io';
 import 'package:closers/local_storage/local_storage.dart';
 import 'package:closers/remote_storage/remote_storage.dart';
 import 'package:closers/repository/repository.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'dart:typed_data';
+import 'package:isar_plus/isar_plus.dart';
 
 class MockLocalStorage extends LocalStorage {
   Map<String, Model> lastModels = {};
@@ -646,11 +648,255 @@ group('Timer sync error resilience', () {
   });
 });
 
+group('Repository full sync scenario', () {
+  // Полный сценарий локальной работы с синхронизацией на реальном IsarStorage:
+  // A) базовая синхронизация домена; B) правки во время синхронизации встают
+  // в очередь и доезжают только следующим циклом (правки НЕ теряются);
+  // D) отказ в доступе -> accessDenied-колбэк, откат локальных правок,
+  // восстановление после снятия флага; C) неразрешимая коллизия слияния ->
+  // mergeConflict-колбэк. Порядок D перед C: после merge-конфликта локальная
+  // база откатывается к remote-версии, и последующая правка без пул-обновления
+  // (реестровые подписки в тесте неактивны) ушла бы в конфликт вместо deny.
+  late IsarStorage storage;
+
+  Future<IsarStorage> freshStorage() async {
+    try {
+      storage.isar.close(deleteFromDisk: true);
+    } catch (_) {}
+    final fresh = IsarStorage();
+    await fresh.init();
+    storage = fresh; // tearDownAll закрывает актуальный инстанс
+    return fresh;
+  }
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'getApplicationDocumentsDirectory') {
+          return '.';
+        }
+        return null;
+      },
+    );
+    // https://github.com/ahmtydn/isar_plus/releases?q=1.2.6&expanded=true
+    if (Platform.isWindows) await Isar.initialize('test/isar_windows_x64.dll');
+    if (Platform.isLinux) await Isar.initialize('test/libisar_linux_x64.so');
+    if (Platform.isMacOS) await Isar.initialize('test/libisar_macos.dylib');
+    storage = IsarStorage();
+    await storage.init();
+  });
+
+  tearDownAll(() async {
+    // close() синхронный (возвращает bool), см. isar_plus 1.2.6.
+    storage.isar.close(deleteFromDisk: true);
+  });
+
+  Future<void> waitFor(bool Function() condition, {String because = 'condition'}) async {
+    final sw = Stopwatch()..start();
+    while (!condition() && sw.elapsedMilliseconds < 10000) {
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+    expect(condition(), isTrue, reason: 'Timed out waiting: $because');
+  }
+
+  test('edits made during a sync stay queued and sync after it completes; conflict and access denied callbacks fire', () async {
+    final localStorage = await freshStorage();
+    final remote = GatedRemoteStorage();
+    final r = Repository(localStorage: localStorage, remoteStorages: {'rs': remote});
+    // Без init() таймера нет (late == true): saveModel(immediate: true)
+    // синхронизирует напрямую, immediate: false - только очередь,
+    // а runSyncForTest() запускает цикл вручную.
+    r.me = User(id: 'me', name: 'me');
+
+    // set me подписывает 'me' на дефолтного слушателя; снимаем эту подписку,
+    // чтобы колбэки получал только адресный слушатель task1.
+    r.removeSyncListener(r.defaultSyncSubscriber);
+
+    final localConflicts = <Map<String, Model>>[];
+    final remoteConflicts = <Map<String, Model>>[];
+    final accessDenied = <Map<String, dynamic>>[];
+    final listenerId = r.addSyncListener(
+      (id, syncedItem) {},
+      (localChanges, remoteChanges) {
+        localConflicts.add(localChanges);
+        remoteConflicts.add(remoteChanges);
+      },
+      (items) {
+        accessDenied.add(items);
+      },
+    );
+
+    // Фаза A: базовая синхронизация домена и задачи.
+    final domain = Domain(id: 'domain1', title: 'Domain 1', originatorId: 'me');
+    final task = Task(id: 'task1', title: 'Task 1', originatorId: 'me');
+    // Родитель задачи - домен: у задачи children=[domain1], у домена
+    // parents=[task1] - _getParent идет по parents вверх до домена.
+    task.link(from: domain);
+    domain.link(to: task);
+    // task3 создается заранее и удаляется во время синхронизации (фаза B).
+    final task3 = Task(id: 'task3', title: 'Task 3', originatorId: 'me');
+    task3.link(from: domain);
+    domain.link(to: task3);
+    r.me.domainsIds.add('domain1');
+    // Немедленная отправка не должна блокировать UI (local-first).
+    // Базовые модели едут без подписки на колбэки (subscriberId null);
+    // task1 подписана на адресного слушателя - только его колбэки и ловим.
+    await r.saveModels([r.me, domain, task3], null, true);
+    await r.saveModel(task, listenerId, true);
+    expect((remote.lastModels['task1'] as Task?)?.title, 'Task 1');
+    expect((remote.lastModels['task3'] as Task?)?.title, 'Task 3');
+    expect(r.outgoingChanges, isEmpty);
+    expect(r.outgoingDeletes, isEmpty);
+
+    // Фаза B: правка задачи начинает синхронизироваться и застревает на
+    // шлюзе - очередь непуста, второй правки в remote еще нет.
+    remote.closeGate();
+    final syncDone = Completer<void>();
+    // Правка в очередь, sync стартует и застревает: не ждем его (saveModel
+    // с immediate дожидался бы синхронизации - в тесте без init() это
+    // дедлок на шлюзе).
+    await r.saveModel(
+      (remote.lastModels['task1'] as Task).copyWith(title: 'Task 1 v2'),
+      listenerId,
+    );
+    unawaited(r.runSyncForTest().whenComplete(syncDone.complete));
+    await waitFor(
+      () => remote.saveItemsCalls.any(
+        (batch) => (batch['task1'] as Task?)?.title == 'Task 1 v2',
+      ),
+      because: 'first edit sync reached the gate',
+    );
+    // Правка в полете: она еще в очереди (очистка после отправки).
+    expect(r.outgoingChanges, hasLength(1));
+    expect(syncDone.isCompleted, false); // sync еще в полете
+
+    // Следующие правки во время синхронизации: новая модель и удаление.
+    final task2 = Task(id: 'task2', title: 'Task 2', originatorId: 'me');
+    task2.link(from: domain);
+    domain.link(to: task2);
+    await r.saveModel(task2, listenerId);
+    expect(r.outgoingChanges, isNotEmpty); // правки ждут окончания sync
+    expect(remote.lastModels['task2'], isNull); // и еще не уехали в remote
+    r.deleteModel(task3);
+    expect(r.outgoingDeletes, isNotEmpty);
+    // Открываем шлюз: застрявшая пачка дотекает, правки из очереди остаются.
+    remote.openGate();
+    await syncDone.future; // sync с застрявшей правкой завершается
+    // Застрявший цикл увозит только свой снапшот (правку task1): правки,
+    // добавленные во время синхронизации, остаются в очереди.
+    expect(r.outgoingChanges, hasLength(1)); // только task2
+    expect(remote.lastModels['task2'], isNull); // task2 еще не уехал
+    expect(remote.deleteItemsCalls, isEmpty); // удаление task3 еще не уехало
+    expect(remote.lastModels['task3'], isNotNull); // task3 еще не удален
+
+    // Следующий цикл: правки из очереди и удаления доезжают до remote.
+    await r.runSyncForTest();
+    expect(r.outgoingChanges, isEmpty);
+    expect(r.outgoingDeletes, isEmpty);
+    expect((remote.lastModels['task2'] as Task?)?.title, 'Task 2');
+    expect(remote.deleteItemsCalls, hasLength(1));
+    expect(remote.deleteItemsCalls.last.containsKey('task3'), isTrue);
+    expect(remote.lastModels['task3'], isNull); // удалена в remote
+
+    // Фаза D: пользователь исключен из домена - транспорт отвечает 403.
+    remote.deny = true;
+    await r.saveModel(
+      (remote.lastModels['task1'] as Task).copyWith(title: 'Task 1 v3'),
+      listenerId,
+      true,
+    );
+    expect(accessDenied, hasLength(1));
+    expect(accessDenied.last['task1'], isA<Task>());
+    // Локальные изменения откачены к последней закоммиченной базе.
+    final rolledBack = await r.getModelNow<Task>('task1');
+    expect(rolledBack?.title, 'Task 1 v2');
+
+    // Восстановление: флаг снят - та же правка проходит без конфликта.
+    remote.deny = false;
+    await r.saveModel(
+      (await r.getModelNow<Task>('task1'))!.copyWith(title: 'Task 1 v3'),
+      listenerId,
+      true,
+    );
+    expect(accessDenied, hasLength(1));
+    expect((remote.lastModels['task1'] as Task?)?.title, 'Task 1 v3');
+
+    // Фаза C: вторая сторона меняет тот же скаляр (title) - неразрешимая
+    // коллизия слияния -> mergeConflict-колбэк.
+    // Чужая транзакция в реестре домена: индекс 5 в remote занят внешним
+    // изменением, локальная транзакция 5 столкнется с ней.
+    remote.lastRegistries[domain.registryId]!.addNewTransaction(
+      Transaction.next(
+        remote.lastRegistries[domain.registryId]!.lastTransaction,
+        'task1',
+        'changeDetails',
+        'changeType',
+        ['task1'],
+        'path',
+      ),
+    );
+    remote.lastModels['task1'] = (remote.lastModels['task1'] as Task).copyWith(title: 'Remote edit');
+    await r.saveModel(
+      (remote.lastModels['task1'] as Task).copyWith(title: 'Local edit'),
+      listenerId,
+      true,
+    );
+    expect(localConflicts, hasLength(1));
+    expect((localConflicts.last['task1'] as Task?)?.title, 'Local edit');
+    expect((remoteConflicts.last['task1'] as Task?)?.title, 'Remote edit');
+    // Локальная правка откачена к последней закоммиченной базе; у второй
+    // стороны осталась ее версия.
+    expect((await r.getModelNow<Task>('task1'))?.title, 'Task 1 v3');
+    expect((remote.lastModels['task1'] as Task?)?.title, 'Remote edit');
+  });
+});
+
 }
 
 class ThrowingSaveRemoteStorage extends TrackingRemoteStorage {
   @override
   Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     throw Exception('saveItems failed');
+  }
+}
+
+/// Транспорт для сценария полной синхронизации: обычный MockRemoteStorage,
+/// но пока шлюз [gate] закрыт (closeGate), каждый saveItems висит на нем -
+/// тест держит синхронизацию mid-flight; флаг [deny] эмулирует отказ
+/// в доступе (пользователь исключен из домена). Все вызовы saveItems
+/// записываются.
+class GatedRemoteStorage extends DenyingRemoteStorage {
+  /// Изначально открыт: базовая синхронизация проходит свободно.
+  Completer<void> gate = Completer<void>()..complete();
+
+  void closeGate() {
+    gate = Completer<void>();
+  }
+
+  void openGate() {
+    if (!gate.isCompleted) gate.complete();
+  }
+
+  final List<Map<String, dynamic>> saveItemsCalls = [];
+
+  @override
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
+    saveItemsCalls.add(Map<String, dynamic>.from(items));
+    await gate.future;
+    return super.saveItems(items, deletions: deletions);
+  }
+
+  final List<Map<String, dynamic>> deleteItemsCalls = [];
+
+  @override
+  Future<int> deleteItems(Map<String, dynamic> items) async {
+    deleteItemsCalls.add(Map<String, dynamic>.from(items));
+    for (final id in items.keys) {
+      lastModels.remove(id);
+    }
+    return items.length;
   }
 }

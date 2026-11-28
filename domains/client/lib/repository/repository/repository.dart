@@ -355,14 +355,24 @@ class Repository {
 
     // Отправляем локальные изменения в удаленное хранилище (реестровый
     // конвейер: транзакции, ребейз, коллизии записи - syncWithRemoteStorage).
+    // Снапшот пачки снимается до отправки: правки, добавленные в очередь
+    // ПОСЛЕ снапшота (пока sync висит на медленном транспорте), в пачку не
+    // попадают. Финальная очистка трогает только снапшот: правки во время
+    // синхронизации остаются в очереди и уезжают следующим циклом - иначе
+    // очистка "пока очередь не пуста" вычищала бы их молча, и изменения
+    // терялись, так и не долетев до удаленного хранилища (см. тест
+    // 'Full sync scenario' в test/repository_test.dart).
+    final outgoingSnapshot = outgoingChanges.toList();
     int saved = await syncWithRemoteStorage(
-      Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))),
+      Map.fromEntries(outgoingSnapshot.map((item) => MapEntry(item.id, item))),
     );
     // Вызываем для каждого синхронизированного элемента событие для слушателя
-    while (outgoingChanges.isNotEmpty) {
-      String id = outgoingChanges.first.id;
+    for (final id in outgoingSnapshot.map((item) => item.id).toSet()) {
       _findAndCallListeners(id);
-      outgoingChanges.removeFirst();
+    }
+    // Из очереди убираем только отправленные модели
+    for (final item in outgoingSnapshot) {
+      outgoingChanges.remove(item);
     }
 
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
@@ -437,8 +447,14 @@ class Repository {
       for (final listenerId in listeners) {
         localModelsByListeners[listenerId] ??= {};
         remoteModelsByListeners[listenerId] ??= {};
-        localModelsByListeners[listenerId]?[modelId] = localItems[modelId]!;
-        remoteModelsByListeners[listenerId]?[modelId] = remoteItems[modelId]!;
+        // Подписаны могут быть модели, которых нет в конфликтной пачке
+        // ('me' подписан всегда) - в map попадают только конфликтующие.
+        if (localItems.containsKey(modelId)) {
+          localModelsByListeners[listenerId]?[modelId] = localItems[modelId]!;
+        }
+        if (remoteItems.containsKey(modelId)) {
+          remoteModelsByListeners[listenerId]?[modelId] = remoteItems[modelId]!;
+        }
       }
     }
     for (final listenerId in involvedListenerIds) {
@@ -1540,10 +1556,17 @@ Uint8List? getImage(String name) {
   // (ассоциация изменений с реестрами - внедряется туда колбэком).
   Map<Model, Map<String, dynamic>> _clusterItemsByParent(Map<String, dynamic> items) {
     Map<Model, Map<String, dynamic>> paretnItems = {};
+    // Кластер по ID родителя, а не по экземпляру: экземпляр из пачки и его
+    // копия из ЛХ (прочитанная для детей) - разные объекты Equatable
+    // (registryId мутируется в _getRegistries), и без слияния на каждый
+    // родитель создавалось по два реестра - второй навсегда отрывался от
+    // registryId в хранилище и ломал построение транзакций.
+    Map<String, Model> parentById = {};
     for (var entry in items.entries) {
       final parent = _getParent(entry.value);
       if (parent != null) {
-        paretnItems.putIfAbsent(parent, () => <String, dynamic>{})[entry.key] = entry.value;
+        final knownParent = parentById.putIfAbsent(parent.id, () => parent);
+        paretnItems.putIfAbsent(knownParent, () => <String, dynamic>{})[entry.key] = entry.value;
       } else {
         print('No domain found for ${entry.value.runtimeType} ${entry.key}'); // todo: handle users
       }
