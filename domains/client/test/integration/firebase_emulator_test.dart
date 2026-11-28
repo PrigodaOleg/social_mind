@@ -222,8 +222,15 @@ void main() {
     });
 
     test('saveItems appends transactions sequentially (lastIdx)', () async {
+      // Правила допускают только продолжение цепочки: prevId новой
+      // транзакции обязан ссылаться на id текущей головы (см.
+      // database.rules.json, transactions/$tidx). Строим транзакцию
+      // от прочитанной головы, а не с нуля.
+      final head = await storage.readRegistry('r1');
+      final newIndex = head!.lastTransactionIndex! + 1;
       final registry = Registry(id: 'r1', parentId: 'u1');
-      registry.transactions[1] = Transaction.zero(
+      registry.transactions[newIndex] = Transaction.fromPrev(
+        head.lastTransaction!,
         'u1',
         'test',
         'update',
@@ -233,7 +240,7 @@ void main() {
       expect(await storage.saveItems({'r1': registry}), 1);
 
       final snapshot = await db.ref('registries/r1/lastIdx').get();
-      expect(snapshot.value, 1);
+      expect(snapshot.value, newIndex);
     });
 
     test('rules reject transaction with wrong index', () async {
