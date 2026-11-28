@@ -14,7 +14,7 @@ SSH_OPTS := -i $(IMAC_KEY) -o StrictHostKeyChecking=accept-new
 # Преобразуем KEY=VALUE из build.env в аргументы --dart-define
 DART_DEFINES := $(shell [ -f "$(BUILD_ENV_FILE)" ] && sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$$/--dart-define \1=\2/' $(BUILD_ENV_FILE))
 
-.PHONY:all analyze build-apk test-emulator supabase-migrate build-linux build-web clean deps format help ios ios-build ios-sync secrets setup-host test test-auth-e2e test-auth-e2e-android test-auth-e2e-android-debug test-auth-e2e-android-interactive test-auth-e2e-debug test-auth-e2e-interactive test-auth-e2e-ios test-auth-e2e-ios-debug test-auth-e2e-ios-interactive
+.PHONY:all analyze build-apk test-emulator supabase-migrate build-linux build-web clean deps format help ios ios-build ios-sync secrets setup-host test test-acquaintance-e2e test-auth-e2e test-auth-e2e-android test-auth-e2e-android-debug test-auth-e2e-android-interactive test-auth-e2e-debug test-auth-e2e-interactive test-auth-e2e-ios test-auth-e2e-ios-debug test-auth-e2e-ios-interactive
 
 help: ## Показать список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -103,6 +103,9 @@ all: deps secrets test build-linux build-web build-apk ios ## Полный ци�
 
 test-emulator: ## Интеграционные тесты на Firebase-эмуляторах (запускает эмуляторы, если они не запущены)
 	@tool/run_emulator_tests.sh
+
+test-acquaintance-e2e: ## E2E знакомства на ДВУХ физ. устройствах (QR камерой + синхронизация домена; Firebase-эмуляторы)
+	tool/run_acquaintance_e2e.sh
 
 supabase-migrate: ## Пересоздать локальную базу Supabase (накатить миграции из supabase/migrations)
 	(cd supabase && supabase db reset)

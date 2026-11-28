@@ -116,7 +116,7 @@ class CloudFirestoreStorage extends RemoteStorage {
   }
 
   @override
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     try {
       // Транзакции реестров пишем консистентно через runTransaction с проверкой lastIdx
       final models_ = <String, dynamic>{};

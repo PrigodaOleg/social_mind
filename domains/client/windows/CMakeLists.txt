@@ -41,8 +41,13 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
   target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
   target_compile_options(${TARGET} PRIVATE /EHsc)
+  # firebase_auth (windows) emits C4238 ("class rvalue used as lvalue") in
+  # firebase_auth_plugin.cpp; with /WX above it fails the build (upstream
+  # flutterfire issue, seen on Flutter 3.50 / firebase_auth 6.x). Plugins use
+  # this function by default, so suppress just this warning here — for the
+  # runner and for plugin targets alike.
+  target_compile_options(${TARGET} PRIVATE /wd"4238")
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
-  target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()
 
 # Flutter library and tool build rules.

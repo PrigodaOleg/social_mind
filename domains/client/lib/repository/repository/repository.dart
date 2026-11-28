@@ -274,10 +274,20 @@ class Repository {
     _syncInProgress = true;
   }
 
+  @visibleForTesting
+  Future<void> runSyncForTest() => _delayedSync();
+
   Future<void> _delayedSync() async {
     await _syncMutex();
     try {
       await _doDelayedSync();
+    } catch (e) {
+      // Ошибка синхронизации не должна убивать подписку таймера
+      // (Timer.listen использует cancelOnError: true) - иначе sync умирает
+      // до конца сессии и локальные изменения больше никогда не уедут в
+      // удаленное хранилище. Логируем и продолжаем: незасинхронизированные
+      // изменения остаются в очередях и будут отправлены в следующем цикле.
+      print('Sync failed: $e');
     } finally {
       _syncInProgress = false;
     }
@@ -345,14 +355,24 @@ class Repository {
 
     // Отправляем локальные изменения в удаленное хранилище (реестровый
     // конвейер: транзакции, ребейз, коллизии записи - syncWithRemoteStorage).
+    // Снапшот пачки снимается до отправки: правки, добавленные в очередь
+    // ПОСЛЕ снапшота (пока sync висит на медленном транспорте), в пачку не
+    // попадают. Финальная очистка трогает только снапшот: правки во время
+    // синхронизации остаются в очереди и уезжают следующим циклом - иначе
+    // очистка "пока очередь не пуста" вычищала бы их молча, и изменения
+    // терялись, так и не долетев до удаленного хранилища (см. тест
+    // 'Full sync scenario' в test/repository_test.dart).
+    final outgoingSnapshot = outgoingChanges.toList();
     int saved = await syncWithRemoteStorage(
-      Map.fromEntries(outgoingChanges.map((item) => MapEntry(item.id, item))),
+      Map.fromEntries(outgoingSnapshot.map((item) => MapEntry(item.id, item))),
     );
     // Вызываем для каждого синхронизированного элемента событие для слушателя
-    while (outgoingChanges.isNotEmpty) {
-      String id = outgoingChanges.first.id;
+    for (final id in outgoingSnapshot.map((item) => item.id).toSet()) {
       _findAndCallListeners(id);
-      outgoingChanges.removeFirst();
+    }
+    // Из очереди убираем только отправленные модели
+    for (final item in outgoingSnapshot) {
+      outgoingChanges.remove(item);
     }
 
     // Актуализируем элементы, на синхронизацию которых поступил запрос от слушателей
@@ -427,8 +447,14 @@ class Repository {
       for (final listenerId in listeners) {
         localModelsByListeners[listenerId] ??= {};
         remoteModelsByListeners[listenerId] ??= {};
-        localModelsByListeners[listenerId]?[modelId] = localItems[modelId]!;
-        remoteModelsByListeners[listenerId]?[modelId] = remoteItems[modelId]!;
+        // Подписаны могут быть модели, которых нет в конфликтной пачке
+        // ('me' подписан всегда) - в map попадают только конфликтующие.
+        if (localItems.containsKey(modelId)) {
+          localModelsByListeners[listenerId]?[modelId] = localItems[modelId]!;
+        }
+        if (remoteItems.containsKey(modelId)) {
+          remoteModelsByListeners[listenerId]?[modelId] = remoteItems[modelId]!;
+        }
       }
     }
     for (final listenerId in involvedListenerIds) {
@@ -744,7 +770,11 @@ class Repository {
       }
       remoteRegistries = _buildTransactions(remoteRegistries, remoteUpdates, originatorId);
       try {
-        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())));
+        // Tombstones (удалённые ключи map-полей) считаются здесь, в
+        // repository, по базе ребейза - транспорт получает готовые удаления
+        // и не знает прежнего состояния моделей (blocker-1 ревью, архитектура
+        // 996dc23 переделана на tombstones).
+        if (remoteUpdates.isNotEmpty) await _saveToAllRemoteStorages(remoteUpdates, remoteRegistries.map((k, v) => MapEntry(k, v.onlyLastTransaction())), deletions: _buildMapDeletions(oldItems.cast<String, Model>(), remoteUpdates));
         // Залилось
         localRegistries = remoteRegistries;
         if (localUpdates.isNotEmpty) _localStorage.storeItems({...localUpdates, ...localRegistries});
@@ -774,7 +804,9 @@ class Repository {
         // Тогда ситуация отсутствия реестра будет только в том случае, если пользователь или домен только что создан.
         // Создаем новый реестр с нулевой транзакцией.
         ?? Registry(parentId: item.id);
-      // Линкуем реестр к контейнеру и сохраняем в локальное хранилище
+      // Линкуем реестр к контейнеру и сохраняем в локальное хранилище.
+      // Реестры существуют ТОЛЬКО у контейнеров (User/Domain) — бизнес-правило
+      // проекта; дочерние модели фиксируются в реестре своего родителя.
       if (item is Domain) item.registryId = registry.id!;
       if (item is User) item.registryId = registry.id!;
       registries[registry.id!] = registry;
@@ -969,9 +1001,14 @@ class Repository {
         if (localMap.containsKey(field)) {
           // поле изменилось в обоих местах
           if (remoteMap[field] != localMap[field]) {
+            if (oldMap.containsKey(field) && remoteMap[field] == oldMap[field]) {
+              // Remote не менял поле - берем локальное значение.
+              remoteMap[field] = localMap[field];
+              continue;
+            }
             // нужно решить конфликт
             if (remoteMap[field] is Map) {
-              remoteMap[field] = _rebaseMap(remoteMap[field], localMap[field]);
+              remoteMap[field] = _rebaseMap(remoteMap[field], localMap[field], oldMap[field] is Map ? oldMap[field] as Map : null);
             } else if (remoteMap[field] is List) {
               remoteMap[field] = {...remoteMap[field], ...(localMap[field] as List)}.toList();
             } else {
@@ -988,12 +1025,13 @@ class Repository {
     return FirebaseStorage().models[remoteModel.type]!(remoteMap);
   }
 
-  Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap) {
+  Map<String, dynamic>? _rebaseMap(Map<String, dynamic> remoteMap, Map<String, dynamic> localMap, [Map? oldMap]) {
     final keys = <String>{...remoteMap.keys, ...localMap.keys};
     for (final key in keys) {
       if (remoteMap.containsKey(key) && localMap.containsKey(key)) {
         if (remoteMap[key] is Map && localMap[key] is Map) {
-          final rebasedMap = _rebaseMap(remoteMap[key], localMap[key]);
+          final oldVal = oldMap?[key];
+          final rebasedMap = _rebaseMap(remoteMap[key], localMap[key], oldVal is Map ? oldVal : null);
           if (rebasedMap == null) return null;
           remoteMap[key] = rebasedMap;
         } else if ( remoteMap[key] is List && localMap[key] is List) {
@@ -1001,6 +1039,11 @@ class Repository {
         } else {
           if (remoteMap[key] != localMap[key]) {
             // нужно решить конфликт
+            if (oldMap != null && oldMap.containsKey(key) && remoteMap[key] == oldMap[key]) {
+              // remote не менял значение (совпадает со старым) - берем локальное
+              remoteMap[key] = localMap[key];
+              continue;
+            }
             // todo: пока берем удаленную версию, локальные изменения теряем
             return null;
           }
@@ -1373,12 +1416,48 @@ Uint8List? getImage(String name) {
     return items;
   }
 
+  // Tombstones для транспорта: удалённые ключи map-полей (unlink/removeTask)
+  // в виде {modelId: {field: {ключи}}}. Считаются здесь, в repository, по
+  // базе ребейза (oldItems - состояние моделей до окна синхронизации из
+  // head-пакета очереди): ключ есть в базе, но исчез из нового состояния -
+  // доносится до удалённого хранилища как удаление. Транспорт прежнего
+  // состояния не знает (архитектурное решение: только repository владеет
+  // историей). Модели, удалённые целиком, обрабатываются deleteItems - здесь
+  // только исчезнувшие ключи выживших моделей.
+  Map<String, Map<String, Set<String>>> _buildMapDeletions(Map<String, Model> oldItems, Map<String, Model> newItems) {
+    final deletions = <String, Map<String, Set<String>>>{};
+    for (final entry in newItems.entries) {
+      final oldModel = oldItems[entry.key];
+      if (oldModel == null) continue;
+      final oldJson = oldModel.toJson();
+      for (final field in entry.value.toJson().entries) {
+        if (field.value is! Map) continue;
+        final newKeys = (field.value as Map).keys.map((k) => k.toString()).toSet();
+        final oldKeys = ((oldJson[field.key] as Map?)?.keys ?? const <String>[]).map((k) => k.toString()).toSet();
+        final removed = oldKeys.difference(newKeys);
+        if (removed.isEmpty) continue;
+        deletions.putIfAbsent(entry.key, () => {})[field.key] = removed;
+      }
+    }
+    return deletions;
+  }
+
   // Сохраняем модели в их удаленные хранилища. Каждая пачка кластеризуется
   // по родителю, и каждая пачка пишется ровно в одно хранилище - то, которое
   // указано в поле storageKey родителя.
-  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries) async {
+  Future<int> _saveToAllRemoteStorages(Map<String, Model> items, Map<String, Registry> registries, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     int count = 0;
     Map<Model, Map<String, dynamic>> parentItems = _clusterItemsByParent(items);
+    // RTDB update - одна атомарная мультилокационная запись: правила требуют,
+    // чтобы кросс-ссылки моделей (domainsIds/parents/children) и изменения
+    // реестров (changes/$chid -> models/$chid) указывали на модели из ТОЙ ЖЕ
+    // записи. Поэтому все кластеры одного хранилища сливаются в ОДИН
+    // saveItems-вызов: разбиение по кластерам роняло каждую запись, где
+    // модель ссылалась на модель другого кластера (saveModels([domain, me])
+    // при знакомстве: юзер получает domainsIds -> домен, который шел
+    // отдельным вызовом, - обе записи отвергались правилами, и модели
+    // навсегда застревали локальными).
+    final updatesByStorage = <RemoteStorage, Map<String, dynamic>>{};
     for (var parentEntry in parentItems.entries) {
       final parent = parentEntry.key;
       var storage = _storageForModel(parent);
@@ -1389,15 +1468,32 @@ Uint8List? getImage(String name) {
         print('No remote storage configured for ${parent.runtimeType} ${parent.id}'); // todo: показывать ошибку пользователю
         continue;
       }
-      count += await storage.saveItems({...parentEntry.value, ...registries});
+      final bucket =
+          updatesByStorage.putIfAbsent(storage, () => <String, dynamic>{});
+      bucket.addAll(parentEntry.value);
+      // Реестр едет строго с моделями своего родителя: правило
+      // registries/$rid/transactions/$tidx/changes/$chid требует модели
+      // $chid в той же записи.
+      for (var registryEntry in registries.entries) {
+        if (registryEntry.value.parentId == parent.id) {
+          bucket[registryEntry.key] = registryEntry.value;
+        }
+      }
     }
-    // Реестры, чей родитель не среди items (например, личный реестр пользователя),
-    // пишем в хранилище пользователя.
+    for (var storageEntry in updatesByStorage.entries) {
+      count += await storageEntry.key.saveItems(storageEntry.value, deletions: deletions);
+    }
+    // Реестры, чей родитель не среди items и неизвестен локально (некому их
+    // маршрутизировать), пишем в хранилище пользователя.
     final orphanRegistries = <String, Registry>{};
     for (var registryEntry in registries.entries) {
       if (items.containsKey(registryEntry.value.parentId)) continue;
       final parentModel = _localStorage.getItem(id: registryEntry.value.parentId ?? '');
-      if (parentModel != null && items.containsKey(parentModel.id)) continue;
+      // Родитель известен локально: его реестр либо ушел вместе с кластером
+      // родителя выше, либо новых транзакций не имеет. Перезапись уже
+      // закоммиченной транзакции запрещена правилами (index == lastIdx + 1) -
+      // она уронила бы весь батч.
+      if (parentModel != null) continue;
       orphanRegistries[registryEntry.key] = registryEntry.value;
     }
     if (orphanRegistries.isNotEmpty) {
@@ -1460,10 +1556,17 @@ Uint8List? getImage(String name) {
   // (ассоциация изменений с реестрами - внедряется туда колбэком).
   Map<Model, Map<String, dynamic>> _clusterItemsByParent(Map<String, dynamic> items) {
     Map<Model, Map<String, dynamic>> paretnItems = {};
+    // Кластер по ID родителя, а не по экземпляру: экземпляр из пачки и его
+    // копия из ЛХ (прочитанная для детей) - разные объекты Equatable
+    // (registryId мутируется в _getRegistries), и без слияния на каждый
+    // родитель создавалось по два реестра - второй навсегда отрывался от
+    // registryId в хранилище и ломал построение транзакций.
+    Map<String, Model> parentById = {};
     for (var entry in items.entries) {
       final parent = _getParent(entry.value);
       if (parent != null) {
-        paretnItems.putIfAbsent(parent, () => <String, dynamic>{})[entry.key] = entry.value;
+        final knownParent = parentById.putIfAbsent(parent.id, () => parent);
+        paretnItems.putIfAbsent(knownParent, () => <String, dynamic>{})[entry.key] = entry.value;
       } else {
         print('No domain found for ${entry.value.runtimeType} ${entry.key}'); // todo: handle users
       }

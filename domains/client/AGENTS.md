@@ -28,6 +28,15 @@
 - Тесты, требующие реальную Isar-БД, инициализируют нативный бинарник в `setUpAll`
   (`test/isar_windows_x64.dll` / `test/libisar_linux_x64.so`) и закрывают БД в `tearDownAll` —
   `test/local_database_test.dart:16-38`.
+- Тесты истории очереди (`Check history of ...` в `local_database_test.dart`) сбрасывают
+  хранилище целиком (`resetStorage`) — `clearHistoryQueueHead` чистит только head-пакет,
+  строки прошлых тестов на других индексах искажают семантику очереди.
+- Device-e2e знакомства (`tool/run_acquaintance_e2e.sh` → `integration_test/acquaintance_e2e_body.dart`)
+  работает НЕ на IsarStorage, а на in-memory заглушке `MemoryLocalStorage` из
+  `acquaintance_e2e_body.dart`. Фиксы семантики очереди истории (база для 3-way ребейза:
+  снимок состояния ДО изменения, неразрушающее чтение до `clearHistoryQueueHead`)
+  нужно зеркалить и туда, и в `isar_storage.dart` — рассинхрон маскирует баги
+  (rename домена не доезжал до второй стороны, хотя Isar-версия уже была исправлена).
 - Стиль: `flutter_test`, `group('...', () { test('...', () async {...}); });`.
 - Новый тест — файл `test/<name>_test.dart`, импорт кода через `package:closers/...`.
 

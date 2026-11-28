@@ -181,26 +181,56 @@ class InvitationService {
     return invitation;
   }
 
-  /// Шаг инициатора: прочитать входящие приглашения-знакомства и принять их.
-  /// Для каждого принятого: создается домен на двоих, контакт, участники.
+  /// Шаг инициатора: прочитать входящие приглашения и принять их.
+  /// - acquaintance: создается домен на двоих, контакт, участники; новому
+  ///   знакомому сразу отправляется приглашение в этот домен (domainJoin) -
+  ///   иначе второй участник о создании домена не узнает.
+  /// - domainJoin: подключение к хранилищу домена (второй шаг знакомства на
+  ///   стороне приглашенного).
+  /// Возвращает список доменов (созданных или присоединенных).
   Future<List<Domain>> acceptAcquaintanceInvitations() async {
     final me = _repo.me;
     final accepted = <Domain>[];
     final incoming = await _readInvitationsAtPath('by-user/${me.id}');
     for (final invitation in incoming) {
-      if (invitation.invitationType != InvitationType.acquaintance) continue;
       if (invitation.status != InvitationStatus.pending) continue;
       // Идемпотентность: если приглашение уже было обработано локально
       // (запись статуса не дошла до remote), не создаем дубликат домена.
       final localCopy = _repo.getModel<Invitation>(invitation.id);
       if (localCopy != null && localCopy.status == InvitationStatus.accepted) continue;
-      // Создаем домен на двоих
-      final domain = await createMutualDomain(otherUserId: invitation.originatorId, otherUserName: invitation.title);
-      // Отмечаем приглашение принятым
-      invitation.status = InvitationStatus.accepted;
-      await _repo.saveModel(invitation);
-      await _putInvitationAtPath('by-user/${me.id}/${invitation.id}', invitation);
-      accepted.add(domain);
+      if (invitation.invitationType == InvitationType.acquaintance) {
+        // Создаем домен на двоих
+        final domain = await createMutualDomain(otherUserId: invitation.originatorId, otherUserName: invitation.title);
+        // Отмечаем приглашение принятым
+        invitation.status = InvitationStatus.accepted;
+        await _repo.saveModel(invitation);
+        await _putInvitationAtPath('by-user/${me.id}/${invitation.id}', invitation);
+        // Статус дочерним путем: правила by-user могут отклонить whole-object
+        // запись (см. [_putInvitationChild]) - статус критичен для
+        // идемпотентности (повторный accept не создает дубликат домена).
+        await _putInvitationStatus('by-user/${me.id}/${invitation.id}', invitation);
+        accepted.add(domain);
+        // Отправляем новому знакомому приглашение в домен (по пути by-user):
+        // он примет его через [acceptDomainInvitation] и подключится к
+        // хранилищу домена. Голос создателя уже учтен в [invitation.approve].
+        try {
+          final joinInvitation = await createDomainInvitation(domain: domain, inviteeId: invitation.originatorId);
+          await _putInvitationAtPath('by-user/${invitation.originatorId}/${joinInvitation.id}', joinInvitation);
+        } catch (e) {
+          print('Failed to send domain join invitation to ${invitation.originatorId}: $e');
+        }
+      } else if (invitation.invitationType == InvitationType.domainJoin) {
+        // Присоединяемся к домену инициатора знакомства
+        final joined = await acceptDomainInvitation(invitation);
+        if (joined == null) continue;
+        final domain = _repo.getModel<Domain>(invitation.domainId);
+        if (domain != null) {
+          // Голос за приглашение: кворум = все участники (создатель уже
+          // проголосовал при создании) - приглашение уйдет в approved.
+          await voteForInvitation(invitation, domain);
+          accepted.add(domain);
+        }
+      }
     }
     return accepted;
   }
@@ -215,7 +245,17 @@ class InvitationService {
     );
     domain.participantsIds.addAll([me.id, otherUserId]);
     me.domainsIds.add(domain.id);
-    await _repo.saveModels([domain, me]);
+    // Домен линкуется к создателю: правило RTDB models/$mid/domainsIds/$did
+    // требует, чтобы домен $did в ТОЙ ЖЕ записи имел parents/$mid (запись
+    // domainsIds у юзера отвергает весь батч [domain, me] - до remote не
+    // доходило ничего, знакомство застревало: у B не появлялся общий домен).
+    domain.link(from: me);
+    me.link(to: domain);
+    // Немедленная отправка: приглашение в домен кладется в инбокс партнера
+    // сразу после этого, и он может прочитать его раньше, чем debounced
+    // запись домена дойдет до remote (тогда acceptDomainInvitation не найдет
+    // домен и вернется за ним на следующем опросе).
+    await _repo.saveModels([domain, me], null, true);
     await _addContact(me.id, otherUserId);
     _repo.updateRegistryWatches();
     return domain;
@@ -311,20 +351,45 @@ class InvitationService {
     }
     // 2. Читаем домен из хранилища и добавляем себе
     final storage2 = _repo.connectedStorages[invitation.storageKey];
-    if (storage2 != null) {
-      final domain = await storage2.getItem(id: invitation.domainId) as Domain?;
-      if (domain != null) {
-        domain.storageKey = invitation.storageKey;
-        await _repo.saveModel(domain);
-        if (!me.domainsIds.contains(domain.id)) me.domainsIds.add(domain.id);
-        await _repo.saveModel(me);
-        _repo.updateRegistryWatches();
+    final domain =
+        await storage2?.getItem(id: invitation.domainId) as Domain?;
+    // Домен может быть еще не записан создателем в remote (запись домена -
+    // debounced, а приглашение кладется в инбокс сразу): НЕ отмечаем
+    // принятие и возвращаем null, чтобы следующий опрос повторил попытку.
+    // Иначе приглашение навсегда застрянет "принятым" без домена
+    // (e2e acquaintance: сканер 5 минут опрашивал инбокс, имея локальную
+    // копию в статусе accepted, и не мог присоединиться).
+    if (domain == null || storage2 == null) return null;
+    domain.storageKey = invitation.storageKey;
+    // Подтягиваем реестр домена ДО сохранения модели: без него
+    // _getRegistries создаст НОВЫЙ реестр (форк) вместо продолжения
+    // цепочки транзакций создателя домена, и первая же запись в домен
+    // упрётся в коллизию индексов (см. collaboration_emulator_test).
+    if (domain.registryId.isNotEmpty) {
+      final registry = await storage2.readRegistry(domain.registryId);
+      if (registry != null) {
+        await _repo.localStorage.storeItems({registry.id!: registry});
       }
     }
-    // 3. Отмечаем принятие
+    if (!me.domainsIds.contains(domain.id)) me.domainsIds.add(domain.id);
+    // Линкуем домен и юзера взаимно и пишем ОДНОЙ атомарной записью: правило
+    // RTDB models/$mid/domainsIds/$did требует у домена parents/$mid, а
+    // models/$mid/parents/$did - обратную ссылку domainsIds на юзера.
+    // Раздельные saveModel отвергались правилами (в записи юзера домена нет,
+    // в записи домена - юзера с обратной ссылкой): domainsIds юзера
+    // отвергался на каждом sync-цикле, юзер и его реестр навсегда
+    // застревали локальными (e2e acquaintance, сторона сканера).
+    domain.link(from: me);
+    me.link(to: domain);
+    await _repo.saveModels([domain, me], null, true);
+    _repo.updateRegistryWatches();
+    // 3. Отмечаем принятие - ТОЛЬКО после успешного получения домена
     invitation.status = InvitationStatus.accepted;
     await _repo.saveModel(invitation);
     await _putInvitationAtPath('${invitation.id}', invitation);
+    // Статус дочерним путем: whole-object запись может не пройти правила
+    // (approvals с чужими голосами) - статус критичен для идемпотентности.
+    await _putInvitationStatus('${invitation.id}', invitation);
     return invitation;
   }
 
@@ -349,7 +414,11 @@ class InvitationService {
       await _repo.saveModel(domain);
     }
     await _repo.saveModel(invitation, null, true); // немедленная отправка
-    await _putInvitationAtPath('${invitation.id}', invitation);
+    // Голос и статус пишем по дочерним путям: whole-object запись с чужими
+    // голосами отклоняется правилами RTDB (approvals/$voter проверяет
+    // auth.token.email == voter@a.aa, diff в .validate недоступен).
+    await _putInvitationChild('${invitation.id}/approvals/${voterId ?? _repo.myId!}', approved);
+    await _putInvitationStatus('${invitation.id}', invitation);
   }
 
   // # Внутренние методы
@@ -395,6 +464,29 @@ class InvitationService {
     return success;
   }
 
+  /// Записать дочернее значение приглашения (голос/статус): whole-object
+  /// запись с чужими голосами отклоняется правилами RTDB
+  /// (approvals/$voter проверяет auth.token.email == voter@a.aa; RTDB .validate
+  /// не умеет diff). Голос пишется как boolean, статус - как string, ровно
+  /// как того требуют правила (см. database.rules.json).
+  Future<void> _putInvitationChild(String path, Object? value) async {
+    if (!path.split('/').every(isSafeRemotePathId)) {
+      print('Rejected unsafe invitation path: $path');
+      return;
+    }
+    for (var storageEntry in _repo.connectedStorages.entries) {
+      try {
+        await storageEntry.value.saveRawChild('invitations/$path', value);
+      } catch (e) {
+        print('Failed to put invitation child to ${storageEntry.key}: $e');
+      }
+    }
+  }
+
+  /// Записать статус приглашения по дочернему пути (см. [_putInvitationChild]).
+  Future<void> _putInvitationStatus(String path, Invitation invitation) =>
+      _putInvitationChild('$path/status', invitation.status.name);
+
   /// Записать приглашение в удаленное хранилище по пути.
   Future<void> _putInvitationAtPath(String path, Invitation invitation) async {
     // Защита от path injection: все сегменты пути должны быть безопасными ID
@@ -404,9 +496,19 @@ class InvitationService {
     }
     // Приглашения храним в выделенном пути remote storage (не в models/, чтобы
     // не смешивать с моделями и не требовать прав на запись models)
+    // Правило approvals/$voter (auth.token.email == $voter@a.aa) отклоняет
+    // whole-object запись с чужими голосами (.validate в RTDB не умеет diff).
+    // Пишем только свой голос; кворум хранится в модели домена (проверка на
+    // сервере - последующая задача, см. database.rules.json).
+    final json = invitation.toJson();
+    final myId = _repo.myId ?? '';
+    final ownVote = invitation.approvals[myId];
+    if (json['approvals'] is Map) {
+      json['approvals'] = (myId.isNotEmpty && ownVote != null) ? {myId: ownVote} : <String, bool>{};
+    }
     for (var storageEntry in _repo.connectedStorages.entries) {
       try {
-        await storageEntry.value.saveRaw('invitations/$path', invitation.toJson());
+        await storageEntry.value.saveRaw('invitations/$path', json);
       } catch (e) {
         print('Failed to put invitation to ${storageEntry.key}: $e');
       }

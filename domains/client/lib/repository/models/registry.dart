@@ -194,19 +194,24 @@ class Registry extends Equatable {
 
   String? get parentId => metadata.parentId;
 
-  Transaction? get lastTransaction => transactions.values.lastOrNull;
-  int? get lastTransactionIndex => transactions.keys.lastOrNull;
+  Transaction? get lastTransaction => transactions[lastTransactionIndex];
+  int? get lastTransactionIndex {
+    if (transactions.isEmpty) return null;
+    // Map хранит порядок вставки (Isar отдает строки в DESC) - берем max.
+    return transactions.keys.reduce((a, b) => a > b ? a : b);
+  }
 
   Transaction addNewTransaction(Transaction transaction) {
-    final newIndex = (transactions.keys.lastOrNull ?? -1) + 1;
+    final newIndex = (lastTransactionIndex ?? -1) + 1;
     transactions[newIndex] = (transaction);
     return transaction;
   }
 
-  void removeLastTransaction() => transactions.remove(transactions.keys.lastOrNull);
+  void removeLastTransaction() => transactions.remove(lastTransactionIndex);
 
   Registry onlyLastTransaction() {
-    if (transactions.isNotEmpty) return copyWith(transactions: Map.fromEntries([transactions.entries.last]));
+    final lastIdx = lastTransactionIndex;
+    if (lastIdx != null) return copyWith(transactions: Map.fromEntries([MapEntry(lastIdx, transactions[lastIdx]!)]));
     return this;
   }
 }

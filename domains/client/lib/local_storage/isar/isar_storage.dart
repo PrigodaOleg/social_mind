@@ -256,19 +256,58 @@ class IsarStorage extends LocalStorage {
     if (item is Model) {
       String? serializedItem = jsonEncode(item);
       isar.write((isar) {
+        final headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+        // Текущее состояние ДО записи - база для 3-way ребейза (_rebaseModel).
+        final ModelBox? oldRow = isar.modelBoxs.where()
+            .modelIdEqualTo(item.id)
+            .historyIdxEqualTo(0)
+            .findFirst();
+        // Есть ли уже строка модели в head-пакете (база снята ранее в этом окне).
+        final bool hasRowAtHead = oldRow != null &&
+            isar.modelBoxs.where()
+                .modelIdEqualTo(item.id)
+                .historyIdxEqualTo(headIdx.value)
+                .findFirst() != null;
+        // Снимок СТАРОГО состояния в head-пакет: getNextItemsFromHistoryQueue
+        // читает строки head-пакета как oldItems для ребейза. Без снимка базой
+        // ребейза становится само новое состояние -> ребейз считает поля
+        // "неизмененными локально" и отдает приоритет remote - локальные правки
+        // терялись (e2e acquaintance: rename домена не доезжал до второй
+        // стороны).
+        if (oldRow != null && !hasRowAtHead) {
+          isar.modelBoxs.put(
+            ModelBox()
+            ..id = isar.modelBoxs.autoIncrement()
+            ..modelId = item.id
+            ..historyIdx = headIdx.value
+            ..modelData = oldRow.modelData
+          );
+        }
+        // Строка нового состояния. Для СУЩЕСТВУЮЩЕЙ модели - в пакет head+1:
+        // getNext берет последнюю строку модели в пакете, и новая строка
+        // затерла бы базу ребейза в head. Для НОВОЙ модели (oldRow == null)
+        // база - само создание: строка идет в пакет head (так же читает ее
+        // getNext до clear). clearHistoryQueueHead потом продвигает head на
+        // пакет пачки, и состояние этой записи становится базой следующего
+        // окна (blocker-2 ревью). Существующую строку пакета перезаписываем
+        // (составной индекс (modelId, historyIdx) уникален).
+        isar.modelBoxs.where()
+            .modelIdEqualTo(item.id)
+            .historyIdxEqualTo(oldRow == null ? headIdx.value : headIdx.value + 1)
+            .deleteAll();
+        isar.modelBoxs.put(
+          ModelBox()
+          ..id = isar.modelBoxs.autoIncrement()
+          ..modelId = item.id
+          ..historyIdx = oldRow == null ? headIdx.value : headIdx.value + 1
+          ..modelData = serializedItem
+        );
+        // Актуальная копия (historyIdx = 0).
         isar.modelBoxs.put(
           ModelBox()
           ..id = isar.modelBoxs.autoIncrement()
           ..modelId = item.id
           ..historyIdx = 0
-          ..modelData = serializedItem
-        );
-        final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
-        isar.modelBoxs.put(
-          ModelBox()
-          ..id = isar.modelBoxs.autoIncrement()
-          ..modelId = item.id
-          ..historyIdx = tailIdx.value
           ..modelData = serializedItem
         );
       });
@@ -313,14 +352,52 @@ class IsarStorage extends LocalStorage {
       }
     }
     isar.write((isar) {
-      isar.modelBoxs.putAll(rawModels);
-      isar.registryBoxs.putAll(rawRegistry);
       final tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
-      final rawHistoricalModels = rawModels.map((e) => e.copyWith(
-        historyIdx: tailIdx.value,
-        id: isar.modelBoxs.autoIncrement())
-      ).toList();
-      isar.modelBoxs.putAll(rawHistoricalModels);
+      final headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
+      for (final entry in rawModels) {
+        final ModelBox? oldRow = isar.modelBoxs.where()
+            .modelIdEqualTo(entry.modelId!)
+            .historyIdxEqualTo(0)
+            .findFirst();
+        final bool hasRowAtHead = oldRow != null &&
+            isar.modelBoxs.where()
+                .modelIdEqualTo(entry.modelId!)
+                .historyIdxEqualTo(headIdx.value)
+                .findFirst() != null;
+        // Снимок старого состояния в head - база для 3-way ребейза
+        // (см. комментарий в storeItem).
+        if (oldRow != null && !hasRowAtHead) {
+          isar.modelBoxs.put(
+            ModelBox()
+            ..id = isar.modelBoxs.autoIncrement()
+            ..modelId = entry.modelId
+            ..historyIdx = headIdx.value
+            ..modelData = oldRow.modelData
+          );
+        }
+        // Строка нового состояния в пакете head+1 (пакет пачки, см.
+        // комментарий в storeItem): clearHistoryQueueHead потом продвигает
+        // head на этот пакет, и отправленное/слитое состояние становится
+        // базой следующего окна (blocker-2 ревью). Строка локальной пачки
+        // уже может сидеть в head+1 (storeItem при записи правки) -
+        // success-path storeItems (слитое состояние) ПЕРЕЗАПИСЫВАЕТ её:
+        // составной индекс (modelId, historyIdx) уникален, второй put с тем
+        // же ключом бросил бы IsarError. Для НОВОЙ модели база - создание,
+        // строка идет в пакет head (см. storeItem).
+        final int packetIdx = oldRow == null ? headIdx.value : headIdx.value + 1;
+        isar.modelBoxs.where()
+            .modelIdEqualTo(entry.modelId!)
+            .historyIdxEqualTo(packetIdx)
+            .deleteAll();
+        isar.modelBoxs.put(entry.copyWith(
+          historyIdx: packetIdx,
+          id: isar.modelBoxs.autoIncrement(),
+        ));
+        // Актуальная копия (historyIdx = 0).
+        isar.modelBoxs.put(entry);
+      }
+      isar.historyQueueTailIdxs.put(tailIdx);
+      isar.registryBoxs.putAll(rawRegistry);
     });
     return rawModels.length + rawRegistry.length;
   }
@@ -373,9 +450,8 @@ class IsarStorage extends LocalStorage {
       if (rawModels.isEmpty && headIdx.value >= tailIdx.value) {
         headIdx = HistoryQueueHeadIdx();
         tailIdx = HistoryQueueTailIdx();
-      } else {
-        // Инкрементируем tailIdx
-        tailIdx.value += 1;
+        isar.historyQueueHeadIdxs.put(headIdx);
+        isar.historyQueueTailIdxs.put(tailIdx);
       }
 
       // Если они есть, конструируем из них объекты
@@ -386,38 +462,30 @@ class IsarStorage extends LocalStorage {
           items[json['id']] = models[json['type']]?.call(json);
         }
       });
-
-      isar.historyQueueHeadIdxs.put(headIdx);
-      isar.historyQueueTailIdxs.put(tailIdx);
     });
     return items;
   }
 
-  // Increments history queue head index and deletes these historical data.
+  // Отработавший пакет head удаляется; слитое/отправленное состояние из
+  // пакета head+1 становится базой следующего окна синхронизации (blocker-2
+  // ревью): иначе базой оставалась pre-rebase состояние, второй раунд давал
+  // детерминированный ложный конфликт -> rollback -> потеря правок.
   @override
   void clearHistoryQueueHead() {
     isar.write((isar) {
       var headIdx = isar.historyQueueHeadIdxs.get(0) ?? HistoryQueueHeadIdx();
       var tailIdx = isar.historyQueueTailIdxs.get(0) ?? HistoryQueueTailIdx();
 
-      // Удаляем все модели с текущим headIdx
+      // База отработавшего окна больше не нужна.
       isar.modelBoxs.where().historyIdxEqualTo(headIdx.value).deleteAll();
 
-      // Счетчик головы не может быть больше счетчика хвоста
-      if (headIdx.value >= tailIdx.value) {
-        // Если так, то накопленные элементы мы уже удалили, поэтому можно сбросить и счетчики
+      // Пакет пачки (head+1) со слитым состоянием становится новым head.
+      headIdx.value += 1;
+      if (isar.modelBoxs.where().historyIdxEqualTo(headIdx.value).findAll().isEmpty) {
+        // Очередь пуста - сбрасываем счетчики (base следующего окна снимет
+        // storeItem/storeItems снапшотом в head).
         headIdx = HistoryQueueHeadIdx();
         tailIdx = HistoryQueueTailIdx();
-      } else {
-        // В штатном режиме инкрементируем голову и пробуем сбросить счетчики
-        headIdx.value += 1;
-        if (headIdx.value == tailIdx.value) {
-          // Если накопленных элементов больше нет, то сбрасываем счетчики
-          if (isar.modelBoxs.where().historyIdxEqualTo(tailIdx.value).findFirst() != null) {
-            headIdx = HistoryQueueHeadIdx();
-            tailIdx = HistoryQueueTailIdx();
-          }
-        }
       }
       isar.historyQueueTailIdxs.put(tailIdx);
       isar.historyQueueHeadIdxs.put(headIdx);

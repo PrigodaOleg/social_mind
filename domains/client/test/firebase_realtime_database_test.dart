@@ -449,6 +449,41 @@ void main() {
       final count = await storage.saveItems({'t-err3': task('t-err3')});
       expect(count, 1);
     });
+
+    test('writes tombstone deletions as null (unlink reaches RTDB)', () async {
+      // Blocker 1: unlink/removeTask убирает ключ из map-поля; repository
+      // считает tombstones по базе ребейза и передаёт готовые удаления -
+      // транспорт доносит их как null, не зная прежнего состояния.
+      final list = models.TaskList(
+        id: 'tl-1',
+        title: 'list',
+        parents: {'u1': 'User'},
+      );
+      list.tasks['t-1'] = 't-1';
+      await storage.saveItems(
+        {'tl-1': list},
+        deletions: {'tl-1': {'tasks': {'t-gone'}, 'parents': {'u2'}}},
+      );
+      final updates = (mockDb.log.lastWhere((e) => e['method'] == 'update'))['value'] as Map<String, Object?>;
+      expect(updates['models/tl-1/tasks/t-gone'], isNull);
+      expect(updates['models/tl-1/parents/u2'], isNull);
+      expect(updates['models/tl-1/tasks/t-1'], 't-1');
+      expect(updates['models/tl-1/parents/u1'], 'User');
+    });
+
+    test('empty map is written per-key only, tombstones carry deletions', () async {
+      // Пустой map после unlink последней связи: поле не пишется узлом
+      // (update() превратил бы {} в null и стёр узел), удаления едут
+      // tombstones.
+      final list = models.TaskList(id: 'tl-2', title: 'l2');
+      await storage.saveItems(
+        {'tl-2': list},
+        deletions: {'tl-2': {'tasks': {'t-gone'}}},
+      );
+      final updates = (mockDb.log.lastWhere((e) => e['method'] == 'update'))['value'] as Map<String, Object?>;
+      expect(updates['models/tl-2/tasks/t-gone'], isNull);
+      expect(updates.keys.where((k) => k.startsWith('models/tl-2/tasks')), ['models/tl-2/tasks/t-gone']);
+    });
   });
 
   group('FirebaseStorage deleteItems', () {

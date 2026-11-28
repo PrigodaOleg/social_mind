@@ -7,20 +7,49 @@
     "registries": {
       "$rid": {
         ".validate": "$rid != null",
+        // Голова цепочки транзакций. Инварианты:
+        //   1. transactions/$tidx можно записать ТОЛЬКО при
+        //      $tidx == lastIdx + 1 (append-only, без дыр и rewrite'ов);
+        //   2. lastIdx растет строго на +1 за одну запись и только вместе
+        //      с новой транзакцией.
+        // Так устаревший клиент (не видевший чужих транзакций) не может
+        // записать транзакцию поверх существующей истории.
+        // NB: .write-правила в RTDB складываются по OR с родительскими, а
+        // корневой .write широкий - поэтому ограничение только через
+        // .validate (он обязателен независимо от .write).
+        "lastIdx": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && (!data.exists() || newData.val() > data.val())"
+        },
         "metadata": {
           ".validate": "
-          	newData.hasChildren(['id'])
-          	&& newData.child('id').val() == $rid
-         	"
+            newData.hasChildren(['id', 'parentId'])
+            && newData.child('id').val() == $rid
+          "
         },
         "transactions": {
+          // Новая транзакция обязана продолжать голову: её индекс равен
+          // lastIdx + 1, а prevId ссылается на id текущей головы цепочки.
+          // Genesis-транзакция (prevId == '') допустима только как tx 0 на
+          // пустом реестре (!registries/$rid/lastIdx exists).
+          // NB: data = состояние ДО пачки: в атомарной записи lastIdx еще
+          // может не существовать, поэтому арифметика только под .exists()
+          // (арифметика над null = ошибка правил = отказ всей записи).
           "$tidx": {
             ".validate": "
-            	newData.hasChildren(['changes', 'id', 'prevId', 'originatorId'])
-              && ((data.parent().parent().child('lastIdx').exists() && $tidx == data.parent().parent().child('lastIdx').val() + 1 + '')
-                  || (!data.parent().parent().child('lastIdx').exists() && $tidx == '0'))
+              newData.hasChildren(['changes', 'id', 'prevId', 'originatorId'])
+              && (
+                (
+                  data.parent().parent().child('lastIdx').exists()
+                  && $tidx + '' == data.parent().parent().child('lastIdx').val() + 1 + ''
+                  && newData.child('prevId').val() == data.parent().parent().child('transactions').child(data.parent().parent().child('lastIdx').val() + '').child('id').val()
+                )
+                || (!data.parent().parent().child('lastIdx').exists() && $tidx == '0')
+              )
             ",
             "changes": {
+              // Каждая модель из changes обязана существовать в базе:
+              // транзакция описывает уже записанные (в той же пачке) модели.
+              // NB: от changes/$chid до корня ровно 6 parent() (глубина пути 6).
               "$chid": {
                 ".validate": "newData.parent().parent().parent().parent().parent().parent().child('models').child($chid).val() != null"
               }
@@ -31,45 +60,121 @@
     },
     "models": {
       "$mid": {
-      	".validate": "
-      		newData.hasChildren(['id'])
-        	&& newData.child('id').val() == $mid
-        	&& ((newData.child('registryId').exists() && newData.parent().parent()
-               .child('registries')
-               .child(newData.child('registryId').val())
-               .child('transactions')
-               .child(newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val() + '')
-               .child('changes')
-               .child($mid).exists()
+        // Два класса моделей (бизнес-правило проекта: реестры существуют
+        // только у контейнеров User/Domain, поле registryId есть только у
+        // них; изменения дочерних моделей фиксируются в реестре родителя).
+        // 1) Контейнер: несёт собственный registryId. Запись разрешена только
+        //    ВМЕСТЕ с новой транзакцией своего реестра: lastIdx обязан вырасти
+        //    в этой же пачке (genesis: 0 на пустом реестре), а id модели —
+        //    стоять в changes новой головы цепочки. Голая запись модели без
+        //    транзакции (в т.ч. устаревшей копией) отвергается.
+        // 2) Дочерняя модель (Task и т.п.): registryId не несёт. Её запись
+        //    всегда идёт в одной атомарной пачке с транзакцией реестра
+        //    родителя (контракт клиента); от перетирания истории защищают
+        //    правила транзакций (append-only цепочка, монотонный lastIdx):
+        //    проигравшая гонку пачка отвергается целиком.
+        ".validate": "
+          newData.hasChildren(['id'])
+          && newData.child('id').val() == $mid
+          && (
+            (
+              newData.child('registryId').exists()
+              && newData.child('registryId').val() != ''
+              && (
+                (
+                  !data.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').exists()
+                  && newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val() == 0
+                )
+                || (
+                  data.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').exists()
+                  && newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val()
+                     > data.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val()
+                )
               )
-              || newData.hasChild('parents'))
-      	",
+              && newData.parent().parent().child('registries').child(newData.child('registryId').val())
+              .child('transactions')
+              .child(newData.parent().parent().child('registries').child(newData.child('registryId').val()).child('lastIdx').val() + '')
+              .child('changes')
+              .child($mid).exists()
+            )
+            || (
+              !newData.child('registryId').exists()
+              && newData.child('parents').hasChildren()
+            )
+          )
+        ",
         "parents": {
           "$pid": {
+            // Родитель обязан существовать в той же пачке и ссылаться обратно
+            // на $mid одним из своих link-полей (children/domainsIds/tasks/
+            // contactList - у разных типов обратная ссылка живёт в разных map).
+            // NB: значение parents/$pid - строка ТИПА РОДИТЕЛЯ
+            // (см. Model.link: parents[from.id] = from.type), тип ребёнка -
+            // newData.parent().parent().child('type') (2 parent() = узел $mid).
+            // Таблица пар (тип родителя -> тип ребёнка). Глубина иерархии
+            // правилом не ограничена: цепочка Domain -> Project -> TaskList ->
+            // Task проверяется этим же правилом на каждом уровне; новые уровни
+            // добавляются строками в таблицу.
+            // !newData.exists(): null-запись (удаление ключа связи) обязана
+            // проходить - unlink удаляет ОБЕ стороны ссылки в одной пачке, и
+            // проверка бэклинка/таблицы типов на null всегда ложна (ребёнок
+            // уже не ссылается на родителя в итоговом дереве). Для записи
+            // значения (не null) проверка полная.
             ".validate": "
-            	newData.parent().parent().parent().hasChild($pid)
-            	&& ((newData.parent().parent().parent().child($pid).hasChild('children')
-            	&& newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
-                || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
-            			&& newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid)))
+              !newData.exists()
+              || (
+                newData.parent().parent().parent().hasChild($pid)
+                && (
+                  (newData.parent().parent().parent().child($pid).hasChild('children')
+                   && newData.parent().parent().parent().child($pid).child('children').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('domainsIds')
+                       && newData.parent().parent().parent().child($pid).child('domainsIds').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('tasks')
+                       && newData.parent().parent().parent().child($pid).child('tasks').hasChild($mid))
+                  || (newData.parent().parent().parent().child($pid).hasChild('contactList')
+                       && newData.parent().parent().parent().child($pid).child('contactList').hasChild($mid))
+                )
+                && (
+                  (newData.val() == 'User'
+                   && (newData.parent().parent().child('type').val() == 'Domain'
+                       || newData.parent().parent().child('type').val() == 'TaskList'
+                       || newData.parent().parent().child('type').val() == 'ContactList'))
+                  || (newData.val() == 'Domain'
+                   && (newData.parent().parent().child('type').val() == 'TaskList'
+                       || newData.parent().parent().child('type').val() == 'Task'
+                       || newData.parent().parent().child('type').val() == 'Project'))
+                  || (newData.val() == 'Project'
+                   && newData.parent().parent().child('type').val() == 'TaskList')
+                  || (newData.val() == 'TaskList'
+                   && newData.parent().parent().child('type').val() == 'Task')
+                )
+              )
             "
-          }          
+          }
         },
         "children": {
           "$chid": {
+          	// !newData.exists(): null-удаление ключа связи (см. parents/$pid).
           	".validate": "
-          		newData.parent().parent().parent().hasChild($chid)
-            	&& newData.parent().parent().parent().child($chid).hasChild('parents')
-            	&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          		!newData.exists()
+          		|| (
+          			newData.parent().parent().parent().hasChild($chid)
+            		&& newData.parent().parent().parent().child($chid).hasChild('parents')
+            		&& newData.parent().parent().parent().child($chid).child('parents').hasChild($mid)
+          		)
           	"
         	}
         },
         "domainsIds": {
           "$did": {
+          	// !newData.exists(): null-удаление ключа связи (см. parents/$pid).
           	".validate": "
-          		newData.parent().parent().parent().hasChild($did)
-            	&& newData.parent().parent().parent().child($did).hasChild('parents')
-            	&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          		!newData.exists()
+          		|| (
+          			newData.parent().parent().parent().hasChild($did)
+            		&& newData.parent().parent().parent().child($did).hasChild('parents')
+            		&& newData.parent().parent().parent().child($did).child('parents').hasChild($mid)
+          		)
           	"
         	}
         }
@@ -102,9 +207,13 @@
         "$uid": {
           "$iid": {
             ".validate": "
-            	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
-            	&& newData.child('status').val() == 'pending'
+            	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status'])
             	&& newData.child('inviteeId').val() == $uid
+            	&& (newData.child('status').val() == 'pending'
+            		|| newData.child('status').val() == 'approved'
+            		|| newData.child('status').val() == 'declined'
+            		|| newData.child('status').val() == 'accepted'
+            		|| newData.child('status').val() == 'canceled')
             ",
             "approvals": {
               "$voter": {
@@ -116,7 +225,7 @@
       },
       "$iid": {
         ".validate": "
-        	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status', 'approvals'])
+        	newData.hasChildren(['originatorId', 'inviteeId', 'invitationType', 'status'])
         	&& (newData.child('status').val() == 'pending'
         		|| newData.child('status').val() == 'approved'
         		|| newData.child('status').val() == 'declined'

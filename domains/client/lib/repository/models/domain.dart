@@ -58,7 +58,11 @@ class Domain extends Model {
     Map<String, String>? models,
     String? storageKey,
   }) {
-    return Domain(
+    // Связи (parents/children) переносятся: без них копия писалась в remote
+    // без parents -> правило models/$mid требовало registryId-ветку, а записи
+    // детей (domainsIds на этот домен) отвергались - rename домена не доезжал
+    // до второй стороны (e2e acquaintance).
+    final copy = Domain(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
@@ -70,6 +74,9 @@ class Domain extends Model {
       models: models ?? this.models,
       storageKey: storageKey ?? this.storageKey,
     );
+    copy.parents.addAll(this.parents);
+    copy.children.addAll(this.children);
+    return copy;
   }
 
   @override

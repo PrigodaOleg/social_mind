@@ -57,7 +57,11 @@ abstract class RemoteStorage {  // todo: abstract?
     return items;
   }
   
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  // deletions - tombstones от repository: удалённые ключи map-полей
+  // (unlink/removeTask) в виде {modelId: {field: {ключи}}}. Repository
+  // вычисляет их по базе ребейза; транспорт только доносит удаления до
+  // хранилища и не знает прежнего состояния моделей.
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     return 0;
   }
 
@@ -84,6 +88,12 @@ abstract class RemoteStorage {  // todo: abstract?
 
   /// Записать произвольный JSON по пути (используется для приглашений).
   Future<bool> saveRaw(String path, Map<String, dynamic> json) async {return false;}
+
+  /// Записать примитив/JSON по дочернему пути (листовое значение).
+  /// Нужен для протокола приглашений: правила RTDB проверяют голоса
+  /// (approvals/$voter - boolean) и статусы по дочерним путям, whole-object
+  /// запись с чужими голосами отклоняется (.validate не умеет diff).
+  Future<bool> saveRawChild(String path, Object? value) async {return false;}
 
   /// Прочитать произвольный JSON по пути.
   Future<Map<String, dynamic>?> readRaw(String path) async {return null;}

@@ -122,7 +122,7 @@ class SupabaseStorage extends RemoteStorage {
   }
 
   @override
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     try {
       for (var entry in items.entries) {
         if (entry.value is Model) {

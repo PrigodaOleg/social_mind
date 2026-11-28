@@ -141,7 +141,7 @@ class FirebaseStorage extends RemoteStorage {
   }
   
   @override
-  Future<int> saveItems(Map<String, dynamic> items) async {
+  Future<int> saveItems(Map<String, dynamic> items, {Map<String, Map<String, Set<String>>> deletions = const {}}) async {
     // https://firebase.google.com/docs/database/flutter/read-and-write
     // 15.12.2024
     // Тут надо не забыть обрабатывать ошибки связи с базой, ошибки прав доступа или правил работы с объектами.
@@ -166,11 +166,24 @@ class FirebaseStorage extends RemoteStorage {
     // Попробуем писать простые поля и списки по отдельности
 
     try {
-      Map<String, Object?> updates = {};
-      
+      final Map<String, Object?> updates = {};
       for (dynamic item in items.values) {
         if (item is Model) {
           for (MapEntry<String, dynamic> field in item.toJson().entries) {
+            // Map-поля (children/parents и т.п.) пишем поключево: запись узла
+            // целиком затирала ключи, добавленные параллельным писцом (e2e
+            // acquaintance: пачка сканера перезаписала children домена без
+            // задачи инициатора -> у задачи пропал бэклинк -> следующая пачка
+            // отвергалась правилами parents/$pid). Удаления (unlink,
+            // removeTask)Repository доносит отдельно: tombstones - map
+            // {modelId: {field: {ключи}}} от базы ребейза; транспорт не знает
+            // прежнего состояния моделей.
+            if (field.value is Map) {
+              (field.value as Map).forEach((key, value) {
+                updates['models/${item.id}/${field.key}/$key'] = value;
+              });
+              continue;
+            }
             if (field.value is List) {
               for (String value in field.value) {
                 updates['models/${item.id}/${field.key}/$value'] = '';
@@ -180,6 +193,13 @@ class FirebaseStorage extends RemoteStorage {
               updates['models/${item.id}/${field.key}'] = field.value;
             }
           }
+          // Tombstones: удалённые ключи map-полей пишутся null (удаление
+          // узла в RTDB).
+          deletions[item.id]?.forEach((field, keys) {
+            for (final key in keys) {
+              updates['models/${item.id}/$field/$key'] = null;
+            }
+          });
         }
         if (item is Registry) {
           updates['registries/${item.id}/metadata'] = item.metadata.toJson();
@@ -199,6 +219,7 @@ class FirebaseStorage extends RemoteStorage {
       }
       await database.update(updates);
     } on FirebaseException catch (e) {
+      print('saveItems error (${e.code}): ${e.message}');
       switch (e.code) {
         case 'permission-denied':
           // Отказано в доступе.
@@ -324,6 +345,19 @@ class FirebaseStorage extends RemoteStorage {
       return true;
     } catch (e) {
       print('saveRaw error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> saveRawChild(String path, Object? value) async {
+    try {
+      // set() с примитивом: RTDB хранит его как значение листа
+      // (правила проверяют newData.isBoolean()/val() на этом узле).
+      await database.child(path).set(value);
+      return true;
+    } catch (e) {
+      print('saveRawChild error: $e');
       return false;
     }
   }
